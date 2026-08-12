@@ -21,8 +21,22 @@ in it is `todo` or blocked.
 
 ## Getting started
 
+**Do NOT use `git clone --recurse-submodules` or `git submodule update --init --recursive` on this
+tree.** Both ABORT partway: `external/psxport/vendor/beetle-psx` nests a URL-less
+`deps/lightning/gnulib`, and a recursive operation dies on it *after* cloning beetle and *before*
+reaching `vendor/lucent` — leaving lucent's worktree empty with every file staged-deleted, and cmake
+then failing on a missing `CMakeLists.txt`. Measured 2026-08-11; see
+`external/psxport/docs/workspace/KNOWN-DEFECT-sync-submodules.md`. Init the vendors ONE AT A TIME,
+non-recursively, exactly as `psxport/scripts/bootstrap-workspace.sh` does:
+
 ```sh
-git clone --recurse-submodules <this repo>          # or: git submodule update --init
+git clone <this repo> && cd vagrant
+git submodule update --init external/psxport external/rood-reverse
+for sm in vendor/beetle-psx vendor/lucent; do                    # one at a time, NEVER --recursive
+  git -C external/psxport submodule update --init "$sm"
+  git -C "external/psxport/$sm" reset --hard -q HEAD             # repairs a half-checkout
+done
+git -C external/psxport/vendor/beetle-psx submodule update --init deps/libchdr   # CHD disc access
 cp .env.example .env && $EDITOR .env                # point it at your own disc image (.env is gitignored)
 python3 tools/extract_exe.py                        # extract + identity-check SLUS_010.40
 python3 tools/verify_decomp_targets.py              # does the vendored decomp target our bytes? (21/21)
