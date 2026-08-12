@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot,re-01
 depends: game/core/game_config.cpp,tools/re_crt0.py
-reconfirmed: 2026-08-12
-verified_at: 2026-08-12
+reconfirmed: 2026-08-12 20:34:38
+verified_at: 2026-08-12 20:34:38
 ---
 
 ## Claim
@@ -35,3 +35,7 @@ KNOWN LIMITS, stated because a reader will otherwise assume otherwise:
 ## Re-confirmed 2026-08-12
 
 Re-verified 2026-08-12 after a review refuted the 'gap: NONE' framing. The eleven values are unchanged and are now checked by CODE against the bytes: re_crt0.py --check-config 0 FAILED (11/11 constants + their field bindings), --gate-citations byte-identical, --selftest 22 assertions 0 failed (13 negatives, 7 of them hand-edits of the shipping file that must be REPORTED), --gate-config 6/6. Sabotage-proven RED on the real file (kHeapSizePtr->0x80030FBC and kLibcInit->0x8001F564 -> exit 1 naming both; retyped citation word -> exit 1 naming line 71) and GREEN on restore. Two values gained an independent witness (SN link record at 0x80030FBC). Three limits added to the claim rather than glossed: the declared BIOS heap arena overlaps 138,836 bytes of the loaded image but is never allocated from (census: 2023 jal sites, 19 A0 thunks, no malloc/free/calloc/realloc thunk exists, InitHeap's only caller is crt0), the gp-encoding census was 5 not 4, and nothing has ever executed this boot group.
+
+## Re-confirmed 2026-08-12
+
+Re-verified 2026-08-12: tools/re_crt0.py --check-config reports 11 of 11 shipped constants matching these bytes, 0 FAILED, rc=0; and psxport tools/crt0_extract independently agrees on all 8 fields it resolves (claim C005).

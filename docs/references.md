@@ -44,9 +44,15 @@ SLUS_010.40 alone) is a map into the exact executable this repo extracts.
 
 **What it does NOT buy, and this is the part to hold on to.**
 
-1. **Nothing is filled in from it.** `game/core/game_config.cpp` is all zeros. A borrowed address is a
-   HYPOTHESIS until measured against these bytes; the workspace has already recorded wrong conclusions
-   from reading an address out of the wrong image.
+1. **Nothing is filled in from it — not one value, including the group that is now filled in.** A
+   borrowed address is a HYPOTHESIS until measured against these bytes; the workspace has already
+   recorded wrong conclusions from reading an address out of the wrong image. RE-01 is the pattern to
+   copy: `tools/re_crt0.py` EXECUTES crt0 on our extracted image and derives all eleven boot-group
+   values from what that execution did, and `game/core/game_config.cpp` carries the disassembly line
+   behind each one. The decomp's names for the same addresses (`__ra_temp`, `_ramsize`, `_stacksize`,
+   `__heapbase`, `__heapsize`, `InitHeap`, `vs_main_exec`, `__SN_ENTRY_POINT`) turned out to agree —
+   which is worth something as corroboration and nothing as evidence. Had they disagreed, the
+   measurement would have won. Every other group in that file is still zero.
 2. **A SHA-1 match says nothing about coverage.** It proves the decomp aims at these bytes, not how
    much of them is decompiled — and its percentage is `objdiff` object identity, which is a different
    axis from this port's SBS byte-exact RAM parity. The two numbers are not comparable and neither

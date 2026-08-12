@@ -12,12 +12,17 @@ directive that **`./run.sh` is the user's and agents must never invoke it**. The
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
-## THE STATE OF THIS PORT: nothing is reverse-engineered. Do not read anything else as progress
+## THE STATE OF THIS PORT: ONE subsystem is RE'd. Do not read anything else as progress
 
-Created 2026-08-12. There is **no recompiled substrate, no port binary, and no RE'd guest address.**
-`game/core/game_config.cpp` is all zeros with each field pointing at its open step in
-`docs/re-frontier.md`. If something here looks like it works, check `docs/codemap.md` — the honest
-inventory is short, and it is provisioning plus a compiling seam.
+Created 2026-08-12. There is **no recompiled substrate and no port binary.** Exactly one group of guest
+addresses is measured — the **crt0/boot group** (`RE-01` `re-verified`, claim `C004`, instrument
+`tools/re_crt0.py`, which executes crt0 on the extracted executable and cites every value). Every other
+field in `game/core/game_config.cpp` is `0` with its open step in `docs/re-frontier.md` named, and
+**nothing has ever executed the boot group** — "measured" means "this is what crt0 does to this image",
+not "the port boots with it". A framework defect found while measuring it (issue #3) would give a BIOS
+`InitHeap` a zero-size heap; measured 2026-08-12, that is **latent here** — no code in this image can
+call BIOS `malloc` (issue #3 has the census), so this game can neither exhibit the bug nor demonstrate
+its fix. If something here looks like it works, check `docs/codemap.md` — the honest inventory is short.
 
 What DOES build today, and is the gate for a change to the seam:
 
@@ -27,7 +32,13 @@ cmake -S . -B build && cmake --build build --target vagrant_seam -j$(nproc)
 
 `vagrant_seam` is an OBJECT library over `game/core/{game_config,game_hooks,main}.cpp`: it compiles but
 does not link, which is the strongest check possible before a substrate exists — it proves this port's
-`GameConfig`/`GameHooks` still satisfy the pinned framework's seam. `vagrant_port` is not configured at
+`GameConfig`/`GameHooks` still satisfy the pinned framework's seam. **A change to a MEASURED constant in
+`game_config.cpp` must also pass `python3 tools/re_crt0.py --selftest`**, which diffs every shipped
+constant and the whole disassembly citation block against the executable's bytes. Compiling is not
+enough: the `static_assert`s only check the constants' internal RELATIONS, and `hi - lo == 0x46B20` holds
+just as well when both values are wrong — which is exactly how a reviewer moved `kHeapSizePtr` +4 and
+pointed `kLibcInit` at an unrelated nop with every gate green (workspace `PROTOCOL.md`, "THE SHIPPED
+VALUE MUST BE COMPARED TO THE MEASURED ONE"). `vagrant_port` is not configured at
 all until `generated/rec_sources.cmake` exists, and CMake says so loudly at configure time.
 
 ## Start here, every task
@@ -54,8 +65,11 @@ Three rules for using it, and they are the whole reason this section exists:
 
 1. **A borrowed address is a HYPOTHESIS until measured against these bytes.** Where a reference and a
    measurement disagree, the measurement wins — the standing workspace rule. Nothing in
-   `game_config.cpp` is filled in from it, and nothing should be filled in without the disassembly line
-   that justifies it pasted alongside (the shape `spider1/game/core/game_config.cpp` uses).
+   `game_config.cpp` is filled in from it, and nothing may be filled in without the disassembly line
+   that justifies it pasted alongside (the shape `spider1/game/core/game_config.cpp` uses). RE-01 is the
+   worked example: `tools/re_crt0.py` EXECUTES crt0 on our bytes and cites every value, and the decomp's
+   names (`__ra_temp`, `_ramsize`, `InitHeap`, `vs_main_exec`) appear in the file only as corroborating
+   labels. Prefer that shape — a tool that re-measures on demand — over pasting even a correct number.
 2. **Never paste an overlay load base from it.** Its splat configs state a `vram` per module
    (`0x80068800` / `0x800F9800` / `0x80102800`); an overlay is keyed BY its load address, so a wrong
    base emits a whole module of correctly-decoded instructions at wrong addresses and every `jal`
@@ -75,8 +89,33 @@ citation attached. Full detail: `docs/references.md`.
 - **One boot executable, no boot stub.** `SYSTEM.CNF` reads `BOOT = cdrom:\SLUS_010.40;1`,
   `STACK = 801fff00`, `TCB = 4`, `EVENT = 16`. So psxport's stub stage is unused, as in spyro/spider1.
 - **`SLUS_010.40`** is 337,920 bytes, SHA-1 `fababcfd4325d42f350d95b3472874affeb0e48c`. PS-EXE header:
-  entry `pc0 = 0x8001F544`, text `0x80010000 + 0x52000`, initial sp `0x801FFFF0`, `gp0 = 0` (so crt0
-  sets `gp`).
+  entry `pc0 = 0x8001F544`, text `0x80010000 + 0x52000`, `s_addr = 0x801FFFF0`, `gp0 = 0`, and
+  `d_size = b_addr = b_size = 0` — one flat loaded image, so the loader clears no `.bss` and sets no
+  `gp`; both are crt0's job.
+- **crt0 is MEASURED (RE-01):** a stock SN crt0 at the entry point that clears
+  `[0x80033678,0x800401A8)` (52,016 B), computes `sp = fp = 0x801FFFF8` from the `_ramsize` global
+  (**not** from `s_addr` or SYSTEM.CNF's `STACK` — those are the BIOS shell's and get overwritten), sets
+  `gp = 0x80033674`, calls BIOS `A0:0x39 InitHeap(0x800401AC, 0x001BBE50)` via the thunk at
+  `0x80026864`, then `jal 0x80042C38` (`vs_main_exec`) followed by a `break`, so main never returns.
+  Reproduce with `python3 tools/re_crt0.py`; the eleven `GameConfig` values are in
+  `game/core/game_config.cpp` and are GATED against the bytes by `--check-config`.
+- **`SLUS_010.40` IS THREE SEPARATELY-LINKED SEGMENTS in one flat image, and this is the fact most
+  likely to mislead you.** Measured (zero/non-zero profile; rood-reverse's splat config supplies the
+  labels and agrees to the byte): segment 1 `[0x80010000,0x800401A8)` ending in the `.sbss+.bss` that
+  crt0 clears · segment 2 (libgte) `[0x80040210,0x80041D68)` · segment 3 (`main`)
+  `[0x80041D68,0x80062000)`, whose own `.bss` `[0x8004FF88,0x80062000)` **crt0 never clears** — the
+  verbatim load supplies the zeros, which is why `b_size = 0` works. Consequences: `heapBase`
+  (`0x800401A8`) is the end of segment 1's `.bss`, **not** the end of the image, so the BIOS arena crt0
+  declares overlaps 138,836 bytes of loaded code and data including `gameMain` itself; and the SN
+  linker's own record at `0x80030FBC` describes segment 1 ONLY (`__bss + __bsslen -> 0x800401A8`,
+  `__data + __datalen -> 0x80033674 = gp`), which makes it an independent witness for two of the eleven
+  values. Do not read "the heap starts where .bss ends" as "the heap is free RAM"; that mistake was
+  made here and corrected.
+- **The BIOS heap is never allocated from.** Census over the whole image (2,023 `jal` sites vs 19 BIOS
+  A0 thunks): no `malloc`/`free`/`calloc`/`realloc` A0 thunk exists in the image at all, and
+  `InitHeap`'s only caller is crt0. The game uses its own allocator (rood-reverse: `vs_main_initHeap`
+  `0x80043F74`, arena `0x8010C000 + 0xF2000`, above the image). That is why the overlapping arena is
+  not a contradiction, and why issue #3 is latent here.
 - **21 `.PRG` code modules on the disc** — `BATTLE/BATTLE.PRG` (577,828 B), `TITLE/TITLE.PRG`,
   `ENDING/ENDING.PRG`, `BATTLE/INITBTL.PRG`, `GIM/SCREFF2.PRG` and 16 `MENU/*.PRG` (one of which,
   `MENUA.PRG`, is 0 bytes). This game's "overlays" are these files; their load bases are UNKNOWN here.
@@ -88,9 +127,9 @@ citation attached. Full detail: `docs/references.md`.
   `C_011`), libetc (`VSYNC`, `INTR`, `INTR_DMA`), libgpu, libspu, libpad (`PADENTRY`), libds, libc.
   That says which SHAPES to look for; it says nothing about where they are in this image.
 
-Everything else about this game — crt0 layout, the loader, the frame loop, the OT/packet-pool dance,
-the pad buffers, the scene model — is **unknown**. Do not let a plausible-sounding sentence in a doc
-elsewhere stand in for it.
+Everything else about this game — the loader and the 21 overlay load bases, the frame loop, the
+OT/packet-pool dance, the pad buffers, the scene model, the platform HLE windows — is **unknown**. Do
+not let a plausible-sounding sentence in a doc elsewhere stand in for it.
 
 ## The rules that bite hardest here
 

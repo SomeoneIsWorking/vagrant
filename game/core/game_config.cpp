@@ -331,23 +331,27 @@ static const GameConfig g_vagrant_cfg = {
     .stackBias = {1, -8},
 };
 
-// ⚠ FRAMEWORK GAP FOUND WHILE MEASURING RE-01 — NOT fixable from this file, and not a hack to paper
-// over here. The pinned framework's crt0_setup (external/psxport/runtime/recomp/native_boot.cpp) sets
-// `c->r[4] = heapBase + 4` and dispatches `libcInit`, but never sets `c->r[5]`. In THIS game libcInit
-// (0x80026864) is a BIOS A0:0x39 InitHeap thunk, and psxport's own HLE implements it as
-// `heapInit(a0, a1)` (runtime/recomp/hle.cpp:355) — with a1 left at 0 the arena is created with
-// size 0. The guest crt0 provably passes the size (0x8001F5A0 `subu $a1,$a1,$a0`, a1 = 0x001BBE50 live
-// into the jal at 0x8001F5CC, above). This is a framework change (crt0_setup must set r[5] from the
-// same `heapsz` it already computes for heapSizePtr), so it belongs in the framework dev clone, not
-// here: recorded in docs/issues/0003. Do NOT work around it game-side.
+// THE a1 CONTRACT, and why this file records it rather than doing anything about it. libcInit here
+// (0x80026864) is a BIOS A0:0x39 InitHeap thunk, and psxport's HLE implements it as `heapInit(a0, a1)`
+// — so the arena's SIZE is whatever `a1` holds at the call. The guest crt0 provably passes it
+// (0x8001F5A0 `subu $a1,$a1,$a0`, a1 = 0x001BBE50 live into the jal at 0x8001F5CC, note 4 above).
 //
-// SEVERITY, CORRECTED 2026-08-12 — this was first written as "a live defect for THIS game", and that
-// was wrong. Nothing in SLUS_010.40 can allocate from the BIOS heap: the image contains no
-// malloc/free/calloc/realloc A0 thunk at all, and InitHeap's only caller is crt0 (note 4 above,
-// measured by re_crt0.py). So for Vagrant Story the wrong-size arena is INERT — it is a faithfulness
-// defect that will bite the first psxport consumer whose guest actually calls BIOS malloc, and this
-// game is unable to demonstrate either the bug or its fix. Fix it upstream because the contract is
-// wrong, not because this port is broken by it.
+// The framework used to set only `r[4]`, creating every arena with size 0. FIXED upstream in psxport
+// 726d10c9 — which this repo pins — where the boot group became a pure `crt0_plan` in
+// runtime/recomp/crt0_boot.h and `crt0_apply` sets both argument registers. Deleting the a1 store
+// turns psxport's tests/test_crt0_boot_group.cpp red, so it cannot silently regress.
+//
+// TWO THINGS MEASURING THIS TAUGHT US, both worth more than the one-line fix (docs/issues/0003):
+//   * It was NEVER Vagrant-specific. Tomba! 2, Spyro and Spider-Man each log "a1 held 0x00000000
+//     before crt0 set it" on a real boot — the framework's own reference consumer was building a
+//     zero-capacity heap too. An earlier version of this note predicted Tomba! 2 would be immune
+//     because its libcInit was "likely a linked libc routine"; crt0_extract measures it as a BIOS
+//     thunk, so that inference was wrong.
+//   * It is INERT for THIS game, and the argument is structural rather than hopeful: SLUS_010.40
+//     contains no malloc/free/calloc/realloc A0 thunk at all, and InitHeap's only caller is crt0
+//     (re_crt0.py, 2,023 jal sites against 19 A0 thunks). The game uses its own allocator
+//     (`vs_main_initHeap` 0x80043F74). So this port can demonstrate neither the bug nor the fix, and
+//     a green boot here says nothing about either.
 
 const GameConfig* vagrant_game_config() { return &g_vagrant_cfg; }
 
