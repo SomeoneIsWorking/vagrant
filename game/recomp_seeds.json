@@ -1,0 +1,32 @@
+// recomp_seeds.json — this game's recompiler seeds (external/psxport/tools/recomp/emit.py --seeds).
+//
+// The recompiler discovers functions from the binary itself: the entry point, the pointer/table scans,
+// then the direct-`jal` call graph. What it CANNOT see is anything reached only through a function
+// pointer, or entered at a runtime-computed re-entry point, or an overlay's load base. Those are facts
+// about THIS executable and THIS disc, so the framework ships none of them and every game supplies its
+// own file. JSON with `//` comments; every key is optional.
+//
+// IT IS EMPTY BECAUSE NOTHING HAS BEEN REVERSE-ENGINEERED (docs/re-frontier.md RE-02, RE-03).
+//
+// Two rules, both learned the hard way elsewhere in this workspace:
+//
+//   * NEVER copy another game's seed list. A foreign seed that lands inside your text SPLITS a real
+//     function at an arbitrary offset — the emit SUCCEEDS and the recomp is silently corrupt.
+//   * NEVER guess an overlay base. An overlay is keyed BY its load address, so a wrong base emits a
+//     whole module of correctly-decoded instructions at wrong addresses, and every jal target,
+//     pointer test and router lookup is then silently wrong. A missing base is a HARD ERROR in
+//     emit.py, deliberately — that refusal is the feature.
+//
+// Grow it empirically: boot, and when the substrate fail-fasts with `[recomp-MISS] 0x800xxxxx`, add
+// that address WITH a note on how it is reached. An address with no rationale is unreviewable later.
+//
+// This game has 21 .PRG code modules on the disc (BATTLE/TITLE/ENDING/INITBTL/SCREFF2 + 16 MENU/*).
+// rood-reverse's splat configs state a load vram for each; that is a hypothesis to CONFIRM against a
+// running loader, not a value to paste here. See docs/references.md and RE-03.
+{
+  "main": [],
+  "main_reentry": [],
+  "overlay_bases": {},
+  "overlay_base_patterns": [],
+  "overlay_seeds": {}
+}

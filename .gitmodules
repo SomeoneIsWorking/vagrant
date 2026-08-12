@@ -1,0 +1,6 @@
+[submodule "external/psxport"]
+	path = external/psxport
+	url = https://github.com/SomeoneIsWorking/psxport.git
+[submodule "external/rood-reverse"]
+	path = external/rood-reverse
+	url = https://github.com/ser-pounce/rood-reverse.git
