@@ -19,11 +19,12 @@ intended behaviour of the real target being reproduced.
 Statuses: ✅ re-verified · 🟡 re-partial (honest gap) · 🔬 in-progress · ⛔ hack (debt, must remove) ·
 ⬜ todo · ➖ skip-by-design · ⏸ blocked (computed).
 
-## THE STATE OF THIS PORT, 2026-08-12: ONE step of eight is real. The rest is scaffolding
+## THE STATE OF THIS PORT, 2026-08-12: one step is real; one overlay base is partial. The rest is scaffolding
 
 `RE-01` (the crt0/boot group) is `re-verified` — measured out of the executable's own bytes, not copied
 from the vendored decomp; see its evidence block below, claim `C004`, and `tools/re_crt0.py`. **Every
-other entry is `todo` or `blocked`**, there is still no recompiled substrate and no native body, and
+other entry is `todo` or `blocked` except the partial BATTLE overlay-base measurement in RE-03**,
+there is still no recompiled substrate and no native body, and
 every `GameConfig` group except the boot group is still zero with a TODO pointing back here. That is
 the honest value: a plausible-looking wrong address breaks boot in a way that reads as a framework bug.
 
@@ -63,12 +64,12 @@ measures it against this executable.
 ## overlays
 
 ### RE-03 — load base for each of the 21 .PRG code modules
-- status: todo
+- status: re-partial
 - deps:
-- evidence: Disc listing (`tools/discdump.py`): 21 `.PRG` files, 4 distinct sizes of role — BATTLE/BATTLE.PRG 577828 B, TITLE/TITLE.PRG 554568 B, ENDING/ENDING.PRG 473628 B, BATTLE/INITBTL.PRG 7036 B, GIM/SCREFF2.PRG 2324 B, and 16 MENU/*.PRG (one of which, MENUA.PRG, is 0 bytes).
+- evidence: Disc listing (`tools/discdump.py`): 21 `.PRG` files, 4 distinct sizes of role — BATTLE/BATTLE.PRG 577828 B, TITLE/TITLE.PRG 554568 B, ENDING/ENDING.PRG 473628 B, BATTLE/INITBTL.PRG 7036 B, GIM/SCREFF2.PRG 2324 B, and 16 MENU/*.PRG (one of which, MENUA.PRG, is 0 bytes). **BATTLE/BATTLE.PRG is measured at 0x80068800** by `tools/re_overlay.py` M2: 797 `jal`-target/function-entry matches, runner-up 68. Its placement calculation moves to 0x800687FC when one word is prepended and refuses when all 1,255 candidate entries are destroyed. This agrees with rood-reverse's stated `vram:` only as corroboration; the measurement is from this disc's bytes.
 - where: game/recomp_seeds.json (overlay_bases / overlay_base_patterns)
-- gap: NOT MEASURED HERE. rood-reverse's splat configs state a `vram:` per module — 0x80068800 for BATTLE/TITLE/ENDING, 0x800F9800 for INITBTL/SCREFF2/MAINMENU, 0x80102800 for the other MENU modules — which is a strong HYPOTHESIS and is *not* evidence about this port. An overlay is keyed BY its load address: a wrong base emits a whole module of correctly-decoded instructions at wrong addresses. Confirm by observing the loader (`PSXPORT_DEBUG=cd` on a booting port), or by disassembling the loader call site, before any of it reaches a seed file.
-- notes: Three shared slots for 21 modules is the `overlay_base_patterns` shape, not one base per module — but that reading, too, is the reference's, not a measurement.
+- gap: Twenty non-empty `.PRG` modules remain unmeasured. M1 sees only 1/14 candidate loader sites and one destination (0x800F9800), and this executable exposes no indexed LBA table, so it cannot name the BATTLE file-to-slot mapping. Those are explicit limits, not clean results. Confirm the remaining module bases by observing the loader (`PSXPORT_DEBUG=cd` on a booting port), or by extending the static loader analysis, before any of them reaches a seed file.
+- notes: Three shared slots for 21 modules is still only the reference's `overlay_base_patterns` hypothesis. The selftest reports M1 and table coverage as `SKIP` on this executable rather than failing its independent M2 regression checks; a missing loader shape is neither a measured base nor a green M1 result.
 
 ## cd
 
@@ -106,7 +107,7 @@ measures it against this executable.
 - evidence:
 - where: game/ (no native body exists yet)
 - gap: This is the step this title exists to test: psxport's override registry wants (addr, native, gen) triples whose native body byte-matches the substrate body, and a matching decomp is a pre-verified supply of exactly that. Blocked on there being a substrate to match AGAINST. Nothing may be imported before then — an imported body with no byte-gate is a hack with a citation.
-- notes: rood-reverse is ~55-63% matched overall (its own decomp.dev badges; not measured here — and the psxport port's axis is SBS RAM parity, not object identity, so the two percentages are not comparable).
+- notes: rood-reverse is ~55-63% matched overall (its own decomp.dev badges; not measured here — and the psxport port's axis is SBS RAM parity, not object identity, so the two percentages are not comparable). Widescreen source lead only: BATTLE/BATTLE.PRG's matching reference resets `SetGeomOffset(160,112)` every frame, initializes the battle view through `func_800760CC(0x140,0xF0,projectionDistance,...)`, and changes projection via `vs_battle_setProjectionDistance`. `projectionDistance` also changes during camera transitions. A future wide implementation must target that world-camera path, not globally replace `SetGeomOffset`/`SetGeomScreen`: menu, title, and other overlay calls have their own 2D/UI intent. This has no shipping address or runtime confirmation until RE-02/RE-07 exist.
 
 ## platform
 
