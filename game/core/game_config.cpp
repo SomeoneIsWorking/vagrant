@@ -129,7 +129,8 @@ static_assert(kPsExeEntry >= kPsExeTextAddr &&
 // 2. `kLibcInit` IS A BIOS THUNK, NOT A LINKED ROUTINE. 0x80026864 is `addiu $t2,$zero,0xa0 / jr $t2 /
 //    addiu $t1,$zero,0x39` — a tail jump into the BIOS A0 table, function 0x39 = InitHeap(addr, size).
 //    psxport HLEs exactly that (runtime/recomp/hle.cpp, `case 0x39: heapInit(a0, a1)`), so it needs
-//    BOTH argument registers, and crt0_setup sets only a0 — see the ⚠ note below the struct.
+//    BOTH argument registers. The shared `crt0_apply` now supplies both (`a0` and `a1`); issue #3
+//    records the former missing-a1 framework defect and its regression gate.
 // 3. **THIS IMAGE IS THREE SEPARATELY-LINKED SEGMENTS, AND 0x800401A8 IS THE END OF THE FIRST ONE'S
 //    .bss — NOT the end of the image.** An earlier version of this block said "the heap starts where
 //    .bss ends" full stop, which reads as "the heap is free RAM" and is FALSE. The arena crt0 declares

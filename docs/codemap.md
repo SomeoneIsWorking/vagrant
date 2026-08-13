@@ -27,9 +27,10 @@ executable rather than by eye**: `tools/re_crt0.py --check-config` diffs the shi
 `game/core/game_config.cpp` against what it measures, and `--gate-citations` regenerates that file's
 disassembly block from the bytes. Before that, the tool held its own copy of the answer and the .cpp
 held a second hand-typed one with nothing comparing them, so both gates passed with two constants
-sabotaged. Nothing has EXECUTED any of it. A defect found while measuring (issue #3) means
-`crt0_setup` would build a zero-size heap — **latent for this game**: measured, no code in this image
-can call BIOS `malloc`, so Vagrant Story can neither exhibit that bug nor demonstrate its fix.
+sabotaged. Nothing has EXECUTED any of it. The defect found while measuring (issue #3: `crt0_setup`
+formerly omitted `a1` for BIOS InitHeap) is fixed in the shared framework; it was **latent for this
+game** because no code in this image can call BIOS `malloc`, so Vagrant Story cannot demonstrate the
+fix without first gaining a substrate.
 
 ## The two halves
 
