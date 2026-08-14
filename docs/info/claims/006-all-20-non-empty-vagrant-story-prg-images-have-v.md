@@ -5,6 +5,8 @@ status: holds
 created: 2026-08-14
 tags: overlays,re-03
 depends: tools/re_overlay.py#measure, game/core/game_config.cpp, game/recomp_seeds.json
+reconfirmed: 2026-08-14 12:36:37
+verified_at: 2026-08-14 12:36:37
 ---
 
 ## Claim
@@ -18,3 +20,7 @@ All 20 non-empty Vagrant Story .PRG images have verified load-base mappings into
 ## What would falsify it
 
 Falsified if any owned non-empty PRG no longer matches its recorded SHA, M2 becomes undecided or yields a different base, the SHA-bound rood vram disagrees, a running loader writes one of these modules to another base, or the shipping gate fails.
+
+## Re-confirmed 2026-08-14 12:36:37
+
+Reverified after RE-02: overlay shipping check 24/24 and selftest 7/7 remain green; loader reachability remains explicitly unobserved.

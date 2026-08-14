@@ -5,6 +5,8 @@ status: holds
 created: 2026-08-14
 tags: re-02,recompiler
 depends: game/recomp_seeds.json, game/core/game_config.cpp, game/core/recomp_register.cpp, external/psxport
+reconfirmed: 2026-08-14 12:36:31
+verified_at: 2026-08-14 12:36:31
 ---
 
 ## Claim
@@ -21,3 +23,7 @@ same command from the SHA-verified executable reproduces the gitignored generate
 ## What would falsify it
 
 A run against the same SHA-verified executable reports a genuine recomp-MISS before the current BIOS A0:0x2F boundary, or emitter entry-root semantics change
+
+## Re-confirmed 2026-08-14 12:36:31
+
+Commit 10cedc3: clean-pin 4a20ca51 build passes; live resident run reaches guest main then exact A0:2F boundary with no recomp-MISS.

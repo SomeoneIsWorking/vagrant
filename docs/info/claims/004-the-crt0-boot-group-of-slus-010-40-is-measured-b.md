@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot,re-01
 depends: game/core/game_config.cpp,tools/re_crt0.py
-reconfirmed: 2026-08-14 11:53:32
-verified_at: 2026-08-14 11:53:32
+reconfirmed: 2026-08-14 12:36:31
+verified_at: 2026-08-14 12:36:31
 ---
 
 ## Claim
@@ -44,3 +44,7 @@ Re-verified 2026-08-12: tools/re_crt0.py --check-config reports 11 of 11 shipped
 ## Re-confirmed 2026-08-14 11:53:32
 
 Re-verified 2026-08-14 after adding only measured overlay slots to game_config.cpp: --check-config 11/11 and citation block byte-identical, --selftest 22 assertions/0 failed, --gate-config 6/6, seam build green. Boot constants unchanged.
+
+## Re-confirmed 2026-08-14 12:36:31
+
+Reverified after RE-02: re_crt0 selftest 24/24, static-assert gate 6/6, live InitHeap/main path exact.

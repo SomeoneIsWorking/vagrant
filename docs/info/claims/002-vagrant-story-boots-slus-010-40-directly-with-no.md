@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot
 depends: game/core/game_config.cpp, tools/re_crt0.py
-reconfirmed: 2026-08-14 11:53:32
-verified_at: 2026-08-14 11:53:32
+reconfirmed: 2026-08-14 12:36:31
+verified_at: 2026-08-14 12:36:31
 ---
 
 ## Claim
@@ -28,3 +28,7 @@ STRENGTHENED 2026-08-12 against its own falsifier ('a disassembly showing the en
 ## Re-confirmed 2026-08-14 11:53:32
 
 Re-verified 2026-08-14 after the RE-03-only game_config.cpp change: tools/re_crt0.py --check-config and --gate-citations remain 0 FAILED; --selftest 22/22 and --gate-config 6/6. Entry still executes crt0 to exactly two calls, InitHeap then gameMain, with no LoadExec.
+
+## Re-confirmed 2026-08-14 12:36:31
+
+Reverified after RE-02: PS-EXE identity/header gate and bounded resident boot agree; crt0 selftest 24/24.
