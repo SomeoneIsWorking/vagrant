@@ -6,7 +6,8 @@
 // about THIS executable and THIS disc, so the framework ships none of them and every game supplies its
 // own file. JSON with `//` comments; every key is optional.
 //
-// IT IS EMPTY BECAUSE NOTHING HAS BEEN REVERSE-ENGINEERED (docs/re-frontier.md RE-02, RE-03).
+// The overlay bases below are the one completed group (docs/re-frontier.md RE-03). The executable
+// seed sets remain empty because RE-02 has not started; no substrate has been emitted.
 //
 // Two rules, both learned the hard way elsewhere in this workspace:
 //
@@ -20,13 +21,36 @@
 // Grow it empirically: boot, and when the substrate fail-fasts with `[recomp-MISS] 0x800xxxxx`, add
 // that address WITH a note on how it is reached. An address with no rationale is unreviewable later.
 //
-// This game has 21 .PRG code modules on the disc (BATTLE/TITLE/ENDING/INITBTL/SCREFF2 + 16 MENU/*).
-// rood-reverse's splat configs state a load vram for each; that is a hypothesis to CONFIRM against a
-// running loader, not a value to paste here. See docs/references.md and RE-03.
+// This game has 21 .PRG images on the disc (BATTLE/TITLE/ENDING/INITBTL/SCREFF2 + 16 MENU/*), but
+// MENU/MENUA.PRG is 0 bytes and therefore has no code or load base. tools/re_overlay.py verifies the
+// other 20 individually from their own bytes (M2), then SHA-binds each owned image to rood-reverse
+// before checking the reference link address (M3). Its --check-config gate compares this file and
+// game_config.cpp back to the measurement; these values are not transcribed reference guesses.
 {
   "main": [],
   "main_reentry": [],
-  "overlay_bases": {},
+  "overlay_bases": {
+    "BATTLE": "0x80068800",
+    "ENDING": "0x80068800",
+    "INITBTL": "0x800F9800",
+    "MAINMENU": "0x800F9800",
+    "MENU0": "0x80102800",
+    "MENU1": "0x80102800",
+    "MENU2": "0x80102800",
+    "MENU3": "0x80102800",
+    "MENU4": "0x80102800",
+    "MENU5": "0x80102800",
+    "MENU7": "0x80102800",
+    "MENU8": "0x80102800",
+    "MENU9": "0x80102800",
+    "MENUB": "0x80102800",
+    "MENUC": "0x80102800",
+    "MENUD": "0x80102800",
+    "MENUE": "0x80102800",
+    "MENUF": "0x80102800",
+    "SCREFF2": "0x800F9800",
+    "TITLE": "0x80068800"
+  },
   "overlay_base_patterns": [],
   "overlay_seeds": {}
 }

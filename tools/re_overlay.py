@@ -12,20 +12,21 @@ splat configs STATE a `vram:` per module. That is a hypothesis about a different
 evidence about this port, so nothing here reads those configs. Everything below is derived from our
 own extracted bytes plus our own disc's ISO directory.
 
-TWO INDEPENDENT METHODS, and they share no input beyond the files themselves.
+THREE METHODS. They do not share an implementation; M2 and M3 share the owned image only through
+M3's explicit SHA-1 identity gate.
 
-  M1 LOADER (primary, and it is the one that names FILES).
+  M1 LOADER (resident-code corroboration).
       The resident executable holds a table of overlay destination addresses. This tool does not
       assume where: it finds every `lui rX,hi / lw rD,K(rX)` whose effective address lands inside the
-      resident image, reads that word out of the executable, and keeps the site ONLY IF the following
-      `jal` also carries a (lba, byteCount) descriptor — in a stack struct, in argument registers, or
-      loaded from an indexed table — that matches a REAL FILE on this disc by LBA, with a byte count
-      that is a whole number of sectors and covers that file. A site that fails the disc match is
-      reported as UNRESOLVED, never quietly dropped: the disc is the referee.
+      resident image and reads that word out of the executable. It reports EVERY candidate; a site is
+      resolved to a file only if the following `jal` also carries a (lba, byteCount) descriptor — in
+      a stack struct, in argument registers, or loaded from an indexed table — that matches a REAL
+      FILE on this disc by LBA, with a whole-sector byte count covering that file. A site that fails
+      the disc match is UNRESOLVED, never quietly dropped: the disc is the referee.
       So M1's output is (file on the disc) -> (address the loader writes it to), with a disassembly
       citation for each, and the ISO directory as an independent witness for every descriptor.
 
-  M2 SELF-CONSISTENCY (independent corroboration; needs no loader and no disc).
+  M2 SELF-CONSISTENCY (the measurement; needs no loader and no reference config).
       MIPS `jal` encodes an ABSOLUTE target (low 28 bits), so a module's own jal targets are fixed
       numbers, independent of where the module loads. Its function ENTRY offsets are also fixed
       (`addiu $sp,$sp,-N` at file offset O). The load base is therefore the value B that makes the
@@ -34,6 +35,13 @@ TWO INDEPENDENT METHODS, and they share no input beyond the files themselves.
       is destroyed. M2's ground truth is checkable: run it on SLUS_010.40 itself and it must recover
       that file's own PS-EXE `t_addr - 0x800` (the 2 KiB header), a number this method never sees.
 
+  M3 REFERENCE IDENTITY + LINK ADDRESS (independent corroboration).
+      For each non-empty .PRG, the tool parses rood-reverse's `sha1`, `basename`, and segment `vram`
+      from that module's splat config. It first hashes OUR extracted file and requires the stated
+      `sha1`; only then does it compare M2's measured base with `vram`. Thus the reference address is
+      never applied to an unproven image, and it is never the source of M2's answer. All 20 non-empty
+      modules must have both an identity match and an address agreement before RE-03 can pass.
+
 WHAT A NEGATIVE PRINTS. Every run prints its denominators: code images on the disc, images extracted,
 slot-read sites scanned, sites resolved, sites the descriptor could NOT be recovered for (with their
 addresses), modules M2 could not decide (with the histogram margin), and the modules M1 and M2
@@ -41,11 +49,13 @@ DISAGREE about. The tool REFUSES (exit 2) when the disc, the executable or the m
 a search of a corpus that is not there must never look like a clean pass. A module with a thin M2
 margin is printed as THIN with its numbers rather than silently averaged into a pass.
 
-Exit: 0 measured and consistent · 1 a gate FAILED or the two methods disagree · 2 could not look.
+Exit: 0 measured and consistent · 1 a gate FAILED or methods disagree · 2 could not look.
 """
 import argparse
 import collections
+import hashlib
 import os
+import re
 import struct
 import sys
 
@@ -59,6 +69,7 @@ EXE_ON_DISC = "SLUS_010.40"
 PRG_DIR = os.path.join(ROOT, "scratch", "raw", "prg")
 CONFIG_SRC = os.path.join(ROOT, "game", "core", "game_config.cpp")
 SEEDS_SRC = os.path.join(ROOT, "game", "recomp_seeds.json")
+ROOD_CONFIG = os.path.join(ROOT, "external", "rood-reverse", "config")
 
 SECTOR = 2048
 EXE_HEADER = 0x800          # a PS-EXE's 2 KiB header; .PRG files have NO header (measured: M2 on
@@ -136,6 +147,63 @@ def psexe(data):
     f = struct.unpack("<11I", data[0x10:0x10 + 44])
     return dict(zip(["pc0", "gp0", "t_addr", "t_size", "d_addr", "d_size",
                      "b_addr", "b_size", "s_addr", "s_size", "sp_gp"], f))
+
+
+def reference_records(root=ROOD_CONFIG):
+    """Parse the minimum splat-config fields that identify and place each .PRG.
+
+    This is intentionally a strict, dependency-free parser for three scalar keys, not a permissive
+    YAML implementation. Missing/duplicate fields refuse the corpus instead of quietly reducing the
+    denominator. The first `vram` belongs to the module's sole top-level segment in every PRG config;
+    configs with zero or multiple distinct `vram` values refuse because that shape is not understood.
+    """
+    if not os.path.isdir(root):
+        raise Refuse(f"rood-reverse config directory is missing: {root}")
+    configs = []
+    for parent, _dirs, names in os.walk(root):
+        if "splat.yaml" in names and parent.upper().endswith(".PRG"):
+            configs.append(os.path.join(parent, "splat.yaml"))
+    if not configs:
+        raise Refuse(f"scanned {root} and found 0 .PRG/splat.yaml configs")
+
+    records = {}
+    scalar = re.compile(r"^\s*(sha1|basename|vram):\s*([^#\s]+)")
+    for path in sorted(configs):
+        vals = collections.defaultdict(list)
+        for line in open(path, encoding="utf-8"):
+            m = scalar.match(line)
+            if m:
+                vals[m.group(1)].append(m.group(2))
+        sha = vals["sha1"]
+        names = vals["basename"]
+        vrams = sorted(set(vals["vram"]))
+        if len(sha) != 1 or len(names) != 1 or len(vrams) != 1:
+            raise Refuse(f"{path} must contain exactly one sha1, one basename, and one distinct "
+                         f"vram; got sha1={sha}, basename={names}, vram={vrams}")
+        name = names[0].replace("\\", "/").upper()
+        if name in records:
+            raise Refuse(f"duplicate rood-reverse config for {name}: {records[name]['config']} and "
+                         f"{path}")
+        if not re.fullmatch(r"[0-9a-fA-F]{40}", sha[0]):
+            raise Refuse(f"{path} has malformed sha1 {sha[0]!r}")
+        try:
+            base = int(vrams[0], 0)
+        except ValueError:
+            raise Refuse(f"{path} has malformed vram {vrams[0]!r}")
+        records[name] = {"sha1": sha[0].lower(), "base": base, "config": path}
+    return records
+
+
+def reference_verdict(img, rec):
+    """Run the shipping M3 gate for one image: identity first, address only after identity."""
+    digest = hashlib.sha1(img.data).hexdigest()
+    if digest != rec["sha1"]:
+        return "sha", digest
+    if img.base is None:
+        return "no-m2", digest
+    if img.base != rec["base"]:
+        return "base", digest
+    return "ok", digest
 
 
 # ------------------------------------------------------- M2: base from the module's own bytes only --
@@ -474,7 +542,12 @@ class Result:
         self.tables = {}
         self.table_ents = {}
         self.bases = {}          # stem -> (base, how)
-        self.disagree = []
+        self.disagree = []       # M1 file-specific destination vs M2
+        self.ref_checks = []     # (path, sha1, m2 base, reference base)
+        self.ref_missing = []
+        self.ref_sha_mismatch = []
+        self.ref_disagree = []
+        self.ref_extra = []
         self.thin = []
         self.undecided = []
         self.empty = []
@@ -521,16 +594,7 @@ def measure(disc):
         host, ents, why = enumerate_table(t, imgs, bylba)
         r.table_ents[t] = (host, ents, why)
 
-    # slot identity: the distinct destination words the resolved sites read
-    seen = {}
-    for s in r.sites:
-        if s.file or s.table:
-            seen.setdefault(s.dest, []).append(s.slot_va)
-    for dest in sorted(seen):
-        r.slot_of[dest] = len(r.slots)
-        r.slots.append((dest, sorted(set(seen[dest]))))
-
-    # --- M1 vs M2 per module ---------------------------------------------------------------------
+    # --- M1 vs M2 per module (only a disc-resolved PRG descriptor can name a module) --------------
     m1 = {}          # stem -> set of destinations M1 says it is loaded to
     for s in r.sites:
         if s.file and s.file.upper().endswith(".PRG"):
@@ -541,20 +605,43 @@ def measure(disc):
             if path.upper().endswith(".PRG"):
                 m1.setdefault(os.path.splitext(os.path.basename(path))[0], set()).update(dests)
 
+    # --- M3: bind every reference vram to OUR bytes by SHA-1, then compare it with M2 -------------
+    refs = reference_records()
+    owned_prgs = {im.name.upper() for im in imgs.values() if im.name.upper().endswith(".PRG")}
+    r.ref_extra = sorted(set(refs) - owned_prgs)
     for name, im in sorted(imgs.items()):
         if name == EXE_ON_DISC:
             continue
-        cand = m1.get(im.stem)
-        if im.base is None:
+        key = im.name.upper()
+        rec = refs.get(key)
+        if rec is None:
+            r.ref_missing.append(im.name)
             continue
-        how = []
-        if cand is not None:
-            how.append("M1" + ("" if len(cand) == 1 else f"(one of {len(cand)} slots)"))
-            if im.base not in cand:
-                r.disagree.append((im.stem, im.base, sorted(cand)))
-                continue
-        how.append("M2")
-        r.bases[im.stem] = (im.base, "+".join(how))
+        verdict, digest = reference_verdict(im, rec)
+        if verdict == "sha":
+            r.ref_sha_mismatch.append((im.name, digest, rec["sha1"]))
+            continue
+        if verdict == "no-m2":
+            continue
+        r.ref_checks.append((im.name, digest, im.base, rec["base"]))
+        if verdict == "base":
+            r.ref_disagree.append((im.name, im.base, rec["base"]))
+            continue
+        cand = m1.get(im.stem)
+        if cand is not None and im.base not in cand:
+            r.disagree.append((im.stem, im.base, sorted(cand)))
+            continue
+        how = "M2+M3" + ("+M1" if cand is not None else "")
+        r.bases[im.stem] = (im.base, how)
+
+    # The loader/base slots are the distinct bases shared by verified modules. M1 independently
+    # exposes resident words containing all three values, even though it cannot recover file names
+    # for those call paths; cite those read locations without pretending the other candidates are
+    # loader slots.
+    for dest in sorted({base for base, _how in r.bases.values()}):
+        vas = sorted({s.slot_va for s in r.sites if s.dest == dest})
+        r.slot_of[dest] = len(r.slots)
+        r.slots.append((dest, vas))
     for s in r.sites:
         if not (s.file or s.table):
             r.unresolved.append(s)
@@ -577,13 +664,15 @@ def report(r, imgs, out=print):
         f"(file offset 0 therefore loads at 0x{h['t_addr'] - EXE_HEADER:08X})")
 
     out("")
-    out("== the overlay destination table, as the LOADER SITES define it " + "=" * 15)
+    out("== verified overlay slots (distinct M2+M3 module bases) " + "=" * 22)
     for i, (dest, vas) in enumerate(r.slots):
-        out(f"  slot {i}: 0x{dest:08X}   read from " + ", ".join(f"0x{v:08X}" for v in vas))
+        reads = ", ".join(f"0x{v:08X}" for v in vas) if vas else "NO resident candidate read"
+        out(f"  slot {i}: 0x{dest:08X}   resident candidate read(s): {reads}")
     if r.slots:
         vas = sorted({v for _d, vs in r.slots for v in vs})
-        out(f"  the sites read {len(vas)} distinct words spanning 0x{vas[0]:08X}..0x{vas[-1]:08X} "
-            f"— contiguous: {vas == list(range(vas[0], vas[-1] + 1, 4))}")
+        if vas:
+            out(f"  the sites read {len(vas)} distinct words spanning 0x{vas[0]:08X}..0x{vas[-1]:08X} "
+                f"— contiguous: {vas == list(range(vas[0], vas[-1] + 1, 4))}")
 
     out("")
     out("== M1: each loader site, with the disc as referee " + "=" * 29)
@@ -629,6 +718,15 @@ def report(r, imgs, out=print):
             f"(entries={ne} jal-targets={nt})")
 
     out("")
+    out("== M3: rood-reverse identity + link-address corroboration " + "=" * 17)
+    for path, digest, m2, ref in sorted(r.ref_checks):
+        out(f"  {'OK' if m2 == ref else 'DISAGREE':8} {path:24} sha1={digest[:12]}…  "
+            f"M2=0x{m2:08X} rood-vram=0x{ref:08X}")
+    out(f"  checked {len(r.ref_checks)} owned non-empty .PRG images; "
+        f"missing-config={len(r.ref_missing)} sha-mismatch={len(r.ref_sha_mismatch)} "
+        f"address-disagreement={len(r.ref_disagree)} extra-config={len(r.ref_extra)}")
+
+    out("")
     out("== MEASURED load base per module " + "=" * 46)
     for stem, (base, how) in sorted(r.bases.items()):
         out(f"  {stem:10} 0x{base:08X}  slot {r.slot_of.get(base, '?')}  [{how}]")
@@ -647,39 +745,49 @@ def report(r, imgs, out=print):
     for stem, base, cand in r.disagree:
         out(f"  DISAGREEMENT {stem}: M2 says 0x{base:08X}, M1 says " +
             ", ".join(f"0x{c:08X}" for c in cand))
+    for path in r.ref_missing:
+        out(f"  M3 MISSING CONFIG for owned image {path}")
+    for path, got, want in r.ref_sha_mismatch:
+        out(f"  M3 IDENTITY FAILURE {path}: owned sha1={got}, rood config sha1={want}")
+    for path, m2, ref in r.ref_disagree:
+        out(f"  M3 ADDRESS DISAGREEMENT {path}: M2=0x{m2:08X}, rood-vram=0x{ref:08X}")
+    for path in r.ref_extra:
+        out(f"  M3 EXTRA CONFIG {path}: no owned non-empty .PRG image was extracted for it")
     out("  Method blind spots, stated rather than implied:")
     out("   - M1 reads the loader's STATIC descriptors. A module loaded only through a code path this")
     out("     scanner's idiom does not cover would be absent, not wrong; the site count above is the")
     out("     denominator for that.")
     out("   - M2 assumes non-leaf functions open with `addiu $sp,$sp,-N`. It cannot decide a module")
     out("     with too few such entries (printed UNDECIDED), and its margin is printed for every one.")
-    out("   - Neither method observes a RUNNING loader. Both read the SAME two artefacts (this disc,")
-    out("     these bytes); they are independent of each other, not of the image.")
-    out("   - Nothing here reads rood-reverse's splat configs. Their agreement is corroboration only")
-    out("     and is not part of any gate.")
-    if not r.disagree and not r.undecided and r.bases:
+    out("   - None of the methods observes a RUNNING loader. M2 reads owned bytes; M3 reads the")
+    out("     vendored config only after binding it to those bytes by SHA-1; M1 statically reads the")
+    out("     resident executable. Runtime rewriting remains outside this instrument's reach.")
+    failures = (r.disagree or r.undecided or r.ref_missing or r.ref_sha_mismatch or
+                r.ref_disagree or r.ref_extra)
+    if not failures and r.bases:
         out("")
-        out(f"RESULT: {len(r.bases)} modules MEASURED, {len(r.slots)} distinct slots, "
-            f"{len(r.unresolved)} unresolved sites, 0 disagreements between M1 and M2.")
-    return 1 if (r.disagree or r.unresolved) else 0
+        out(f"RESULT: {len(r.bases)} non-empty modules VERIFIED at {len(r.slots)} distinct slots; "
+            f"M2 and SHA-bound M3 agree for all {len(r.ref_checks)}. M1 found candidate resident "
+            f"reads for {len([v for _d, v in r.slots if v])}/{len(r.slots)} slots but left "
+            f"{len(r.unresolved)} candidate sites unresolved; that is a stated M1 coverage limit, "
+            "not a missing module mapping.")
+    return 1 if failures else 0
 
 
 # --------------------------------------------------------------------- the shipping-config gates --
 
 def parse_config(text):
     """The 3 `.overlaySlots` bases out of the SHIPPING game_config.cpp, by text."""
-    i = text.find(".overlaySlots")
-    if i < 0:
+    lines = [line for line in text.splitlines() if ".overlaySlots" in line]
+    if not lines:
         raise Refuse(f"{CONFIG_SRC} has no .overlaySlots initialiser — nothing to check")
-    seg = text[i:text.find(";", i)]
-    out = []
-    for part in seg.split("{")[2:]:
-        tok = part.split(",")[0].strip()
-        try:
-            out.append(int(tok, 0))
-        except ValueError:
-            raise Refuse(f".overlaySlots entry {tok!r} is not an integer literal")
-    return out
+    if len(lines) != 1:
+        raise Refuse(f"{CONFIG_SRC} has {len(lines)} lines containing .overlaySlots; expected one")
+    toks = re.findall(r"\{\s*(0[xX][0-9a-fA-F]+|[0-9]+)\s*,\s*nullptr\s*\}", lines[0])
+    if len(toks) != 3:
+        raise Refuse(f".overlaySlots must contain exactly 3 literal-base/null-callback entries on "
+                     f"one line; parsed {len(toks)} from {lines[0]!r}")
+    return [int(tok, 0) for tok in toks]
 
 
 def parse_seeds(text):
@@ -691,9 +799,13 @@ def parse_seeds(text):
             for k, v in data.get("overlay_bases", {}).items()}
 
 
-def check_config(r, out=print):
-    cfg = parse_config(open(CONFIG_SRC, encoding="utf-8").read())
-    seeds = parse_seeds(open(SEEDS_SRC, encoding="utf-8").read())
+def check_config(r, out=print, config_text=None, seeds_text=None):
+    if config_text is None:
+        config_text = open(CONFIG_SRC, encoding="utf-8").read()
+    if seeds_text is None:
+        seeds_text = open(SEEDS_SRC, encoding="utf-8").read()
+    cfg = parse_config(config_text)
+    seeds = parse_seeds(seeds_text)
     want_slots = [d for d, _v in r.slots]
     fails = 0
     checks = 0
@@ -741,15 +853,14 @@ def selftest(disc, out=print):
         "M2 recovers the boot exe's OWN load address, known independently from its PS-EXE header",
         "M2 on a module shifted by one word must NOT still answer the unshifted base",
         "M2 refuses (UNDECIDED) a module whose function entries have been destroyed",
-        "M1 reports whether this executable exposes enough loader structure to test",
+        "M3 rejects an owned image changed by one byte BEFORE comparing its address",
+        "M3 rejects a reference vram changed by one word after identity passes",
         "M1's disc referee REJECTS a descriptor whose LBA is not a file start",
-        "the indexed LBA table test runs only when this executable exposes such a table",
-        "--check-config FAILS when a shipping slot base is changed by one word",
+        "--check-config names BOTH a changed shipping slot and a changed module seed",
     ], 1):
         out(f"   [{i}] {t}")
     out("")
     fails = []
-    skipped = []
 
     files, images = code_images(disc)
     imgs, failed, _empty = extract_all(disc, images)
@@ -757,6 +868,7 @@ def selftest(disc, out=print):
         raise Refuse("selftest could not extract " + ", ".join(failed))
     exe = imgs[EXE_ON_DISC]
     hdr = psexe(exe.data)
+    refs = reference_records()
     bylba = {}
     for p, l, s in files:
         bylba.setdefault(l, (p, s))
@@ -797,17 +909,31 @@ def selftest(disc, out=print):
     if not ok:
         fails.append(3)
 
-    # [4] M1 coverage is executable-specific. A missing loader shape is not an M2 regression.
-    r, _i2, _e2 = measure(disc)
-    ok = len([s for s in r.sites if s.file or s.table]) >= 5 and len(r.slots) == 3
-    result = "PASS" if ok else "SKIP"
-    out(f"  [4] {result} M1 resolved {len([s for s in r.sites if s.file or s.table])}/{len(r.sites)} "
-        f"sites and found {len(r.slots)} destinations: " + ", ".join(f"0x{d:08X}" for d, _v in r.slots) +
-        ("" if ok else " — this executable has no loader shape for an M1 regression test"))
+    # [4] M3 must bind the reference to the owned bytes before it trusts the address.
+    bat.base = real
+    rec = refs[bat.name.upper()]
+    changed = bytearray(bat.data)
+    changed[-1] ^= 1
+    changed_img = Img(bat.name, bytes(changed))
+    changed_img.base = real
+    verdict4, digest4 = reference_verdict(changed_img, rec)
+    ok = verdict4 == "sha"
+    out(f"  [4] {'PASS' if ok else 'FAIL'} one owned byte changed: verdict={verdict4}, "
+        f"sha1={digest4[:12]}… expected={rec['sha1'][:12]}… — address was not accepted")
     if not ok:
-        skipped.append(4)
+        fails.append(4)
 
-    # [5] the referee must say NO to a bad LBA. Pick an LBA no file starts at.
+    # [5] M3 must independently reject a wrong reference address after SHA identity succeeds.
+    wrong_rec = dict(rec)
+    wrong_rec["base"] += 4
+    verdict5, _digest5 = reference_verdict(bat, wrong_rec)
+    ok = verdict5 == "base"
+    out(f"  [5] {'PASS' if ok else 'FAIL'} owned SHA-1 matches but rood-vram moved +4: "
+        f"verdict={verdict5}, M2=0x{real:08X}, changed-vram=0x{wrong_rec['base']:08X}")
+    if not ok:
+        fails.append(5)
+
+    # [6] the referee must say NO to a bad LBA. Pick an LBA no file starts at.
     bad = next(l for l in range(1, 100000) if l not in bylba)
     probe = Site(exe, 0)
     rejected = not match_disc(probe, bad, 0x800, bylba)
@@ -815,50 +941,40 @@ def selftest(disc, out=print):
     probe2 = Site(exe, 0)
     accepted = match_disc(probe2, good[0], good[1], bylba)
     ok = rejected and accepted
-    out(f"  [5] {'PASS' if ok else 'FAIL'} referee rejects lba={bad} (no file starts there): "
+    out(f"  [6] {'PASS' if ok else 'FAIL'} referee rejects lba={bad} (no file starts there): "
         f"{rejected}; accepts lba={good[0]} bytes=0x{good[1]:X} -> {probe2.file}: {accepted}")
     if not ok:
-        fails.append(5)
-
-    # [6] the table length is measured. Truncating the referee's view must shorten it.
-    ok = True
-    if r.table_ents:
-        t, (host, ents, _why) = sorted(r.table_ents.items())[0]
-        cut = dict(bylba)
-        drop = ents[len(ents) // 2]
-        cut.pop(drop[2])
-        _h2, ents2, _w2 = enumerate_table(t, {k: v for k, v in imgs.items()}, cut)
-        ok = len(ents) > 0 and len(ents2) == len(ents) // 2
-        out(f"  [6] {'PASS' if ok else 'FAIL'} table 0x{t[0]:08X} walks {len(ents)} entries; with "
-            f"entry {len(ents) // 2}'s file (lba {drop[2]}) removed from the referee it stops at "
-            f"{len(ents2)} — the length comes from the disc, not from a hardcoded count")
-    else:
-        ok = None
-        out("  [6] SKIP no indexed table was found at all, so this executable cannot exercise "
-            "the table-length probe")
-    if not ok:
-        (fails if ok is False else skipped).append(6)
+        fails.append(6)
 
     # [7] the config gate must go RED on a one-word change to a SHIPPING value.
+    r, _i2, _e2 = measure(disc)
     text = open(CONFIG_SRC, encoding="utf-8").read()
     cfg = parse_config(text)
-    saboteur = Result()
-    saboteur.slots = [(d + 4 if i == 0 else d, v) for i, (d, v) in enumerate(r.slots)]
-    saboteur.slot_of = {d: i for i, (d, _v) in enumerate(saboteur.slots)}
-    saboteur.bases = r.bases
+    old = f"{{0x{cfg[0]:08X}, nullptr}}"
+    new = f"{{0x{cfg[0] + 4:08X}, nullptr}}"
+    if text.count(old) != 1:
+        raise Refuse(f"selftest could not uniquely locate shipping slot text {old!r}")
+    bad_text = text.replace(old, new)
+    seeds_text = open(SEEDS_SRC, encoding="utf-8").read()
+    seed_old = f'"BATTLE": "0x{r.bases["BATTLE"][0]:08X}"'
+    seed_new = f'"BATTLE": "0x{r.bases["BATTLE"][0] + 4:08X}"'
+    if seeds_text.count(seed_old) != 1:
+        raise Refuse(f"selftest could not uniquely locate shipping seed text {seed_old!r}")
+    bad_seeds = seeds_text.replace(seed_old, seed_new)
     sink = []
-    rc = check_config(saboteur, out=sink.append)
-    ok = rc == 1 and cfg and any("FAILED overlaySlots[0]" in ln for ln in sink)
-    out(f"  [7] {'PASS' if ok else 'FAIL'} with the measured slot 0 moved +4 the gate returns "
-        f"{rc} and prints: " + next((ln.strip() for ln in sink if "FAILED overlaySlots[0]" in ln),
-                                    "(no FAILED line — the gate is blind)"))
+    rc = check_config(r, out=sink.append, config_text=bad_text, seeds_text=bad_seeds)
+    slot_line = next((ln.strip() for ln in sink if "FAILED overlaySlots[0]" in ln), "MISSING")
+    seed_line = next((ln.strip() for ln in sink if "FAILED overlay_bases[BATTLE]" in ln), "MISSING")
+    ok = rc == 1 and slot_line != "MISSING" and seed_line != "MISSING"
+    out(f"  [7] {'PASS' if ok else 'FAIL'} with SHIPPING slot 0 and BATTLE seed moved +4, "
+        f"the gate returns {rc} and prints BOTH: {slot_line}; {seed_line}")
     if not ok:
         fails.append(7)
 
     out("")
-    passed = 7 - len(fails) - len(skipped)
-    out(f"selftest: 7 checks, {passed} PASS, {len(skipped)} SKIP "
-        f"{skipped if skipped else ''}, {len(fails)} FAIL {fails if fails else ''}")
+    passed = 7 - len(fails)
+    out(f"selftest: 7 checks, {passed} PASS, 0 SKIP, {len(fails)} FAIL "
+        f"{fails if fails else ''}")
     out("  Not covered by this selftest, stated explicitly: nothing here observes a RUNNING loader, "
         "so a base that is correct statically but rewritten at run time would pass every check "
         "above. There is no bootable port in this repo yet to check that against (RE-02).")

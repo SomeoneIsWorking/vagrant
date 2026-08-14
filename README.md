@@ -6,18 +6,18 @@ A PC-native port of **Vagrant Story** (PS1, USA, `SLUS_010.40`) built on the
 
 ## Status: scaffolding. It does not run
 
-Created 2026-08-12. There is no recompiled substrate, no port binary, and nothing about the game is
-reverse-engineered yet. What exists:
+Created 2026-08-12. There is no recompiled substrate or port binary. What exists:
 
 - disc → executable provisioning from **your own** disc image (nothing game-derived is in this repo),
-- the framework seam (`GameConfig` / `GameHooks`), compiling against the pinned framework, with every
-  guest address honestly `0`,
+- the framework seam (`GameConfig` / `GameHooks`), compiling against the pinned framework,
+- two measured RE groups: crt0/boot (RE-01) and all 20 non-empty `.PRG` load-base mappings into three
+  overlay slots (RE-03), each gated back to the owned images by its instrument,
 - the project registries (`docs/re-frontier.md`, `docs/codemap.md`, `docs/info/`, `docs/issues/`),
 - a vendored CC0 **matching decompilation** of this exact executable, `external/rood-reverse`, whose
   target images are *measured* to be byte-identical to the ones on this disc (21/21).
 
-`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain and every entry
-in it is `todo` or blocked.
+`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-02 still
+blocks emitting a substrate.
 
 ## Getting started
 

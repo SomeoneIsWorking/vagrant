@@ -3,8 +3,9 @@
 //
 // READ THIS BEFORE FILLING ANYTHING IN.
 //
-// **Exactly ONE group is filled in — the crt0/boot group (RE-01, measured 2026-08-12). Every other
-// address here is still ZERO, because it has not been reverse-engineered in this repo.** Zero is the
+// **Exactly TWO groups are filled in: the crt0/boot group (RE-01) and the three measured overlay
+// slots (RE-03). Every other address here is still ZERO because it has not been reverse-engineered.**
+// Zero is the
 // honest value and it is deliberate: psxport fails fast on a zero it needs, whereas a
 // plausible-looking WRONG address does not fail cleanly — it breaks boot or diverges the byte-compare
 // in a way that reads as a framework bug. Each group names the open step in docs/re-frontier.md.
@@ -15,8 +16,8 @@
 // excellent way to LOCATE a value fast. It is NOT a substitute for measuring one: a value copied out
 // of it is a REFERENCE until this repo has confirmed it against these bytes, and the standing rule in
 // this workspace is that where a reference and a measurement disagree, the measurement wins. When you
-// fill a field, paste the disassembly line that justifies it, as spider1/game/core/game_config.cpp
-// does — that citation is what makes the value reviewable a year from now.
+// fill a field, add the measurement and a shipping-value gate; a plausible citation alone is not a
+// discriminator.
 #include "game_iface.h"
 
 // MEASURED, from the PS-EXE header of the extracted SLUS_010.40 (tools/extract_exe.py prints it) and
@@ -264,15 +265,15 @@ static const GameConfig g_vagrant_cfg = {
     .curTaskPtr = 0,
     .stageStart = 0, .stageDemo = 0, .stageGame = 0,
 
-    // --- overlay router slots ---------------------------------------------------- RE-03, NOT DONE --
+    // --- overlay router slots --------------------------------------------------- RE-03, MEASURED --
     // This game HAS overlay modules — 21 .PRG files on the disc (BATTLE, TITLE, ENDING, INITBTL,
-    // SCREFF2 and 16 MENU/*). Their load bases are NOT known here. An overlay is keyed BY its load
-    // address, so a wrong base emits a whole module of correctly-decoded instructions at wrong
-    // addresses and every jal target, pointer test and router lookup is then silently wrong.
-    // rood-reverse's splat configs state a vram per module; treat that as the hypothesis to CONFIRM,
-    // never as the value to ship. Zero here means the router has no slot, which is what a port with
-    // no recompiled overlays should say.
-    .overlaySlots = { {0, nullptr}, {0, nullptr}, {0, nullptr} },
+    // SCREFF2 and 16 MENU/*), one of which (MENUA.PRG) is 0 bytes and has no code/base. For every
+    // non-empty image, tools/re_overlay.py M2 derives the base from that image's own absolute `jal`
+    // targets and function-entry offsets; M3 SHA-binds OUR bytes to rood-reverse and independently
+    // checks its link address. All 20 agree, and the executable contains all three slot values in
+    // four contiguous resident words at 0x80010000..0x8001000C. The callbacks remain null because
+    // no overlay substrate exists yet; RE-02, not RE-03, owns generating/registering code.
+    .overlaySlots = { {0x80068800, nullptr}, {0x800F9800, nullptr}, {0x80102800, nullptr} },
 
     // --- CD chokepoints ---------------------------------------------------------- RE-04, NOT DONE --
     .cdInit = 0, .cdCommand = 0, .cdSync = 0, .cdReadPrim = 0, .cdFileLoad = 0, .cdAsyncRead = 0,

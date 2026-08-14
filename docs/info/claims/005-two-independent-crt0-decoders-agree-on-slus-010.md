@@ -5,6 +5,8 @@ status: holds
 created: 2026-08-12
 tags: crt0
 depends: game/core/game_config.cpp
+reconfirmed: 2026-08-14 11:53:32
+verified_at: 2026-08-14 11:53:32
 ---
 
 ## Claim
@@ -18,3 +20,7 @@ Measured 2026-08-12. vagrant tools/re_crt0.py CONCRETELY INTERPRETS the crt0 (52
 ## What would falsify it
 
 a third decoder, or a booting vagrant port's own crt0_audit, disagreeing with either tool on any of these fields — agreement between two tools is not truth, and both could share a wrong assumption about PS-EXE header semantics
+
+## Re-confirmed 2026-08-14 11:53:32
+
+Re-verified 2026-08-14: tools/re_crt0.py still yields the recorded boot group, and psxport build/tools/crt0_extract independently resolved 8/8 shared fields with zero disagreements (bss 0x80033678..0x800401A8, sp 0x801FFFF8, gp 0x80033674, heap base 0x800401A8 size 0x1BBE50, libcInit 0x80026864).

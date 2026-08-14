@@ -12,12 +12,12 @@ directive that **`./run.sh` is the user's and agents must never invoke it**. The
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
-## THE STATE OF THIS PORT: ONE subsystem is RE'd. Do not read anything else as progress
+## THE STATE OF THIS PORT: TWO subsystems are RE'd. There is still no port binary
 
-Created 2026-08-12. There is **no recompiled substrate and no port binary.** Exactly one group of guest
-addresses is measured — the **crt0/boot group** (`RE-01` `re-verified`, claim `C004`, instrument
-`tools/re_crt0.py`, which executes crt0 on the extracted executable and cites every value). Every other
-field in `game/core/game_config.cpp` is `0` with its open step in `docs/re-frontier.md` named, and
+Created 2026-08-12. There is **no recompiled substrate and no port binary.** Two groups are measured:
+the **crt0/boot group** (`RE-01`, `tools/re_crt0.py`) and all 20 non-empty `.PRG` overlay mappings into
+three slots (`RE-03`, `tools/re_overlay.py`). Every other guest-address group in
+`game/core/game_config.cpp` is `0` with its open step in `docs/re-frontier.md` named, and
 **nothing has ever executed the boot group** — "measured" means "this is what crt0 does to this image",
 not "the port boots with it". A framework defect found while measuring it (issue #3) would give a BIOS
 `InitHeap` a zero-size heap; measured 2026-08-12, that is **latent here** — no code in this image can
@@ -33,8 +33,9 @@ cmake -S . -B build && cmake --build build --target vagrant_seam -j$(nproc)
 `vagrant_seam` is an OBJECT library over `game/core/{game_config,game_hooks,main}.cpp`: it compiles but
 does not link, which is the strongest check possible before a substrate exists — it proves this port's
 `GameConfig`/`GameHooks` still satisfy the pinned framework's seam. **A change to a MEASURED constant in
-`game_config.cpp` must also pass `python3 tools/re_crt0.py --selftest`**, which diffs every shipped
-constant and the whole disassembly citation block against the executable's bytes. Compiling is not
+`game_config.cpp` must also pass its source instrument: `python3 tools/re_crt0.py --selftest` for the
+boot group, or `python3 tools/re_overlay.py --selftest && python3 tools/re_overlay.py --check-config`
+for overlay slots/seeds. These diff shipped values back to the owned bytes. Compiling is not
 enough: the `static_assert`s only check the constants' internal RELATIONS, and `hi - lo == 0x46B20` holds
 just as well when both values are wrong — which is exactly how a reviewer moved `kHeapSizePtr` +4 and
 pointed `kLibcInit` at an unrelated nop with every gate green (workspace `PROTOCOL.md`, "THE SHIPPED
@@ -70,10 +71,10 @@ Three rules for using it, and they are the whole reason this section exists:
    worked example: `tools/re_crt0.py` EXECUTES crt0 on our bytes and cites every value, and the decomp's
    names (`__ra_temp`, `_ramsize`, `InitHeap`, `vs_main_exec`) appear in the file only as corroborating
    labels. Prefer that shape — a tool that re-measures on demand — over pasting even a correct number.
-2. **Never paste an overlay load base from it.** Its splat configs state a `vram` per module
-   (`0x80068800` / `0x800F9800` / `0x80102800`); an overlay is keyed BY its load address, so a wrong
-   base emits a whole module of correctly-decoded instructions at wrong addresses and every `jal`
-   target, pointer test and router lookup goes silently wrong. Confirm on a running loader. RE-03.
+2. **Never paste an overlay load base from it.** RE-03 is the completed example: M2 derives each base
+   from the owned module's own `jal` targets and entry offsets; M3 first SHA-binds that module to its
+   rood config and only then compares `vram`. All 20 non-empty modules agree at three slots, and the
+   shipping files are gated by `--check-config`. A bare config `vram` remains inadmissible evidence.
 3. **Its decomp.dev percentage is not our percentage.** Theirs is `objdiff` object identity; this port's
    axis is SBS byte-exact RAM parity. Neither implies the other, and quoting one as evidence about the
    other is how a port looks finished while nothing is gated.
@@ -116,9 +117,12 @@ citation attached. Full detail: `docs/references.md`.
   `InitHeap`'s only caller is crt0. The game uses its own allocator (rood-reverse: `vs_main_initHeap`
   `0x80043F74`, arena `0x8010C000 + 0xF2000`, above the image). That is why the overlapping arena is
   not a contradiction, and why issue #3 is latent here.
-- **21 `.PRG` code modules on the disc** — `BATTLE/BATTLE.PRG` (577,828 B), `TITLE/TITLE.PRG`,
+- **21 `.PRG` images on the disc** — `BATTLE/BATTLE.PRG` (577,828 B), `TITLE/TITLE.PRG`,
   `ENDING/ENDING.PRG`, `BATTLE/INITBTL.PRG`, `GIM/SCREFF2.PRG` and 16 `MENU/*.PRG` (one of which,
-  `MENUA.PRG`, is 0 bytes). This game's "overlays" are these files; their load bases are UNKNOWN here.
+  `MENUA.PRG`, is 0 bytes). **RE-03 is measured:** BATTLE/TITLE/ENDING load at `0x80068800`;
+  INITBTL/SCREFF2/MAINMENU at `0x800F9800`; the other 14 non-empty MENU modules at `0x80102800`.
+  `tools/re_overlay.py` verifies all 20 from their own bytes plus SHA-bound rood configs; the 0-byte
+  MENUA has no code/base. The tool has not observed a running loader because no substrate exists.
 - **Top-level disc directories:** `BATTLE BG EFFECT ENDING EVENT GIM MAP MENU MOV MUSIC OBJ SE SMALL
   SOUND TITLE`, plus `SLUS_010.40`, `SYSTEM.CNF`, `DBGFNT.TIM` in the root (5,180 files listed).
 - **It is a heavy streamer.** `ENDING/ENDING.XA` alone is 68 MB, plus `MOV/`, `MUSIC/`, `SE/`. The CD
@@ -127,8 +131,8 @@ citation attached. Full detail: `docs/references.md`.
   `C_011`), libetc (`VSYNC`, `INTR`, `INTR_DMA`), libgpu, libspu, libpad (`PADENTRY`), libds, libc.
   That says which SHAPES to look for; it says nothing about where they are in this image.
 
-Everything else about this game — the loader and the 21 overlay load bases, the frame loop, the
-OT/packet-pool dance, the pad buffers, the scene model, the platform HLE windows — is **unknown**. Do
+Everything else about this game — the loader contract beyond its three static slot words, the frame
+loop, OT/packet-pool dance, pad buffers, scene model, and platform HLE windows — is **unknown**. Do
 not let a plausible-sounding sentence in a doc elsewhere stand in for it.
 
 ## The rules that bite hardest here

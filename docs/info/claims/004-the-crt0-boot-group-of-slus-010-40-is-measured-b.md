@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot,re-01
 depends: game/core/game_config.cpp,tools/re_crt0.py
-reconfirmed: 2026-08-12 20:34:38
-verified_at: 2026-08-12 20:34:38
+reconfirmed: 2026-08-14 11:53:32
+verified_at: 2026-08-14 11:53:32
 ---
 
 ## Claim
@@ -39,3 +39,7 @@ Re-verified 2026-08-12 after a review refuted the 'gap: NONE' framing. The eleve
 ## Re-confirmed 2026-08-12
 
 Re-verified 2026-08-12: tools/re_crt0.py --check-config reports 11 of 11 shipped constants matching these bytes, 0 FAILED, rc=0; and psxport tools/crt0_extract independently agrees on all 8 fields it resolves (claim C005).
+
+## Re-confirmed 2026-08-14 11:53:32
+
+Re-verified 2026-08-14 after adding only measured overlay slots to game_config.cpp: --check-config 11/11 and citation block byte-identical, --selftest 22 assertions/0 failed, --gate-config 6/6, seam build green. Boot constants unchanged.

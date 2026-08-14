@@ -3,8 +3,8 @@
 // reaches them only through psxport_recomp()->field.
 //
 // It therefore cannot compile until a substrate exists. `generated/` is produced by the recompiler,
-// which needs this game's seed file and its overlay load bases — RE-02 and RE-03 in
-// docs/re-frontier.md, neither done. The build reflects that honestly rather than papering over it:
+// which still needs RE-02's executable seed set/substrate. RE-03's overlay bases are measured and
+// present in the seed file, but no generated code exists. The build reflects that honestly:
 // cmake/vagrant_port.cmake configures the port target ONLY when generated/rec_sources.cmake exists,
 // and this file belongs to that target alone. The seam-check target (which DOES build today) compiles
 // game_config.cpp / game_hooks.cpp / main.cpp against the framework headers and deliberately excludes
@@ -28,7 +28,7 @@ from generated/overlay_table.h (see spider1/game/core/recomp_register.cpp) and d
   // No substrate: install nothing. NOT silent — a run that gets here has no recompiled code to
   // dispatch to, and finding that out at the first rec_dispatch would blame the wrong thing.
   cfg_loge("recomp", "no recompiled substrate is registered: generated/ has never been emitted for "
-                     "this game (RE-02 seeds, RE-03 overlay bases — docs/re-frontier.md). Nothing can "
+                     "this game (RE-02 executable seeds/substrate — docs/re-frontier.md). Nothing can "
                      "execute. Refusing to continue.");
   abort();
 #endif

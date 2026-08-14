@@ -12,9 +12,9 @@
 #                      That is the gate for this repo today (`--target vagrant_seam`).
 #   vagrant_port       the game binary. Configured ONLY when generated/rec_sources.cmake exists,
 #                      i.e. once the recompiled substrate has been emitted. It has NOT been: emit.py
-#                      needs this game's seeds and its 21 modules' load bases (docs/re-frontier.md
-#                      RE-02/RE-03), and guessing an overlay base emits a whole module at wrong
-#                      addresses. A loud STATUS message says so at configure time rather than a
+#                      needs RE-02's executable seed set/substrate. RE-03's 20 non-empty module
+#                      mappings are measured, but do not themselves emit code. A loud STATUS message
+#                      says so at configure time rather than a
 #                      cryptic missing-file error, and rather than a stub binary that looks like a port.
 
 option(PSXPORT_BUILD_PORT "Build the Vagrant Story native port binary (needs generated/)" ON)
@@ -47,8 +47,8 @@ if(NOT EXISTS ${CMAKE_SOURCE_DIR}/generated/rec_sources.cmake)
   message(STATUS
     "vagrant_port: NOT configured — generated/rec_sources.cmake is absent, i.e. the recompiled "
     "substrate has never been emitted for this game. That is the honest state of this port, not a "
-    "build problem: see docs/re-frontier.md (RE-01 crt0/GameConfig, RE-02 seeds, RE-03 the 21 .PRG "
-    "load bases). `--target vagrant_seam` is the gate that DOES run today.")
+    "build problem: see docs/re-frontier.md (RE-01 crt0/GameConfig, RE-02 executable seeds/substrate, "
+    "RE-03 verified .PRG load bases). `--target vagrant_seam` is the gate that DOES run today.")
   return()
 endif()
 

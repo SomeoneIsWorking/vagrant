@@ -52,18 +52,21 @@ SLUS_010.40 alone) is a map into the exact executable this repo extracts.
    behind each one. The decomp's names for the same addresses (`__ra_temp`, `_ramsize`, `_stacksize`,
    `__heapbase`, `__heapsize`, `InitHeap`, `vs_main_exec`, `__SN_ENTRY_POINT`) turned out to agree —
    which is worth something as corroboration and nothing as evidence. Had they disagreed, the
-   measurement would have won. Every other group in that file is still zero.
+   measurement would have won. RE-03 now applies the same rule to overlays; all other guest-address
+   groups in that file remain zero.
 2. **A SHA-1 match says nothing about coverage.** It proves the decomp aims at these bytes, not how
    much of them is decompiled — and its percentage is `objdiff` object identity, which is a different
    axis from this port's SBS byte-exact RAM parity. The two numbers are not comparable and neither
    implies the other.
-3. **The load bases in its splat configs are the reference's claim, not our measurement.** They read:
+3. **The load bases in its splat configs are not evidence by themselves.** They read:
    `0x80068800` for BATTLE/TITLE/ENDING, `0x800F9800` for INITBTL/SCREFF2/MAINMENU, `0x80102800` for
-   the other MENU modules — i.e. three shared slots rather than 21 bases. That is a *good lead* for
-   RE-03 and it is not evidence: an overlay is keyed BY its load address, so a wrong base emits a whole
-   module of correctly-decoded instructions at wrong addresses, and every `jal` target, pointer test
-   and router lookup is then silently wrong. Confirm against a running loader before it reaches
-   `game/recomp_seeds.json`.
+   the other non-empty MENU modules — three shared slots. RE-03 is now measured without treating those
+   values as the source: `tools/re_overlay.py` M2 derives all 20 bases from each owned module's own
+   absolute `jal` targets and entry offsets; M3 then requires that owned image's SHA-1 to match the
+   corresponding config before comparing its independently stated `vram`. Result: 20/20 identity and
+   address agreements, zero undecided/missing/extra. The three values also appear in four contiguous
+   resident words at `0x80010000..0x8001000C`. This closes the static mapping and gates the shipped
+   seed/config copies; observing a running loader still awaits a substrate.
 
 ### Why a matching decomp matters STRUCTURALLY to psxport
 

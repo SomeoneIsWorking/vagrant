@@ -12,9 +12,8 @@
 # THERE IS NOTHING TO LAUNCH YET, and this script says so and stops rather than pretending. It does
 # every step that IS real today — check the toolchain, announce which framework checkout is in play,
 # sync submodules, resolve the disc, extract and identity-check SLUS_010.40, build what builds — and
-# then refuses at the recompile step, because emit.py needs this game's seed set and its 21 .PRG load
-# bases and neither has been reverse-engineered (docs/re-frontier.md RE-02/RE-03). Guessing an overlay
-# base would emit a whole module of correctly-decoded instructions at wrong addresses.
+# then refuses at the recompile step because RE-02's executable seed set/substrate has not been
+# established. RE-03's 20 non-empty .PRG mappings are measured and gated; no substrate was emitted.
 set -eu
 cd "$(dirname "$0")"
 
@@ -75,9 +74,8 @@ cat <<'EOF'
 [run] STOPPING HERE, ON PURPOSE. There is no vagrant_port binary to launch.
 [run]
 [run] The next step is the static recompilation of SLUS_010.40, and it CANNOT run yet:
-[run]   * RE-02  game/recomp_seeds.json is empty — seeds are grown from real [recomp-MISS] fail-fasts
-[run]   * RE-03  the 21 .PRG modules' load bases are unknown; emit.py refuses a missing base, and a
-[run]            GUESSED base emits a whole module at wrong addresses (silently corrupt, not broken)
+[run]   * RE-02  the executable seed arrays are empty; no substrate has been emitted or verified
+[run]   * RE-03  is complete: 20 non-empty .PRG mappings are measured at three slots; MENUA is empty
 [run]
 [run] python3 tools/re_frontier.py next        -- the step that is actually ready to work
 [run] python3 tools/verify_decomp_targets.py   -- what the vendored CC0 decomp does target, measured
