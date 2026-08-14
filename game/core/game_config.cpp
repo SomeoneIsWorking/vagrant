@@ -3,8 +3,8 @@
 //
 // READ THIS BEFORE FILLING ANYTHING IN.
 //
-// **Exactly TWO groups are filled in: the crt0/boot group (RE-01) and the three measured overlay
-// slots (RE-03). Every other address here is still ZERO because it has not been reverse-engineered.**
+// **Exactly THREE groups are filled in: crt0/boot (RE-01), recompiled-main range (RE-02), and the
+// three measured overlay slots (RE-03). Other guest-address groups remain ZERO until measured.**
 // Zero is the
 // honest value and it is deliberate: psxport fails fast on a zero it needs, whereas a
 // plausible-looking WRONG address does not fail cleanly — it breaks boot or diverges the byte-compare
@@ -19,6 +19,9 @@
 // fill a field, add the measurement and a shipping-value gate; a plausible citation alone is not a
 // discriminator.
 #include "game_iface.h"
+#ifdef VAGRANT_HAVE_SUBSTRATE
+#include "overlay_table.h"
+#endif
 
 // MEASURED, from the PS-EXE header of the extracted SLUS_010.40 (tools/extract_exe.py prints it) and
 // from the disc's SYSTEM.CNF.
@@ -34,6 +37,12 @@
 // header/CNF values are what the BIOS shell sets up before jumping to the entry point; crt0 then
 // overwrites it. Do not "fix" the boot group to agree with the header.
 static constexpr uint32_t kPsExeEntry     = 0x8001F544u;   // header pc0
+static constexpr uint32_t kRecMainLo      = 0x00010000u;   // header t_addr, physical
+static constexpr uint32_t kRecMainHi      = 0x00062000u;   // t_addr + t_size, physical
+#ifdef VAGRANT_HAVE_SUBSTRATE
+static_assert(kRecMainLo == REC_MAIN_LO && kRecMainHi == REC_MAIN_HI,
+              "GameConfig main routing range drifted from the emitted substrate");
+#endif
 static constexpr uint32_t kPsExeTextAddr  = 0x80010000u;   // header t_addr
 static constexpr uint32_t kPsExeTextSize  = 0x00052000u;   // header t_size
 static_assert(kPsExeEntry >= kPsExeTextAddr &&
@@ -227,12 +236,10 @@ static const GameConfig g_vagrant_cfg = {
     .libcInit = kLibcInit,
     .gameMain = kGameMain, .crt0 = kCrt0,
 
-    // --- recompiled MAIN .text range (physical) ---------------------------------- RE-02, NOT DONE --
-    // These come from the RECOMPILER's own generated/overlay_table.h (REC_MAIN_LO / REC_MAIN_HI) so
-    // they can never drift from the substrate they describe. There is no substrate yet, so they are
-    // zero and this file does not #include that header — including a generated header that does not
-    // exist would make the tree un-configurable rather than honestly incomplete.
-    .recMainLo = 0, .recMainHi = 0,
+    // --- recompiled MAIN .text range (physical) ---------------- RE-02, PS-EXE header + emitter --
+    // The emitter reports these same bounds as REC_MAIN_LO/HI. Keep the measured physical range
+    // available to the compile-only seam too, where generated/ intentionally need not exist.
+    .recMainLo = kRecMainLo, .recMainHi = kRecMainHi,
 
     // --- disc key ----------------------------------------------- this port's own env name, not RE --
     // Not an RE fact but a port fact, and it belongs here because the framework must not know it: the
@@ -272,7 +279,8 @@ static const GameConfig g_vagrant_cfg = {
     // targets and function-entry offsets; M3 SHA-binds OUR bytes to rood-reverse and independently
     // checks its link address. All 20 agree, and the executable contains all three slot values in
     // four contiguous resident words at 0x80010000..0x8001000C. The callbacks remain null because
-    // no overlay substrate exists yet; RE-02, not RE-03, owns generating/registering code.
+    // the current substrate is resident-only; RE-04 must observe loader execution before overlay
+    // emission/registration can be owned.
     .overlaySlots = { {0x80068800, nullptr}, {0x800F9800, nullptr}, {0x80102800, nullptr} },
 
     // --- CD chokepoints ---------------------------------------------------------- RE-04, NOT DONE --
@@ -339,7 +347,8 @@ static const GameConfig g_vagrant_cfg = {
 // (0x8001F5A0 `subu $a1,$a1,$a0`, a1 = 0x001BBE50 live into the jal at 0x8001F5CC, note 4 above).
 //
 // The framework used to set only `r[4]`, creating every arena with size 0. FIXED upstream in psxport
-// 726d10c9 — which this repo pins — where the boot group became a pure `crt0_plan` in
+// 726d10c9 — an ancestor of this repo's framework pin — where the boot group became a pure
+// `crt0_plan` in
 // runtime/recomp/crt0_boot.h and `crt0_apply` sets both argument registers. Deleting the a1 store
 // turns psxport's tests/test_crt0_boot_group.cpp red, so it cannot silently regress.
 //

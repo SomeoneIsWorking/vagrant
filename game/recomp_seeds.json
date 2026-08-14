@@ -6,8 +6,9 @@
 // about THIS executable and THIS disc, so the framework ships none of them and every game supplies its
 // own file. JSON with `//` comments; every key is optional.
 //
-// The overlay bases below are the one completed group (docs/re-frontier.md RE-03). The executable
-// seed sets remain empty because RE-02 has not started; no substrate has been emitted.
+// The executable seed sets are empty by measurement: the emitter independently roots traversal at
+// the PS-EXE entry and discovers its direct-call graph. Add only runtime-observed fail-fast misses;
+// duplicating the entry here would obscure the bootstrap contract instead of extending it.
 //
 // Two rules, both learned the hard way elsewhere in this workspace:
 //

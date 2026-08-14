@@ -8,10 +8,9 @@ Extracts SLUS_010.40 (the boot target named in SYSTEM.CNF: `BOOT = cdrom:\\SLUS_
 SHA-1 against the value the rood-reverse decompilation states for its own target. Nothing extracted
 is ever committed — scratch/ is gitignored, and the executable is the copyright holder's.
 
-There is deliberately NO recompilation step here. The substrate cannot be emitted yet: emit.py
-requires this game's own seed file and, for the 21 .PRG modules, their load bases — neither of which
-has been reverse-engineered in this repo. See docs/re-frontier.md. A tool that emitted anyway, with
-a guessed base, would produce a module of correctly-decoded instructions at wrong addresses.
+Extraction and recompilation remain separate operations. RE-02 documents the resident-only emitter
+command; RE-03 supplies verified bases for later overlay emission. This tool provisions and verifies
+only the copyrighted executable, which stays under gitignored scratch/.
 """
 import hashlib
 import os

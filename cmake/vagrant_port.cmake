@@ -1,4 +1,4 @@
-# cmake/vagrant_port.cmake — what this repo builds, and what it deliberately refuses to build yet.
+# cmake/vagrant_port.cmake — framework, seam, and generated-substrate targets.
 #
 # Three targets:
 #
@@ -10,12 +10,7 @@
 #                      substrate exists: it proves this port's GameConfig/GameHooks still satisfy the
 #                      pinned framework's seam — every designator binds, every hook signature matches.
 #                      That is the gate for this repo today (`--target vagrant_seam`).
-#   vagrant_port       the game binary. Configured ONLY when generated/rec_sources.cmake exists,
-#                      i.e. once the recompiled substrate has been emitted. It has NOT been: emit.py
-#                      needs RE-02's executable seed set/substrate. RE-03's 20 non-empty module
-#                      mappings are measured, but do not themselves emit code. A loud STATUS message
-#                      says so at configure time rather than a
-#                      cryptic missing-file error, and rather than a stub binary that looks like a port.
+#   vagrant_port       the game binary. Configured when the gitignored generated substrate exists.
 
 option(PSXPORT_BUILD_PORT "Build the Vagrant Story native port binary (needs generated/)" ON)
 
@@ -24,8 +19,7 @@ option(PSXPORT_BUILD_PORT "Build the Vagrant Story native port binary (needs gen
 include(${PSXPORT_DIR}/cmake/psxport.cmake)
 
 # ---- the seam, compile-only --------------------------------------------------------------------
-# recomp_register.cpp is EXCLUDED on purpose: it is the one TU that names generated/ symbols, so it
-# cannot compile before the substrate exists (see that file's header).
+# recomp_register.cpp is excluded because it is the one TU that names generated symbols.
 set(SEAM_SRC
   game/core/game_config.cpp
   game/core/game_hooks.cpp
@@ -46,9 +40,8 @@ endif()
 if(NOT EXISTS ${CMAKE_SOURCE_DIR}/generated/rec_sources.cmake)
   message(STATUS
     "vagrant_port: NOT configured — generated/rec_sources.cmake is absent, i.e. the recompiled "
-    "substrate has never been emitted for this game. That is the honest state of this port, not a "
-    "build problem: see docs/re-frontier.md (RE-01 crt0/GameConfig, RE-02 executable seeds/substrate, "
-    "RE-03 verified .PRG load bases). `--target vagrant_seam` is the gate that DOES run today.")
+    "substrate has not been emitted in this checkout. Run the documented RE-02 emit command; "
+    "`--target vagrant_seam` remains available without generated code.")
   return()
 endif()
 
@@ -68,9 +61,6 @@ set_source_files_properties(${GEN_REC_SRCS}
 
 add_executable(vagrant_port ${SEAM_SRC} game/core/recomp_register.cpp ${GEN_REC_SRCS})
 
-# Tripwire, deliberately: recomp_register.cpp #errors under this define until someone writes the real
-# RecompRegistry for the emitted substrate. The alternative — a registry written against guessed
-# generated symbol names — is the kind of thing that reads as a framework bug months later.
 target_compile_definitions(vagrant_port PRIVATE VAGRANT_HAVE_SUBSTRATE=1)
 
 # The framework's SDL_GPU shader header is produced by a psxport custom target; gpu_vk.cpp (inside

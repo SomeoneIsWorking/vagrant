@@ -2,9 +2,9 @@
 # (external/psxport submodule).
 #
 # The framework (PSX-generic static-recomp substrate + runtime + HW backends + SBS harness + SDL_GPU
-# renderer) is the reusable `psxport` library; this repo adds the game (game/**) and — once it exists —
-# the recompiled SLUS_010.40 substrate (generated/**). NOTHING IS RE'd YET: see docs/re-frontier.md and
-# cmake/vagrant_port.cmake for what does and does not build today.
+# renderer) is the reusable `psxport` library; this repo adds the game (game/**) and the gitignored,
+# reproducibly emitted SLUS_010.40 substrate (generated/**). See docs/re-frontier.md for the current
+# verified boundary.
 cmake_minimum_required(VERSION 3.21)
 
 # ccache, when available. The recompiled substrate is hundreds of MB of generated C, so compilation is

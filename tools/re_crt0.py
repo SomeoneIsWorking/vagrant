@@ -637,6 +637,22 @@ def check_config(img, out, text):
             fails.append(f"{f}: SHIPPED 0x{shipped:08X} (via {k}) != MEASURED 0x{want:08X}")
         print(f"  [{'FAIL' if bad else ' ok '}] {f:<14} {k} = 0x{shipped:08X}"
               f"{'':<{max(1, 14 - len(k))}} 0x{want:08X}")
+    # RE-02 routing uses PHYSICAL addresses. A zero or KSEG address makes overlay_router bypass the
+    # generated dispatcher and report a convincing `[recomp-MISS]` for functions that already exist.
+    # Compare the shipping range to this same PS-EXE header so that failure mode is reproducibly red.
+    for field, key, want in (
+            ("recMainLo", "kRecMainLo", img.t_addr & 0x1FFFFFFF),
+            ("recMainHi", "kRecMainHi", (img.t_addr + img.t_size) & 0x1FFFFFFF)):
+        shipped = consts.get(key)
+        bound = binds.get(field)
+        bad = shipped != want or bound != key
+        if bound != key:
+            fails.append(f"{field}: bound to {bound or '<nothing>'}, not {key}")
+        if shipped != want:
+            shown = "<missing>" if shipped is None else f"0x{shipped:08X}"
+            fails.append(f"{field}: SHIPPED {shown} != PS-EXE HEADER 0x{want:08X}")
+        print(f"  [{'FAIL' if bad else ' ok '}] {field:<14} {key} = "
+              f"{('<missing>' if shipped is None else f'0x{shipped:08X}'):<20} 0x{want:08X}")
     return fails
 
 
@@ -714,8 +730,8 @@ def selftest(exe_path):
     except Refuse as e:
         print(f"  [FAIL] could not read the shipped boot group: {e}")
         return 1
-    ok("SHIPPED game_config.cpp constants == MEASURED boot group (all 11 + their field bindings)",
-       not cfails, "; ".join(cfails) if cfails else "11/11")
+    ok("SHIPPED game_config.cpp constants == MEASURED boot group + main routing range",
+       not cfails, "; ".join(cfails) if cfails else "11 boot fields + 2 PS-EXE range bounds")
     citf = gate_citations(img, out, cite, tr, cfg_text)
     ok("game_config.cpp's disassembly block is byte-identical to the generated one",
        not citf, citf[0] if citf else "regenerated and matched")
@@ -810,6 +826,10 @@ def selftest(exe_path):
             "kHeapSizePtr   = 0x80030FB8u", "kHeapSizePtr   = 0x80030FBCu", cfg)
     cfg_neg("kLibcInit pointed at a real nop (the recorded sabotage)",
             "kLibcInit      = 0x80026864u", "kLibcInit      = 0x8001F564u", cfg)
+    cfg_neg("recMainLo zero makes the router bypass generated resident functions",
+            "kRecMainLo      = 0x00010000u", "kRecMainLo      = 0x00000000u", cfg)
+    cfg_neg("recMainHi moved beyond the PS-EXE text",
+            "kRecMainHi      = 0x00062000u", "kRecMainHi      = 0x00062800u", cfg)
     cfg_neg("a right-valued constant bound to the WRONG field (.gp = kLibcInit)",
             ".gp = kGp,", ".gp = kLibcInit,", cfg)
     cfg_neg("a constant deleted outright", "kGameMain      = 0x80042C38u", "kGameMainX = 0u", cfg)
@@ -828,7 +848,7 @@ def selftest(exe_path):
 
 def gate_config():
     """Do game_config.cpp's boot-group static_asserts actually FIRE? Compile the real TU pristine
-    (must SUCCEED) and with four mutations (each must FAIL with a static assertion). A compile-time
+    (must SUCCEED) and with five mutations (each must FAIL with a static assertion). A compile-time
     check nobody has seen fail is the same untested diagnostic as a runtime one."""
     import json
     import subprocess
@@ -840,12 +860,18 @@ def gate_config():
               f"    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release "
               f"-DPSXPORT_DIR=\"$(pwd)/external/psxport\"", file=sys.stderr)
         return 2
-    ents = [e for e in json.load(open(cdb)) if e["file"].endswith("game/core/game_config.cpp")]
-    if len(ents) != 1:
-        print(f"[gate] REFUSED — {len(ents)} compile_commands entries for game/core/game_config.cpp "
-              f"(need exactly 1); nothing compiled.", file=sys.stderr)
+    entries = [e for e in json.load(open(cdb)) if e["file"].endswith("game/core/game_config.cpp")]
+    # A substrate build intentionally compiles this TU twice: once for the generated-code-free seam
+    # target and once for vagrant_port. The assert gate must use the seam command because its contract
+    # is stable before and after generated/ exists. Select that named target, never whichever duplicate
+    # happens to appear first in compile_commands.json.
+    seam_entries = [e for e in entries if "CMakeFiles/vagrant_seam.dir/" in e["command"]]
+    if len(seam_entries) != 1:
+        print(f"[gate] REFUSED — scanned {len(entries)} game_config compile command(s), matched "
+              f"{len(seam_entries)} vagrant_seam command(s) (need exactly 1); nothing compiled.",
+              file=sys.stderr)
         return 2
-    ent, text = ents[0], open(src, encoding="utf-8").read()
+    ent, text = seam_entries[0], open(src, encoding="utf-8").read()
     out_dir = os.path.join(ROOT, "scratch", "assertgate")
     os.makedirs(out_dir, exist_ok=True)
     orig_o = "-o CMakeFiles/vagrant_seam.dir/game/core/game_config.cpp.o"

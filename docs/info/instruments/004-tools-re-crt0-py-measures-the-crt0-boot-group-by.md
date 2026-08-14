@@ -21,7 +21,7 @@ NEGATIVE, 13, all PASS. Six must exit 2 rather than report a number: the clear l
 
 Sabotage-proven outside the selftest, on the real committed file: kHeapSizePtr -> 0x80030FBC and kLibcInit -> 0x8001F564 made --check-config exit 1 naming both ("SHIPPED 0x80030FBC (via kHeapSizePtr) != MEASURED 0x80030FB8"); retyping 0x8001F548's word to 24427836 made --gate-citations exit 1 printing the file line against the generated one; both green again after restore.
 
-Blind spots it states rather than hides: it models only the instruction subset crt0 uses and refuses on anything else; it says nothing about the 21 .PRG overlay bases (RE-03); it cannot corroborate gp from CODE, because this executable contains no gp-relative code accesses at all (5 candidate encodings in the image, all 5 in data) — the SN link record is the only corroboration available and the tool asserts it; and it has never observed a RUNNING boot, because no substrate exists.
+Blind spots it states rather than hides: it models only the instruction subset crt0 uses and refuses on anything else; it says nothing about the 21 .PRG overlay bases (RE-03); it cannot corroborate gp from CODE, because this executable contains no gp-relative code accesses at all (5 candidate encodings in the image, all 5 in data) — the SN link record is the only corroboration available and the tool asserts it. RE-02 now supplies separate running-boot evidence through guest main.
 
 ## Known failure modes
 

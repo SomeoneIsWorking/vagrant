@@ -9,11 +9,8 @@
 #
 #   cmake -S . -B build && cmake --build build --target vagrant_seam -j$(nproc)
 #
-# THERE IS NOTHING TO LAUNCH YET, and this script says so and stops rather than pretending. It does
-# every step that IS real today — check the toolchain, announce which framework checkout is in play,
-# sync submodules, resolve the disc, extract and identity-check SLUS_010.40, build what builds — and
-# then refuses at the recompile step because RE-02's executable seed set/substrate has not been
-# established. RE-03's 20 non-empty .PRG mappings are measured and gated; no substrate was emitted.
+# The resident substrate is reproducibly emitted from the verified executable. It currently reaches
+# guest main and then fails closed at BIOS A0:0x2F; this launcher builds and runs that honest boundary.
 set -eu
 cd "$(dirname "$0")"
 
@@ -61,24 +58,17 @@ fi
 # "which disc" appear.
 PSXPORT_DIR="$PSXPORT_DIR" python3 tools/extract_exe.py ${1:+"$1"} || die "executable provisioning failed"
 
-# ---- 2. build what builds today -----------------------------------------------------------------
-say "building the framework library + the seam check…"
+# ---- 2. emit and build the verified resident substrate ------------------------------------------
+mkdir -p generated
+say "emitting the resident substrate…"
+PSXPORT_SHARDS=8 python3 "$PSXPORT_DIR/tools/recomp/emit.py" \
+  scratch/bin/vagrant/SLUS_010.40 generated/recompiled.c --seeds game/recomp_seeds.json \
+  || die "resident substrate emission failed"
+say "building the port…"
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPSXPORT_DIR="$(cd "$PSXPORT_DIR" && pwd)" >/dev/null \
   || die "cmake configure failed"
-cmake --build build -j "$JOBS" --target vagrant_seam || die "seam check failed"
+cmake --build build -j "$JOBS" --target vagrant_port || die "port build failed"
 
-# ---- 3. STOP. There is no port binary yet ------------------------------------------------------
-cat <<'EOF'
-
-[run] ------------------------------------------------------------------------------------------
-[run] STOPPING HERE, ON PURPOSE. There is no vagrant_port binary to launch.
-[run]
-[run] The next step is the static recompilation of SLUS_010.40, and it CANNOT run yet:
-[run]   * RE-02  the executable seed arrays are empty; no substrate has been emitted or verified
-[run]   * RE-03  is complete: 20 non-empty .PRG mappings are measured at three slots; MENUA is empty
-[run]
-[run] python3 tools/re_frontier.py next        -- the step that is actually ready to work
-[run] python3 tools/verify_decomp_targets.py   -- what the vendored CC0 decomp does target, measured
-[run] ------------------------------------------------------------------------------------------
-EOF
-exit 3
+# ---- 3. run -------------------------------------------------------------------------------------
+say "launching the resident substrate (current expected stop: BIOS A0:0x2F)…"
+exec scratch/bin/vagrant_port

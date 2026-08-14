@@ -22,6 +22,11 @@ any non-zero guest address appearing in game/core/game_config.cpp, or generated/
 
 ## FALSIFIED 2026-08-12
 
-SUPERSEDED 2026-08-12 by its own stated falsifier: non-zero guest addresses now appear in game/core/game_config.cpp. RE-01 (the crt0/boot group) is MEASURED and re-verified — 11 fields, each with the disassembly line that justifies it (see C004). What REMAINS true and is why this claim mattered: there is still NO recompiled substrate (generated/rec_sources.cmake absent, cmake does not configure vagrant_port), and every OTHER GameConfig group — RE-02 seeds, RE-03 overlay bases, RE-04 CD, RE-05 OT/pool, RE-06 pad, RE-08 HLE — is still zero. Read docs/re-frontier.md (1 re-verified / 6 todo / 1 blocked of 8) rather than treating this claim's replacement as 'the port works'. Grepped for downstream reliance: no doc, source file or tool cites C003 (the only hits are info.py's own selftest fixture, which uses the same id for an unrelated corpus).
+SUPERSEDED first by RE-01's measured non-zero boot group, then fully falsified by RE-02's resident
+substrate. `generated/` is reproducibly emitted from the verified PS-EXE entry, `vagrant_port` builds,
+and the bounded run executes crt0 and guest main before failing closed at BIOS `A0:0x2F`. This does not
+mean the game works: overlay execution, CD/platform HLE, frame/pad/render ownership, and gameplay remain
+open in `docs/re-frontier.md`. Grepped for downstream reliance: no source or tool uses C003 as a current
+premise.
 
 > Anything that cited this claim as proof must be re-checked. Grep the repo for it.

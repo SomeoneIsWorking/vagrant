@@ -4,10 +4,8 @@
 // hardware backends, loads the retail executable, and enters the native boot. After the install
 // nothing here names anything but framework symbols.
 //
-// NOTHING IN THIS PORT IS REVERSE-ENGINEERED YET (docs/re-frontier.md). The sequence below is the
-// framework's standard bring-up, and it will get as far as bootInit and then REFUSE, because
-// GameConfig::gameMain is still 0 — see game/core/game_hooks.cpp. That refusal is the intended
-// behaviour of this commit: the plumbing is real, the RE is not, and the two must not be confused.
+// The initial substrate is rooted at the PS-EXE entry by the emitter. The verified direct call graph
+// reaches GameConfig::gameMain, which this boot path dispatches after applying the measured crt0 plan.
 #include "core.h"
 #include "game.h"
 #include "cfg.h"
@@ -73,11 +71,7 @@ int main(int argc, char** argv) {
   game->spu_audio.init();     // SDL audio sink (PSXPORT_NOAUDIO to disable)
   game->gpu.gpu_native_init();// native GPU renderer over the guest's GP0 stream
   game->cd.overridesInit();   // native CD: drive-ready + by-LBA read
-  // Hardware-sync HLE. initBuiltins() installs the framework's generic handlers at whatever addresses
-  // THIS game declares in GameConfig::hle — which is all zero here (RE-01), so it registers nothing
-  // and says so. A run that needs one will hang in the guest's real spin loop; that is the honest
-  // signal that the RE is outstanding, and it is why no address from the vendored decomp may be
-  // pasted in without being measured against this executable first.
+  // Hardware-sync HLE. initBuiltins() installs handlers only at this game's measured addresses.
   game->platform_hle.initBuiltins();
   game->pad.overridesInit();  // native controller input
   c->r[4] = 1; c->r[5] = 0;   // a0/a1 as the BIOS leaves them

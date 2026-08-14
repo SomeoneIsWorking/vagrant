@@ -12,9 +12,8 @@
 //               to say so loudly and abort. A silent stub would let a half-wired path look like it
 //               worked, which is the fake-green the porting doc warns about.
 //
-// bootInit is the ONE hook with real work, and even that work is one line: dispatch the guest's own
-// main() and let the substrate run the game. It cannot do that yet — GameConfig::gameMain is 0
-// because RE-01 has not been done — so it refuses rather than dispatching address zero.
+// bootInit is the ONE hook with real work: dispatch the verified guest main() and let the substrate
+// run the game. The zero guard remains a hard configuration-integrity check.
 #include "core.h"
 #include "game_iface.h"
 #include "cfg.h"

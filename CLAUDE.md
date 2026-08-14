@@ -12,14 +12,15 @@ directive that **`./run.sh` is the user's and agents must never invoke it**. The
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
-## THE STATE OF THIS PORT: TWO subsystems are RE'd. There is still no port binary
+## THE STATE OF THIS PORT: resident substrate boots to the first missing BIOS service
 
-Created 2026-08-12. There is **no recompiled substrate and no port binary.** Two groups are measured:
-the **crt0/boot group** (`RE-01`, `tools/re_crt0.py`) and all 20 non-empty `.PRG` overlay mappings into
-three slots (`RE-03`, `tools/re_overlay.py`). Every other guest-address group in
-`game/core/game_config.cpp` is `0` with its open step in `docs/re-frontier.md` named, and
-**nothing has ever executed the boot group** — "measured" means "this is what crt0 does to this image",
-not "the port boots with it". A framework defect found while measuring it (issue #3) would give a BIOS
+Created 2026-08-12. Three groups are measured: the **crt0/boot group** (`RE-01`,
+`tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), and all 20 non-empty `.PRG`
+overlay mappings into three slots (`RE-03`, `tools/re_overlay.py`). The gitignored substrate emits
+743 resident functions from the PS-EXE entry, builds `vagrant_port`, executes crt0 and guest main,
+then fails closed at the next real dependency: BIOS `A0:0x2F`. Every other guest-address group in
+`game/core/game_config.cpp` is `0` with its open step in `docs/re-frontier.md` named. A framework
+defect found while measuring crt0 (issue #3) would give a BIOS
 `InitHeap` a zero-size heap; measured 2026-08-12, that is **latent here** — no code in this image can
 call BIOS `malloc` (issue #3 has the census), so this game can neither exhibit the bug nor demonstrate
 its fix. If something here looks like it works, check `docs/codemap.md` — the honest inventory is short.
@@ -30,9 +31,10 @@ What DOES build today, and is the gate for a change to the seam:
 cmake -S . -B build && cmake --build build --target vagrant_seam -j$(nproc)
 ```
 
-`vagrant_seam` is an OBJECT library over `game/core/{game_config,game_hooks,main}.cpp`: it compiles but
-does not link, which is the strongest check possible before a substrate exists — it proves this port's
-`GameConfig`/`GameHooks` still satisfy the pinned framework's seam. **A change to a MEASURED constant in
+`vagrant_seam` is an OBJECT library over `game/core/{game_config,game_hooks,main}.cpp`: it proves this
+port's `GameConfig`/`GameHooks` still satisfy the pinned framework's seam without requiring generated
+code. When `generated/rec_sources.cmake` exists, `vagrant_port` is the resident-substrate gate. **A
+change to a MEASURED constant in
 `game_config.cpp` must also pass its source instrument: `python3 tools/re_crt0.py --selftest` for the
 boot group, or `python3 tools/re_overlay.py --selftest && python3 tools/re_overlay.py --check-config`
 for overlay slots/seeds. These diff shipped values back to the owned bytes. Compiling is not
@@ -122,7 +124,8 @@ citation attached. Full detail: `docs/references.md`.
   `MENUA.PRG`, is 0 bytes). **RE-03 is measured:** BATTLE/TITLE/ENDING load at `0x80068800`;
   INITBTL/SCREFF2/MAINMENU at `0x800F9800`; the other 14 non-empty MENU modules at `0x80102800`.
   `tools/re_overlay.py` verifies all 20 from their own bytes plus SHA-bound rood configs; the 0-byte
-  MENUA has no code/base. The tool has not observed a running loader because no substrate exists.
+  MENUA has no code/base. The resident substrate stops at BIOS `A0:0x2F` before the loader, so the
+  tool has not observed a running loader.
 - **Top-level disc directories:** `BATTLE BG EFFECT ENDING EVENT GIM MAP MENU MOV MUSIC OBJ SE SMALL
   SOUND TITLE`, plus `SLUS_010.40`, `SYSTEM.CNF`, `DBGFNT.TIM` in the root (5,180 files listed).
 - **It is a heavy streamer.** `ENDING/ENDING.XA` alone is 68 MB, plus `MOV/`, `MUSIC/`, `SE/`. The CD

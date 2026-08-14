@@ -13,21 +13,20 @@ matching decomp and exactly what it does and does not buy), `docs/info/` (claims
 
 ## Read this before anything else: the honest state, 2026-08-14
 
-**This repo is scaffolding plus TWO reverse-engineered subsystems. The port still does not run.** What
-exists is provisioning, the framework seam (compiling), the registries, a vendored CC0 matching decomp
-whose target images are *measured* to be byte-identical to this disc's — and, since 2026-08-12, the
-**crt0/boot group** (RE-01) and **all 20 non-empty `.PRG` overlay mappings into three slots** (RE-03),
-both measured and gated from the owned images. There is still no recompiled substrate, no
-`vagrant_port` binary, and no native body. `docs/re-frontier.md` reads 2 re-verified / 5 todo / 1
-blocked of 8 — that ratio, not this paragraph, is the status.
+**This repo has a verified resident bootstrap, not gameplay.** Provisioning, the framework seam,
+registries, and the matching CC0 reference are joined by three measured groups: crt0/boot (RE-01), a
+743-function resident substrate rooted at the PS-EXE entry (RE-02), and all 20 non-empty `.PRG`
+overlay mappings into three slots (RE-03). `vagrant_port` executes crt0 and guest main, then fails
+closed at BIOS `A0:0x2F`; overlays and gameplay remain beyond that boundary.
 
-Do not read "RE-01 is done" as "boot works". It means the eleven addresses the framework's `crt0_setup`
-consumes are now measured rather than guessed, **and — since 2026-08-12 — checked by code against the
+Do not read "RE-01 is done" as "the game works". The eleven addresses `crt0_setup` consumes are
+measured rather than guessed, **and — since 2026-08-12 — checked by code against the
 executable rather than by eye**: `tools/re_crt0.py --check-config` diffs the shipped constants in
 `game/core/game_config.cpp` against what it measures, and `--gate-citations` regenerates that file's
 disassembly block from the bytes. Before that, the tool held its own copy of the answer and the .cpp
 held a second hand-typed one with nothing comparing them, so both gates passed with two constants
-sabotaged. Nothing has EXECUTED any of it. The defect found while measuring (issue #3: `crt0_setup`
+sabotaged. RE-02 now executes this boot group through guest main. The defect found while measuring
+(issue #3: `crt0_setup`
 formerly omitted `a1` for BIOS InitHeap) is fixed in the shared framework; it was **latent for this
 game** because no code in this image can call BIOS `malloc`, so Vagrant Story cannot demonstrate the
 fix without first gaining a substrate.
@@ -36,7 +35,7 @@ fix without first gaining a substrate.
 
 | | |
 |---|---|
-| `external/psxport/` | the PSX-generic framework (submodule, pinned `4d218e9f`): MIPS→C recompiler, runtime substrate, GTE/SPU/MDEC/CD/GPU backends, SDK HLE, SBS differential harness, SDL_GPU renderer. **Not ours** — fix framework bugs upstream in the workspace dev clone, never in this submodule. |
+| `external/psxport/` | the PSX-generic framework (submodule, pinned `4a20ca51`): MIPS→C recompiler, runtime substrate, GTE/SPU/MDEC/CD/GPU backends, SDK HLE, SBS differential harness, SDL_GPU renderer. **Not ours** — fix framework bugs upstream in the workspace dev clone, never in this submodule. |
 | `game/`, `tools/`, `generated/` | this port: the seam, the RE, the provisioning, and (eventually) the recompiled substrate. |
 | `external/rood-reverse/` | a CC0 **matching decompilation** of this exact executable — a read-only REFERENCE, never built or linked here. See `docs/references.md`. |
 
@@ -47,15 +46,15 @@ fix without first gaining a substrate.
 | Disc resolution | `tools/resolve_disc.py` | ✅ | One implementation of CLI arg > `$PSXPORT_VAGRANT_DISC` > `.env` > a `*.chd` in the repo root; refuses (exit 2) naming all four sources rather than returning empty, and refuses when a configured path does not exist instead of falling through to a different disc. `run.sh` and `extract_exe.py` both go through it. |
 | Disc → executable provisioning | `tools/extract_exe.py`, `tools/discdump.py` | ✅ | Extracts `SLUS_010.40` (337,920 B) with psxport's own `discdump`, prints the PS-EXE header, and checks the SHA-1 against the vendored decomp's stated target. Verified end to end 2026-08-12. Says explicitly when it CANNOT check (decomp submodule absent) rather than passing quietly. |
 | Decomp-target verification | `tools/verify_decomp_targets.py` | ✅ | 21/21 code images on this disc match the SHA-1 rood-reverse decompiles against; the one uncovered image is the 0-byte `MENUA.PRG`. Prints its denominators and blind spots every run; `--selftest` proves it can report a MISMATCH. |
-| Static recompilation | `game/recomp_seeds.json` → `generated/` | ⬜ | **Not started, and blocked on RE-02.** RE-03 now supplies all 20 explicit non-empty `.PRG` bases, but the executable seed sets remain empty and no substrate was emitted. `emit.py` still refuses any missing mapping by design. |
-| Overlay load-base RE | `tools/re_overlay.py` → `game/recomp_seeds.json`, `game/core/game_config.cpp` | ✅ | 20/20 non-empty `.PRG` images independently place themselves by `jal`/entry-offset mode and agree with SHA-bound rood-reverse link addresses; the 0-byte MENUA has no base. Three verified slots, 20 explicit seed mappings. `--selftest` 7/7 with no skips; `--check-config` 24/24. M1 sees all three resident slot values but leaves 13/14 candidate descriptor sites unresolved; runtime loader observation awaits a substrate. |
-| Framework seam — config | `game/core/game_config.cpp` | 🟡 | Compiles. **The crt0/boot group is MEASURED and GATED (RE-01, C004), and the three overlay slots are MEASURED and GATED (RE-03).** Every other guest-address group remains `0` with its frontier step named (RE-02 executable seeds, RE-04 CD, RE-05 OT/pool, RE-06 pad, RE-08 HLE). Non-RE port facts: `discEnvVar`, `cardEnvVar`/`cardDefaultPath`, `paceQuota = 1`, `windowTitle`, `preserveVramBackdrop = 1`. |
-| Boot / crt0 RE | `tools/re_crt0.py` → `game/core/game_config.cpp` | ✅ | The boot group measured by EXECUTING crt0 on the extracted `SLUS_010.40` from the PS-EXE header's own entry PC (52,051 instructions) and reporting every store/load/call with its citation — so the numbers cannot be a transcription of `external/rood-reverse`, whose symbol names merely agree as labels. `--selftest`: 22 assertions, 0 failed, 13 of them negatives — 6 binary mutations that must REFUSE and 7 hand-edits of the SHIPPING FILE that must be REPORTED (including the two constant sabotages that used to pass). `--check-config`/`--gate-citations`: the shipped constants and citation block vs the bytes. `--gate-config`: 6/6, pristine compiles + 5 mutations each fail a named assert. Sabotage-proven RED on the real file and GREEN on restore. Also measures, and asserts, three things a reader would otherwise get wrong: the image is THREE separately-linked segments so `heapBase` is the end of the FIRST one's `.bss` and the declared BIOS arena overlaps 138,836 bytes of loaded image; that arena is never allocated from (no `malloc`/`free`/`calloc`/`realloc` A0 thunk exists; `InitHeap`'s only caller is crt0); and the SN link record at `0x80030FBC` independently confirms `gp` and `bssZeroHi`. Blind spots stated in the tool: models only the instruction subset crt0 uses (refuses on anything else), says nothing about overlay bases, cannot corroborate `gp` from CODE (zero gp-relative load/stores in code — 5 candidate encodings in the image, all 5 in data), and has never observed a running boot. |
+| Static recompilation | `game/recomp_seeds.json` → `generated/` | ✅ | Resident bootstrap verified: the emitter's mandatory PS-EXE entry root plus pointer/table discovery yields 260 seeds and 743 functions with both explicit executable lists empty. `vagrant_port` builds, executes measured crt0/InitHeap, and enters guest main; it next fail-fasts at unimplemented BIOS `A0:0x2F`, before overlay loading. Generated code is gitignored. |
+| Overlay load-base RE | `tools/re_overlay.py` → `game/recomp_seeds.json`, `game/core/game_config.cpp` | ✅ | 20/20 non-empty `.PRG` images independently place themselves by `jal`/entry-offset mode and agree with SHA-bound rood-reverse link addresses; the 0-byte MENUA has no base. Three verified slots, 20 explicit seed mappings. `--selftest` 7/7 with no skips; `--check-config` 24/24. Runtime loader observation awaits RE-04 because the resident substrate currently stops at BIOS `A0:0x2F` first. |
+| Framework seam — config | `game/core/game_config.cpp` | 🟡 | Compiles. **The crt0/boot group is MEASURED and GATED (RE-01, C004), the physical recompiled-main range is measured from the PS-EXE header (RE-02), and the three overlay slots are MEASURED and GATED (RE-03).** Other guest-address groups remain `0` under RE-04/05/06/08. |
+| Boot / crt0 RE | `tools/re_crt0.py` → `game/core/game_config.cpp` | ✅ | Executes crt0 from the owned image and gates all 11 boot fields plus the two PS-EXE-derived physical routing bounds. `--selftest`: 24 assertions, 0 failed, including negative mutations that zero `recMainLo` or extend `recMainHi`; `--gate-config`: pristine compile plus 5 static-assert mutations. The live substrate corroborates InitHeap and guest-main dispatch. |
 | Framework seam — hooks | `game/core/game_hooks.cpp` | ⬜ | Compiles. Neutral bodies where "nothing is owned" is the correct semantic; fail-fast `abort()` bodies for every framework path this port has not stood up. `bootInit` refuses rather than dispatching `gameMain == 0`. |
-| Framework seam — recomp registry | `game/core/recomp_register.cpp` | ⬜ | Deliberately UNWRITTEN and excluded from the compiling target — it is the one TU that names `generated/` symbols. It `#error`s under `VAGRANT_HAVE_SUBSTRATE` (which the port target defines) so a substrate cannot appear without someone writing the real registry. |
-| Process entry | `game/core/main.cpp` | 🟡 | Compiles. Framework bring-up in the standard order (GTE/MDEC/SPU/GPU/CD/HLE/pad), then `native_boot_run`. Never executed: there is no binary to run yet. |
-| Build | `CMakeLists.txt`, `cmake/vagrant_port.cmake` | 🟡 | `psxport` (framework lib) and `vagrant_seam` (OBJECT lib over the seam TUs — the gate that runs today) configure and build from a bare clone. `vagrant_port` is configured ONLY when `generated/rec_sources.cmake` exists, with a loud configure-time STATUS saying why it does not. `PSXPORT_DIR` defaults to the submodule. |
-| Play launcher | `run.sh` | 🟡 | The USER's; agents must never run it. It still stops before recompile because RE-02 has no executable seed set/substrate; RE-03 is no longer a blocker. |
+| Framework seam — recomp registry | `game/core/recomp_register.cpp` | ✅ | Installs the actual generated main dispatcher/index/override setter and empty generated overlay table. No guessed overlay setter or memset fast-path is wired. |
+| Process entry | `game/core/main.cpp` | 🟡 | Built and executed through measured crt0, InitHeap, and guest main. The current honest boundary is fatal BIOS `A0:0x2F`, before gameplay/overlay loading. |
+| Build | `CMakeLists.txt`, `cmake/vagrant_port.cmake` | ✅ | Bare clone boundary: `vagrant_seam` builds without copyrighted/provisioned inputs; `vagrant_port` is absent until the owner provisions the executable and emits gitignored `generated/`. After that explicit step it compiles and links the 743-function resident substrate. `PSXPORT_DIR` defaults to the pinned submodule and can select the framework dev clone. |
+| Play launcher | `run.sh` | 🟡 | The USER's; agents must never run it. The port binary now exists after explicit provisioning/emission, but boot deliberately stops at the unresolved BIOS `A0:0x2F` HLE dependency before gameplay. |
 | Registries | `tools/re_frontier.py` (shim), `tools/info.py`, `tools/catalog.py` | ✅ | The RE-frontier tracker is a SHIM onto the shared engine at `external/psxport/tools/port/re_frontier.py` — this repo grows no fork of it. `info.py`/`catalog.py` are copies (no hoisted engine exists for them yet); that divergence is a known cost, see below. |
 | Publication audit | `tools/go_public.py` | 🟡 | Copied from the Spyro repo, then FIXED here: it printed "RESULT: clean ✓ — ready to publish" over an empty history (zero blobs scanned, exit 0) — a clean bill of health over nothing. It now prints the blob count it scanned and exits 2 when that count is zero. The copies in the other game repos still have the defect. |
 | Everything else about the game | — | ⬜ | CD, frame loop, pad, renderer, audio, native ownership: **not started.** Boot is the one exception and only at the crt0 layer (row above). `docs/re-frontier.md` is the ordered list. |

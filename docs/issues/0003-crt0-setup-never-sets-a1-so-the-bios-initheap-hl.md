@@ -98,11 +98,11 @@ accumulate. `game/core/game_config.cpp` carries a ⚠ note pointing here.
 
 ## How to verify once it is fixed
 
-There is no substrate yet, so this is a code-read, not a run. When `vagrant_port` first boots:
-`PSXPORT_DEBUG=bios` must show `A0:0x39(0x800401AC, 0x001BBE50, ...)` — the second argument is the
-whole point. A zero there means the fix is absent or was reverted.
+The resident substrate now executes this path. `PSXPORT_DEBUG=bios` must show
+`A0:0x39(0x800401AC, 0x001BBE50, ...)` — the second argument is the whole point. A zero there means
+the fix is absent or was reverted.
 
-## FIXED IN THE FRAMEWORK 2026-08-12 — psxport 726d10c9, and this repo now pins it
+## FIXED IN THE FRAMEWORK 2026-08-12 — psxport 726d10c9, retained by the current pin
 
 `crt0_setup` no longer applies anything it computed itself: the whole boot group moved into
 `runtime/recomp/crt0_boot.h` as a pure `crt0_plan`, and `crt0_apply` sets `a1` (`w.reg(5, p.a1)`)
