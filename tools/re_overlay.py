@@ -977,7 +977,8 @@ def selftest(disc, out=print):
         f"{fails if fails else ''}")
     out("  Not covered by this selftest, stated explicitly: nothing here observes a RUNNING loader, "
         "so a base that is correct statically but rewritten at run time would pass every check "
-        "above. The resident substrate stops at BIOS A0:0x2F before the loader (RE-04).")
+        "above. The resident substrate now completes _diskReset but reaches a later no-frame "
+        "watchdog before any loader is observed (RE-04).")
     return 1 if fails else 0
 
 

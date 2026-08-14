@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: re-02,recompiler
 depends: game/recomp_seeds.json, game/core/game_config.cpp, game/core/recomp_register.cpp, external/psxport
-reconfirmed: 2026-08-14 12:57:01
-verified_at: 2026-08-14 12:57:01
+reconfirmed: 2026-08-14 13:33:18
+verified_at: 2026-08-14 13:33:18
 ---
 
 ## Claim
@@ -37,3 +37,7 @@ Commit 10cedc3: clean-pin 4a20ca51 build passes; live resident run reaches guest
 ## Re-confirmed 2026-08-14 12:57:01
 
 Psxport be03593f resolves the historical rand HLE boundary without changing Vagrant seeds or generated code. The BIOS trace records 1 srand and 97 rand calls; the bounded run reaches a later no-frame watchdog with no recomp-MISS or unimplemented-BIOS fatal. Its sampled Core::mem_w32 stack does not yet classify the stall. No gameplay or overlay execution is claimed.
+
+## Re-confirmed 2026-08-14 13:33:18
+
+Reconfirmed on the RE-04 bounded run using the framework content landed as psxport 2306a7c5: the same 743-function resident substrate reaches generated DsControlB and advances beyond _diskReset after the native blocking-control owner, with no recomp-MISS. Seed/root contract unchanged.

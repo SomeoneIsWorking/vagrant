@@ -1,7 +1,7 @@
 ---
 id: 9
 title: Vagrant reaches a no-frame watchdog after BIOS rand
-status: investigating
+status: resolved
 symptom: bounded resident run reaches main and completes srand/rand, then watchdog samples Core::mem_w32 under generated 0x8002411C with no first frame
 tags: boot,stall,sync,re-08
 created: 2026-08-14
@@ -24,6 +24,11 @@ and the byte-matching reference supplied the classification instead.
 
 ## Resolution
 
-Classified, not behaviorally fixed. RE-04 must own the game/libds command and read contract
-synchronously where possible. Special-casing the two boot commands would leave later read, XA,
-callback, and result semantics unowned.
+`tools/re_cd.py` measures and gates the `DsControlB` owner. The override owns the blocking-control
+command class, retains the generated body, reuses psxport's native controller semantics, and refuses
+unsupported query/read commands. `vagrant_cd_contract_test` compiles that same classifier, accepts all
+9 supported IDs, and refuses query, read, and unknown examples. `scratch/logs/re04-owner-run.log`
+records Pause and Setmode and advances beyond `_diskReset` to a later watchdog under `0x8001355C`.
+
+Async commands, callbacks, query results, reads, and XA remain explicitly open under RE-04; this
+resolution does not claim those contracts or gameplay.

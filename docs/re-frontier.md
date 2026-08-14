@@ -25,11 +25,9 @@ Statuses: ✅ re-verified · 🟡 re-partial (honest gap) · 🔬 in-progress ·
 bases) are `re-verified`. The emitter's mandatory PS-EXE entry root expands from 260 discovered seeds
 to 743 resident functions with `main` and `main_reentry` empty. The built port executes the measured
 crt0 plan, handles InitHeap, enters guest main at `0x80042C38`, and, against psxport `be03593f`,
-completes `_initRand`; the no-frame watchdog then lands inside `_diskReset` at `0x80044A60`.
-Generated code and the SHA-matching CC0 reference identify the complete wait chain:
-`_diskReset -> DsControlB (0x80025BE4) -> DsSync (0x8002411C) -> CD_sync (0x80020F28)`.
-The reset is polling asynchronous libds Pause completion. There is neither a
-recompilation miss nor an unimplemented-BIOS fatal, and there is no native body or gameplay claim.
+completes `_initRand`. RE-04 now owns blocking `DsControlB` at `0x80025BE4`; a bounded run completes
+`_diskReset`'s Pause and Setmode and advances to a later watchdog sampled under `0x8001355C`.
+There is neither a recompilation miss nor an unimplemented-BIOS fatal, and there is no gameplay claim.
 
 The resident substrate now executes the RE-01 plan through guest main. That does not mean gameplay
 boots: platform HLE and CD/overlay loading remain later frontier steps. The earlier fail-fast at the
@@ -78,11 +76,11 @@ measures it against this executable.
 ## cd
 
 ### RE-04 — CD load chokepoints and the loader's contract
-- status: todo
+- status: re-partial
 - deps: RE-01
-- evidence: Generated SLUS_010.40 code identifies the current no-frame chain as `0x80044A60 -> 0x80025BE4 -> 0x8002411C -> 0x80020F28`. The independently SHA-matching CC0 reference names these `_diskReset`, `DsControlB`, `DsSync`, and `CD_sync`, and its `_diskReset` body loops on `DsControlB(DslPause, NULL, NULL)` before issuing Setmode. This classifies the wait without importing behavior.
+- evidence: `tools/re_cd.py` scans the owned SHA-verified PS-EXE and uniquely derives `_diskReset 0x80044A60 -> DsControlB 0x80025BE4 -> DsCommand 0x80023B34 / DsSync 0x8002411C`, plus the low-level `CD_cw 0x80021470` and `CD_sync 0x80020F28` ABI shapes. Its selftest destroys the CD_cw shape and shifts the shipping owner +4; both refuse with named denominators. `vagrant_cd_contract_test` compiles the owner's exact classifier, accepts all 9 declared IDs, and refuses query, read, and unknown IDs. Low-level-only ownership was falsified because queued libds completion remained IRQ-driven. The corrected override retains the generated DsControlB body, validates the control-command class, and reuses psxport's native controller semantics. `scratch/logs/re04-owner-run.log` records Pause and Setmode, then advances beyond `_diskReset` to a later watchdog under `0x8001355C` without a recompilation miss or BIOS fatal.
 - where: game/core/game_config.cpp (cdInit, cdCommand, cdSync, cdReadPrim, cdFileLoad, cdAsyncRead, …)
-- gap: The first live boundary is now located, but the whole command/read/callback contract is not owned. The root implementation direction is a synchronous game/libds CD owner that preserves command results and callbacks; a low-level hardware-spin HLE or a Pause/Setmode special case would be a bandaid. Measure the later read/stream commands before installing an override.
+- gap: Blocking control is owned, not the whole CD subsystem. Async `DsCommand`/`DsPacket`, callbacks, query-result payloads, sector reads, filesystem loads, and XA remain guest-owned; the owner refuses those classes instead of fabricating results.
 - notes: This game streams from the disc heavily (ENDING/ENDING.XA alone is 68 MB, plus MOV/, MUSIC/, SE/), so the CD path is unusually load-bearing here compared with the other ports in this workspace. The user preference is synchronous ownership where semantics allow it; this identified polling loop is the first concrete candidate.
 
 ## frame

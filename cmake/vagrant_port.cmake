@@ -5,8 +5,8 @@
 #   psxport            the framework static library (+ psxport_smoke, its agnosticism proof). Always
 #                      configured, so `cmake --build build --target psxport_smoke` works from a bare
 #                      clone of this repo with nothing game-specific present.
-#   vagrant_seam       AN OBJECT LIBRARY over the seam TUs (game_config / game_hooks / main). It
-#                      COMPILES but does not link, which is exactly the check that is possible before a
+#   vagrant_seam       AN OBJECT LIBRARY over the shared game TUs (config / hooks / main / CD owner).
+#                      It COMPILES but does not link, which is exactly the check possible before a
 #                      substrate exists: it proves this port's GameConfig/GameHooks still satisfy the
 #                      pinned framework's seam — every designator binds, every hook signature matches.
 #                      That is the gate for this repo today (`--target vagrant_seam`).
@@ -20,18 +20,31 @@ include(${PSXPORT_DIR}/cmake/psxport.cmake)
 
 # ---- the seam, compile-only --------------------------------------------------------------------
 # recomp_register.cpp is excluded because it is the one TU that names generated symbols.
-set(SEAM_SRC
+set(GAME_SRC
   game/core/game_config.cpp
   game/core/game_hooks.cpp
   game/core/main.cpp
+  game/cd/ds_control.cpp
 )
-add_library(vagrant_seam OBJECT ${SEAM_SRC})
+add_library(vagrant_seam OBJECT ${GAME_SRC})
 set_target_properties(vagrant_seam PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_include_directories(vagrant_seam PRIVATE game game/core)
 # Links only for its INTERFACE include directories — an OBJECT library performs no link step, which is
 # the whole point: no substrate is needed to check that the seam is well-formed.
 target_link_libraries(vagrant_seam PRIVATE psxport)
 target_compile_options(vagrant_seam PRIVATE -g)
+
+# This test compiles the exact command classifier used by the shipping owner. It needs neither the
+# provisioned executable nor generated code, so a bare clone can prove every accepted control ID and
+# the refusal side of the ownership boundary.
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(vagrant_cd_contract_test tests/test_ds_control_contract.cpp)
+  set_target_properties(vagrant_cd_contract_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+  target_include_directories(vagrant_cd_contract_test PRIVATE game)
+  add_test(NAME vagrant_cd_contract_test COMMAND vagrant_cd_contract_test)
+endif()
 
 if(NOT PSXPORT_BUILD_PORT)
   return()
@@ -59,7 +72,7 @@ set_source_files_properties(${GEN_REC_SRCS}
   PROPERTIES LANGUAGE CXX
   COMPILE_OPTIONS "-O1;-foptimize-sibling-calls;-fno-strict-aliasing;-fwrapv")
 
-add_executable(vagrant_port ${SEAM_SRC} game/core/recomp_register.cpp ${GEN_REC_SRCS})
+add_executable(vagrant_port ${GAME_SRC} game/core/recomp_register.cpp ${GEN_REC_SRCS})
 
 target_compile_definitions(vagrant_port PRIVATE VAGRANT_HAVE_SUBSTRATE=1)
 

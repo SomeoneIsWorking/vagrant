@@ -18,11 +18,10 @@ Created 2026-08-12. Three groups are measured: the **crt0/boot group** (`RE-01`,
 `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), and all 20 non-empty `.PRG`
 overlay mappings into three slots (`RE-03`, `tools/re_overlay.py`). The gitignored substrate emits
 743 resident functions from the PS-EXE entry, builds `vagrant_port`, executes crt0 and guest main,
-and, against psxport `be03593f`, completes `_initRand` before the no-frame watchdog aborts. Static
-code plus the SHA-matching CC0 reference identifies that path as `_diskReset` (`0x80044A60`)
-spinning on `DsControlB` (`0x80025BE4`) / `DsSync` (`0x8002411C`) while `CD_sync`
-(`0x80020F28`) services the asynchronous command. The bounded run has no
-recompilation miss or unimplemented-BIOS fatal; this is not gameplay. Every other guest-address group in
+and completes `_initRand`. RE-04 now owns blocking `DsControlB` (`0x80025BE4`); the bounded run
+executes `_diskReset` Pause and Setmode and reaches a later watchdog sampled under `0x8001355C`.
+There is no recompilation miss or unimplemented-BIOS fatal; this is not gameplay. Async CD, reads,
+XA, overlays, and every other guest-address group in
 `game/core/game_config.cpp` is `0` with its open step in `docs/re-frontier.md` named. A framework
 defect found while measuring crt0 (issue #3) would give a BIOS
 `InitHeap` a zero-size heap; measured 2026-08-12, that is **latent here** — no code in this image can
@@ -35,9 +34,11 @@ What DOES build today, and is the gate for a change to the seam:
 cmake -S . -B build && cmake --build build --target vagrant_seam -j$(nproc)
 ```
 
-`vagrant_seam` is an OBJECT library over `game/core/{game_config,game_hooks,main}.cpp`: it proves this
-port's `GameConfig`/`GameHooks` still satisfy the pinned framework's seam without requiring generated
-code. When `generated/rec_sources.cmake` exists, `vagrant_port` is the resident-substrate gate. **A
+`vagrant_seam` is an OBJECT library over the shared game sources: config, hooks, process entry, and
+the `DsControlB` owner. It proves those sources still satisfy the pinned framework's seam without
+requiring generated code. `vagrant_cd_contract_test` compiles the owner's exact classifier and checks
+every accepted ID plus query/read/unknown refusals. When `generated/rec_sources.cmake` exists,
+`vagrant_port` is the resident-substrate gate. **A
 change to a MEASURED constant in
 `game_config.cpp` must also pass its source instrument: `python3 tools/re_crt0.py --selftest` for the
 boot group, or `python3 tools/re_overlay.py --selftest && python3 tools/re_overlay.py --check-config`

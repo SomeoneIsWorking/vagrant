@@ -7,11 +7,10 @@ A PC-native port of **Vagrant Story** (PS1, USA, `SLUS_010.40`) built on the
 ## Status: verified resident bootstrap, not gameplay
 
 Created 2026-08-12. An owner-provisioned, gitignored resident substrate now builds and runs. It
-executes measured crt0 and guest main and, against psxport `be03593f`, completes `_initRand` before
-the no-frame watchdog aborts. The sampled backtrace is in `OtAttr::trackStoreSlow -> Core::mem_w32`
-beneath generated guest functions; it is not evidence of a specific hardware-sync primitive. The
-bounded run has no recompilation miss or unimplemented-BIOS fatal; overlays and gameplay have not
-been reached. What exists:
+executes measured crt0 and guest main, completes `_initRand`, and now completes `_diskReset`'s Pause
+and Setmode through blocking libds control ownership. The next watchdog is sampled later under
+generated `0x8001355C`. The bounded run has no recompilation miss or unimplemented-BIOS fatal; async
+CD, reads, XA, overlays, and gameplay have not been reached. What exists:
 
 - disc → executable provisioning from **your own** disc image (nothing game-derived is in this repo),
 - the framework seam (`GameConfig` / `GameHooks`), compiling against the pinned framework,

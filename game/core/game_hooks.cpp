@@ -19,6 +19,8 @@
 #include "cfg.h"
 #include <stdlib.h>
 
+void vagrant_cd_register_overrides();
+
 // ── boot ────────────────────────────────────────────────────────────────────────────────────────
 static void vagrant_bootInit(Core* c) {
   if (!c->cfg->gameMain) {
@@ -33,9 +35,7 @@ static void vagrant_bootInit(Core* c) {
 
 // ── neutral ─────────────────────────────────────────────────────────────────────────────────────
 static void vagrant_registerOverrides(Game*) {
-  // No native override exists — this port owns no guest function. Nothing to install is the truthful
-  // state, and keeping the hook wired means the wiring is exercised from the first commit rather than
-  // stood up later on top of an untested seam.
+  vagrant_cd_register_overrides();
 }
 
 static void vagrant_renderFadeState(Core*, FadeState* out) {

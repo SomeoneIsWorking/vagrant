@@ -17,11 +17,10 @@ matching decomp and exactly what it does and does not buy), `docs/info/` (claims
 registries, and the matching CC0 reference are joined by three measured groups: crt0/boot (RE-01), a
 743-function resident substrate rooted at the PS-EXE entry (RE-02), and all 20 non-empty `.PRG`
 overlay mappings into three slots (RE-03). Against psxport `be03593f`, `vagrant_port` executes crt0
-and guest main, completes `_initRand`, then aborts at the no-frame watchdog. Generated code and the
-SHA-matching CC0 reference identify the enclosing operation as `_diskReset`: it polls `DsControlB`
-until the asynchronous Pause command completes through `DsSync`/`CD_sync`. This is a game/libds CD
-ownership gap, not evidence for a low-level hardware-spin HLE. There is no recompilation miss or
-unimplemented-BIOS fatal; overlays and gameplay remain beyond that boundary.
+and guest main and completes `_initRand`. Against pinned psxport `2306a7c5`, it also completes
+`_diskReset` through measured `DsControlB` ownership. The
+next watchdog is sampled later under generated `0x8001355C`. Async CD,
+reads, XA, overlays, frame ownership, and gameplay remain open.
 
 Do not read "RE-01 is done" as "the game works". The eleven addresses `crt0_setup` consumes are
 measured rather than guessed, **and — since 2026-08-12 — checked by code against the
@@ -39,7 +38,7 @@ fix without first gaining a substrate.
 
 | | |
 |---|---|
-| `external/psxport/` | the PSX-generic framework (recorded gitlink `be03593f`): MIPS→C recompiler, runtime substrate, GTE/SPU/MDEC/CD/GPU backends, SDK HLE, SBS differential harness, SDL_GPU renderer. **Not ours** — fix framework bugs upstream in the workspace dev clone, never in this submodule. |
+| `external/psxport/` | the PSX-generic framework (recorded gitlink `2306a7c5`): MIPS→C recompiler, runtime substrate, GTE/SPU/MDEC/CD/GPU backends, SDK HLE, SBS differential harness, SDL_GPU renderer. **Not ours** — fix framework bugs upstream in the workspace dev clone, never in this submodule. |
 | `game/`, `tools/`, `generated/` | this port: the seam, the RE, the provisioning, and (eventually) the recompiled substrate. |
 | `external/rood-reverse/` | a CC0 **matching decompilation** of this exact executable — a read-only REFERENCE, never built or linked here. See `docs/references.md`. |
 
@@ -56,12 +55,13 @@ fix without first gaining a substrate.
 | Boot / crt0 RE | `tools/re_crt0.py` → `game/core/game_config.cpp` | ✅ | Executes crt0 from the owned image and gates all 11 boot fields plus the two PS-EXE-derived physical routing bounds. `--selftest`: 24 assertions, 0 failed, including negative mutations that zero `recMainLo` or extend `recMainHi`; `--gate-config`: pristine compile plus 5 static-assert mutations. The live substrate corroborates InitHeap and guest-main dispatch. |
 | Framework seam — hooks | `game/core/game_hooks.cpp` | ⬜ | Compiles. Neutral bodies where "nothing is owned" is the correct semantic; fail-fast `abort()` bodies for every framework path this port has not stood up. `bootInit` refuses rather than dispatching `gameMain == 0`. |
 | Framework seam — recomp registry | `game/core/recomp_register.cpp` | ✅ | Installs the actual generated main dispatcher/index/override setter and empty generated overlay table. No guessed overlay setter or memset fast-path is wired. |
-| Process entry | `game/core/main.cpp` | 🟡 | Built and executed through measured crt0, InitHeap, guest main, and `_initRand`. The current honest boundary is `_diskReset` polling asynchronous libds Pause completion; no gameplay/overlay loading is observed. |
-| Build | `CMakeLists.txt`, `cmake/vagrant_port.cmake` | ✅ | Bare clone boundary: `vagrant_seam` builds without copyrighted/provisioned inputs; `vagrant_port` is absent until the owner provisions the executable and emits gitignored `generated/`. After that explicit step it compiles and links the 743-function resident substrate. `PSXPORT_DIR` defaults to the pinned submodule and can select the framework dev clone. |
+| Blocking libds control | `game/cd/ds_control.cpp`, `game/cd/ds_control_contract.h`, `tests/test_ds_control_contract.cpp` | 🟡 | The runtime owns measured `DsControlB` through the generic synchronous controller and retains the generated body. The standalone shipping-classifier test accepts all 9 supported control IDs and refuses query, read, and unknown IDs. Async commands, callbacks, result payloads, reads, and XA remain unowned. |
+| Process entry | `game/core/main.cpp` | 🟡 | Built and executed through crt0, guest main, `_initRand`, and `_diskReset` Pause/Setmode. The current honest boundary is a later watchdog sampled under `0x8001355C`; no gameplay/overlay loading is observed. |
+| Build | `CMakeLists.txt`, `cmake/vagrant_port.cmake` | ✅ | Bare clone boundary: `vagrant_seam` compiles one shared game-source list, including the `DsControlB` owner, without copyrighted/provisioned inputs; `vagrant_cd_contract_test` exercises the owner's exact classifier. `vagrant_port` reuses that list and is absent until the owner provisions the executable and emits gitignored `generated/`. After that explicit step it compiles and links the 743-function resident substrate. `PSXPORT_DIR` defaults to the pinned submodule and can select the framework dev clone. |
 | Play launcher | `run.sh` | 🟡 | The USER's; agents must never run it. After explicit provisioning/emission it builds and runs the resident substrate to the current no-frame watchdog; this is not a gameplay claim. |
 | Registries | `tools/re_frontier.py` (shim), `tools/info.py`, `tools/catalog.py` | ✅ | The RE-frontier tracker is a SHIM onto the shared engine at `external/psxport/tools/port/re_frontier.py` — this repo grows no fork of it. `info.py`/`catalog.py` are copies (no hoisted engine exists for them yet); that divergence is a known cost, see below. |
 | Publication audit | `tools/go_public.py` | 🟡 | Copied from the Spyro repo, then FIXED here: it printed "RESULT: clean ✓ — ready to publish" over an empty history (zero blobs scanned, exit 0) — a clean bill of health over nothing. It now prints the blob count it scanned and exits 2 when that count is zero. The copies in the other game repos still have the defect. |
-| Everything else about the game | — | ⬜ | CD, frame loop, pad, renderer, audio, native ownership: **not started.** Boot is the one exception and only at the crt0 layer (row above). `docs/re-frontier.md` is the ordered list. |
+| Everything else about the game | — | ⬜ | Async CD/read/XA, frame loop, pad, renderer, audio, and other native ownership: **not started.** Boot and blocking libds control are the exceptions described above. `docs/re-frontier.md` is the ordered list. |
 
 ## Known local costs, recorded rather than hidden
 

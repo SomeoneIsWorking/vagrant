@@ -283,7 +283,10 @@ static const GameConfig g_vagrant_cfg = {
     // emission/registration can be owned.
     .overlaySlots = { {0x80068800, nullptr}, {0x800F9800, nullptr}, {0x80102800, nullptr} },
 
-    // --- CD chokepoints ---------------------------------------------------------- RE-04, NOT DONE --
+    // --- CD chokepoints --------------------------------------------------------------- RE-04 --
+    // tools/re_cd.py measures the full _diskReset -> DsControlB -> DsCommand/DsSync -> CD_sync
+    // chain. The synchronous DsControlB owner is registered by game/cd/ds_control.cpp; asynchronous
+    // commands, callbacks, reads and XA remain zero/unowned until separately measured.
     .cdInit = 0, .cdCommand = 0, .cdSync = 0, .cdReadPrim = 0, .cdFileLoad = 0, .cdAsyncRead = 0,
     .voicePlay = 0, .voiceStop = 0, .lastSectorTracker = 0,
     .cdInlineLoad = 0,
@@ -302,15 +305,7 @@ static const GameConfig g_vagrant_cfg = {
     .padSlotPtrTable = 0,
     .padSlotPtrStride = 0,
 
-    // --- platform HLE (the hardware-sync primitives) ----------------------------- RE-08, NOT DONE --
-    // Retagged from RE-01 to RE-08 on 2026-08-12: RE-01 is the crt0 GROUP consumed by crt0_setup
-    // (the fields above) and it is now MEASURED, so leaving these windows under the same step number
-    // would have made a done RE-01 imply a done HLE. They are a separate step and RE-08 is it.
-    // ZERO MEANS "not RE'd, install nothing". initBuiltins() then registers no handler and says so;
-    // a run that needs one hangs in the guest's real spin loop, which is the honest signal that the RE
-    // is outstanding. The windows are zero too, so register_() refuses everything — this game has not
-    // stated its memory map yet, and a window guessed from another game's map is how a handler lands
-    // on an unrelated function.
+    // --- platform HLE (the hardware-sync primitives) ------------------------------- RE-04/08 --
     .hle = {},
 
     // --- rendering policy ------------------------------------------------- 1 while the guest draws --
