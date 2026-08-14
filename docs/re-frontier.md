@@ -25,9 +25,10 @@ Statuses: ✅ re-verified · 🟡 re-partial (honest gap) · 🔬 in-progress ·
 bases) are `re-verified`. The emitter's mandatory PS-EXE entry root expands from 260 discovered seeds
 to 743 resident functions with `main` and `main_reentry` empty. The built port executes the measured
 crt0 plan, handles InitHeap, enters guest main at `0x80042C38`, and, against psxport `be03593f`,
-completes `_initRand`; the no-frame watchdog then samples `OtAttr::trackStoreSlow -> Core::mem_w32`
-beneath generated guest functions `0x8002411C -> 0x80025BE4 -> 0x80044A60 -> 0x80042A64 ->
-0x80042BAC -> main`. That sample does not identify the blocking condition. There is neither a
+completes `_initRand`; the no-frame watchdog then lands inside `_diskReset` at `0x80044A60`.
+Generated code and the SHA-matching CC0 reference identify the complete wait chain:
+`_diskReset -> DsControlB (0x80025BE4) -> DsSync (0x8002411C) -> CD_sync (0x80020F28)`.
+The reset is polling asynchronous libds Pause completion. There is neither a
 recompilation miss nor an unimplemented-BIOS fatal, and there is no native body or gameplay claim.
 
 The resident substrate now executes the RE-01 plan through guest main. That does not mean gameplay
@@ -61,7 +62,7 @@ measures it against this executable.
 - deps: RE-01
 - evidence: The framework emitter was run on the owned, SHA-verified SLUS_010.40 with this game's seed file and no overlay directory. Its built-in root contract is `{exe.entry} | explicit main seeds | pointer/table discoveries`; the measured PS-EXE entry is `0x8001F544`. With both explicit executable lists empty it reports `260 seeds -> 743 recompiled after jal discovery`, including entry `0x8001F544`, InitHeap thunk `0x80026864`, and main `0x80042C38`. `vagrant_port` builds and bounded runs prove the generated dispatcher handles InitHeap then reaches guest main. The earlier `scratch/logs/re02-third-run.log` fail-fast at BIOS `A0:0x2F` was a generic framework rand gap, not a missing seed. Against psxport `be03593f`, `scratch/logs/bios-rand-vagrant-bios-trace.log` records exactly one `srand` (`A0:0x30`) and 97 `rand` (`A0:0x2F`) calls. `scratch/logs/bios-rand-vagrant-final-run.log` then reaches the no-frame watchdog without `[recomp-MISS]` or unimplemented-BIOS fatal; its sampled stack is in `Core::mem_w32` beneath generated `0x8002411C` and callers, which is not enough to classify the stall. A deliberately broken first run with `recMainLo/Hi=0` produced a false miss for already-generated `0x80026864`; inspecting `rec_func_index` identified the routing-range root cause, and configuring the PS-EXE physical text range `[0x00010000,0x00062000)` removed it without adding a seed.
 - where: game/recomp_seeds.json (empty explicit executable seed lists) + game/core/game_config.cpp (physical main routing range) + game/core/recomp_register.cpp (generated registry) + generated/ (gitignored emitter output)
-- gap: This is the verified resident bootstrap frontier, not a gameplay claim. Overlay modules are not in this smallest substrate, and the later no-frame stall remains unclassified. Future `[recomp-MISS]` failures may extend the explicit lists only with their runtime rationale.
+- gap: This is the verified resident bootstrap frontier, not a gameplay claim. Overlay modules are not in this smallest substrate. The later no-frame stall is classified as `_diskReset` polling asynchronous libds command completion; owning that contract belongs to RE-04. Future `[recomp-MISS]` failures may extend the explicit lists only with their runtime rationale.
 - notes: Reproduce from a provisioned executable with `mkdir -p generated && PSXPORT_SHARDS=8 python3 "${PSXPORT_DIR:-external/psxport}/tools/recomp/emit.py" scratch/bin/vagrant/SLUS_010.40 generated/recompiled.c --seeds game/recomp_seeds.json`, then configure/build normally. Generated code remains gitignored and must never be edited.
 
 ## overlays
@@ -79,10 +80,10 @@ measures it against this executable.
 ### RE-04 — CD load chokepoints and the loader's contract
 - status: todo
 - deps: RE-01
-- evidence:
+- evidence: Generated SLUS_010.40 code identifies the current no-frame chain as `0x80044A60 -> 0x80025BE4 -> 0x8002411C -> 0x80020F28`. The independently SHA-matching CC0 reference names these `_diskReset`, `DsControlB`, `DsSync`, and `CD_sync`, and its `_diskReset` body loops on `DsControlB(DslPause, NULL, NULL)` before issuing Setmode. This classifies the wait without importing behavior.
 - where: game/core/game_config.cpp (cdInit, cdCommand, cdSync, cdReadPrim, cdFileLoad, cdAsyncRead, …)
-- gap: Nothing located. The splat config shows the executable links stock Sony libcd (`libcd/SYS`, `libcd/BIOS`, `libcd/C_011` .rodata subsegments), so the framework's stock-libcd chokepoint set is the likely shape — again a hypothesis about which entry points exist, not their addresses in this image.
-- notes: This game streams from the disc heavily (ENDING/ENDING.XA alone is 68 MB, plus MOV/, MUSIC/, SE/), so the CD path is unusually load-bearing here compared with the other ports in this workspace.
+- gap: The first live boundary is now located, but the whole command/read/callback contract is not owned. The root implementation direction is a synchronous game/libds CD owner that preserves command results and callbacks; a low-level hardware-spin HLE or a Pause/Setmode special case would be a bandaid. Measure the later read/stream commands before installing an override.
+- notes: This game streams from the disc heavily (ENDING/ENDING.XA alone is 68 MB, plus MOV/, MUSIC/, SE/), so the CD path is unusually load-bearing here compared with the other ports in this workspace. The user preference is synchronous ownership where semantics allow it; this identified polling loop is the first concrete candidate.
 
 ## frame
 

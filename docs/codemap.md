@@ -17,10 +17,11 @@ matching decomp and exactly what it does and does not buy), `docs/info/` (claims
 registries, and the matching CC0 reference are joined by three measured groups: crt0/boot (RE-01), a
 743-function resident substrate rooted at the PS-EXE entry (RE-02), and all 20 non-empty `.PRG`
 overlay mappings into three slots (RE-03). Against psxport `be03593f`, `vagrant_port` executes crt0
-and guest main, completes `_initRand`, then aborts at the no-frame watchdog. The sampled backtrace is
-`OtAttr::trackStoreSlow -> Core::mem_w32` beneath generated guest functions, not proof of a specific
-hardware-sync primitive. There is no recompilation miss or unimplemented-BIOS fatal; overlays and
-gameplay remain beyond that boundary.
+and guest main, completes `_initRand`, then aborts at the no-frame watchdog. Generated code and the
+SHA-matching CC0 reference identify the enclosing operation as `_diskReset`: it polls `DsControlB`
+until the asynchronous Pause command completes through `DsSync`/`CD_sync`. This is a game/libds CD
+ownership gap, not evidence for a low-level hardware-spin HLE. There is no recompilation miss or
+unimplemented-BIOS fatal; overlays and gameplay remain beyond that boundary.
 
 Do not read "RE-01 is done" as "the game works". The eleven addresses `crt0_setup` consumes are
 measured rather than guessed, **and — since 2026-08-12 — checked by code against the
@@ -55,7 +56,7 @@ fix without first gaining a substrate.
 | Boot / crt0 RE | `tools/re_crt0.py` → `game/core/game_config.cpp` | ✅ | Executes crt0 from the owned image and gates all 11 boot fields plus the two PS-EXE-derived physical routing bounds. `--selftest`: 24 assertions, 0 failed, including negative mutations that zero `recMainLo` or extend `recMainHi`; `--gate-config`: pristine compile plus 5 static-assert mutations. The live substrate corroborates InitHeap and guest-main dispatch. |
 | Framework seam — hooks | `game/core/game_hooks.cpp` | ⬜ | Compiles. Neutral bodies where "nothing is owned" is the correct semantic; fail-fast `abort()` bodies for every framework path this port has not stood up. `bootInit` refuses rather than dispatching `gameMain == 0`. |
 | Framework seam — recomp registry | `game/core/recomp_register.cpp` | ✅ | Installs the actual generated main dispatcher/index/override setter and empty generated overlay table. No guessed overlay setter or memset fast-path is wired. |
-| Process entry | `game/core/main.cpp` | 🟡 | Built and executed through measured crt0, InitHeap, guest main, and `_initRand`. The current honest boundary is the no-frame watchdog, sampled in `OtAttr::trackStoreSlow -> Core::mem_w32`; no gameplay/overlay loading is observed. |
+| Process entry | `game/core/main.cpp` | 🟡 | Built and executed through measured crt0, InitHeap, guest main, and `_initRand`. The current honest boundary is `_diskReset` polling asynchronous libds Pause completion; no gameplay/overlay loading is observed. |
 | Build | `CMakeLists.txt`, `cmake/vagrant_port.cmake` | ✅ | Bare clone boundary: `vagrant_seam` builds without copyrighted/provisioned inputs; `vagrant_port` is absent until the owner provisions the executable and emits gitignored `generated/`. After that explicit step it compiles and links the 743-function resident substrate. `PSXPORT_DIR` defaults to the pinned submodule and can select the framework dev clone. |
 | Play launcher | `run.sh` | 🟡 | The USER's; agents must never run it. After explicit provisioning/emission it builds and runs the resident substrate to the current no-frame watchdog; this is not a gameplay claim. |
 | Registries | `tools/re_frontier.py` (shim), `tools/info.py`, `tools/catalog.py` | ✅ | The RE-frontier tracker is a SHIM onto the shared engine at `external/psxport/tools/port/re_frontier.py` — this repo grows no fork of it. `info.py`/`catalog.py` are copies (no hoisted engine exists for them yet); that divergence is a known cost, see below. |

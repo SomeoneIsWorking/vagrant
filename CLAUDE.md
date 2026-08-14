@@ -18,9 +18,10 @@ Created 2026-08-12. Three groups are measured: the **crt0/boot group** (`RE-01`,
 `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), and all 20 non-empty `.PRG`
 overlay mappings into three slots (`RE-03`, `tools/re_overlay.py`). The gitignored substrate emits
 743 resident functions from the PS-EXE entry, builds `vagrant_port`, executes crt0 and guest main,
-and, against psxport `be03593f`, completes `_initRand` before the no-frame watchdog aborts. Its
-backtrace samples `OtAttr::trackStoreSlow -> Core::mem_w32` beneath generated functions
-`0x8002411C -> 0x80025BE4 -> 0x80044A60 -> 0x80042A64 -> 0x80042BAC -> main`. The bounded run has no
+and, against psxport `be03593f`, completes `_initRand` before the no-frame watchdog aborts. Static
+code plus the SHA-matching CC0 reference identifies that path as `_diskReset` (`0x80044A60`)
+spinning on `DsControlB` (`0x80025BE4`) / `DsSync` (`0x8002411C`) while `CD_sync`
+(`0x80020F28`) services the asynchronous command. The bounded run has no
 recompilation miss or unimplemented-BIOS fatal; this is not gameplay. Every other guest-address group in
 `game/core/game_config.cpp` is `0` with its open step in `docs/re-frontier.md` named. A framework
 defect found while measuring crt0 (issue #3) would give a BIOS
