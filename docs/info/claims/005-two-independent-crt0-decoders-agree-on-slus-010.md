@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: crt0
 depends: game/core/game_config.cpp
-reconfirmed: 2026-08-14 12:36:31
-verified_at: 2026-08-14 12:36:31
+reconfirmed: 2026-08-14 12:57:01
+verified_at: 2026-08-14 12:57:01
 ---
 
 ## Claim
@@ -28,3 +28,7 @@ Re-verified 2026-08-14: tools/re_crt0.py still yields the recorded boot group, a
 ## Re-confirmed 2026-08-14 12:36:31
 
 Reverified after RE-02: shipped boot constants and citation gate remain exact; live resident boot agrees through guest main.
+
+## Re-confirmed 2026-08-14 12:57:01
+
+Reconfirmed after psxport be03593f integration: the symbolic and concrete crt0 measurements remain unchanged, and the live resident path continues to corroborate measured InitHeap and guest-main dispatch before a later, still-unclassified no-frame stall.

@@ -12,13 +12,16 @@ directive that **`./run.sh` is the user's and agents must never invoke it**. The
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
-## THE STATE OF THIS PORT: resident substrate boots to the first missing BIOS service
+## THE STATE OF THIS PORT: resident substrate reaches the no-frame watchdog
 
 Created 2026-08-12. Three groups are measured: the **crt0/boot group** (`RE-01`,
 `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), and all 20 non-empty `.PRG`
 overlay mappings into three slots (`RE-03`, `tools/re_overlay.py`). The gitignored substrate emits
 743 resident functions from the PS-EXE entry, builds `vagrant_port`, executes crt0 and guest main,
-then fails closed at the next real dependency: BIOS `A0:0x2F`. Every other guest-address group in
+and, against psxport `be03593f`, completes `_initRand` before the no-frame watchdog aborts. Its
+backtrace samples `OtAttr::trackStoreSlow -> Core::mem_w32` beneath generated functions
+`0x8002411C -> 0x80025BE4 -> 0x80044A60 -> 0x80042A64 -> 0x80042BAC -> main`. The bounded run has no
+recompilation miss or unimplemented-BIOS fatal; this is not gameplay. Every other guest-address group in
 `game/core/game_config.cpp` is `0` with its open step in `docs/re-frontier.md` named. A framework
 defect found while measuring crt0 (issue #3) would give a BIOS
 `InitHeap` a zero-size heap; measured 2026-08-12, that is **latent here** — no code in this image can
@@ -124,8 +127,8 @@ citation attached. Full detail: `docs/references.md`.
   `MENUA.PRG`, is 0 bytes). **RE-03 is measured:** BATTLE/TITLE/ENDING load at `0x80068800`;
   INITBTL/SCREFF2/MAINMENU at `0x800F9800`; the other 14 non-empty MENU modules at `0x80102800`.
   `tools/re_overlay.py` verifies all 20 from their own bytes plus SHA-bound rood configs; the 0-byte
-  MENUA has no code/base. The resident substrate stops at BIOS `A0:0x2F` before the loader, so the
-  tool has not observed a running loader.
+  MENUA has no code/base. The resident substrate reaches the no-frame watchdog before a loader is
+  observed, so the tool has not observed a running loader.
 - **Top-level disc directories:** `BATTLE BG EFFECT ENDING EVENT GIM MAP MENU MOV MUSIC OBJ SE SMALL
   SOUND TITLE`, plus `SLUS_010.40`, `SYSTEM.CNF`, `DBGFNT.TIM` in the root (5,180 files listed).
 - **It is a heavy streamer.** `ENDING/ENDING.XA` alone is 68 MB, plus `MOV/`, `MUSIC/`, `SE/`. The CD

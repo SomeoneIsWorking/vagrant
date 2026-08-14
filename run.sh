@@ -10,7 +10,8 @@
 #   cmake -S . -B build && cmake --build build --target vagrant_seam -j$(nproc)
 #
 # The resident substrate is reproducibly emitted from the verified executable. It currently reaches
-# guest main and then fails closed at BIOS A0:0x2F; this launcher builds and runs that honest boundary.
+# the no-frame watchdog after entering guest main; this launcher builds and runs that honest,
+# pre-gameplay boundary.
 set -eu
 cd "$(dirname "$0")"
 
@@ -70,5 +71,5 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPSXPORT_DIR="$(cd "$PSXPORT_DIR
 cmake --build build -j "$JOBS" --target vagrant_port || die "port build failed"
 
 # ---- 3. run -------------------------------------------------------------------------------------
-say "launching the resident substrate (current expected stop: BIOS A0:0x2F)…"
+say "launching the resident substrate (current expected stop: no-frame watchdog after guest main)…"
 exec scratch/bin/vagrant_port

@@ -24,12 +24,16 @@ Statuses: ✅ re-verified · 🟡 re-partial (honest gap) · 🔬 in-progress ·
 `RE-01` (crt0/boot), `RE-02` (resident seed set/substrate), and `RE-03` (all non-empty `.PRG` load
 bases) are `re-verified`. The emitter's mandatory PS-EXE entry root expands from 260 discovered seeds
 to 743 resident functions with `main` and `main_reentry` empty. The built port executes the measured
-crt0 plan, handles InitHeap, and enters guest main at `0x80042C38`; its next honest stop is the
-framework's fatal unimplemented BIOS `A0:0x2F`, not a recompilation miss. There is no native body.
+crt0 plan, handles InitHeap, enters guest main at `0x80042C38`, and, against psxport `be03593f`,
+completes `_initRand`; the no-frame watchdog then samples `OtAttr::trackStoreSlow -> Core::mem_w32`
+beneath generated guest functions `0x8002411C -> 0x80025BE4 -> 0x80044A60 -> 0x80042A64 ->
+0x80042BAC -> main`. That sample does not identify the blocking condition. There is neither a
+recompilation miss nor an unimplemented-BIOS fatal, and there is no native body or gameplay claim.
 
 The resident substrate now executes the RE-01 plan through guest main. That does not mean gameplay
-boots: platform HLE and CD/overlay loading remain later frontier steps, and the first run correctly
-refuses at an unimplemented value-returning BIOS leaf instead of fabricating a return value.
+boots: platform HLE and CD/overlay loading remain later frontier steps. The earlier fail-fast at the
+unimplemented `rand` leaf exposed a generic framework gap; psxport `be03593f` resolves it without a
+Vagrant seed or generated-code change.
 
 **The one thing that IS measured is the SUPPLY, not the port** — see `docs/references.md`. A CC0
 matching decompilation (rood-reverse) targets byte-identical copies of all 21 code images on this
@@ -55,9 +59,9 @@ measures it against this executable.
 ### RE-02 — recompiler seed set for SLUS_010.40
 - status: re-verified
 - deps: RE-01
-- evidence: The framework emitter was run on the owned, SHA-verified SLUS_010.40 with this game's seed file and no overlay directory. Its built-in root contract is `{exe.entry} | explicit main seeds | pointer/table discoveries`; the measured PS-EXE entry is `0x8001F544`. With both explicit executable lists empty it reports `260 seeds -> 743 recompiled after jal discovery`, including entry `0x8001F544`, InitHeap thunk `0x80026864`, and main `0x80042C38`. `vagrant_port` builds and the bounded headless run `scratch/logs/re02-third-run.log` proves the generated dispatcher handles InitHeap then reaches guest main. The next failure is explicitly `FATAL: unimplemented BIOS A0:0x2F`, caller `0x80042778`; there is no `[recomp-MISS]` to justify another seed. A deliberately broken first run with `recMainLo/Hi=0` produced a false miss for already-generated `0x80026864`; inspecting `rec_func_index` identified the routing-range root cause, and configuring the PS-EXE physical text range `[0x00010000,0x00062000)` removed it without adding a seed.
+- evidence: The framework emitter was run on the owned, SHA-verified SLUS_010.40 with this game's seed file and no overlay directory. Its built-in root contract is `{exe.entry} | explicit main seeds | pointer/table discoveries`; the measured PS-EXE entry is `0x8001F544`. With both explicit executable lists empty it reports `260 seeds -> 743 recompiled after jal discovery`, including entry `0x8001F544`, InitHeap thunk `0x80026864`, and main `0x80042C38`. `vagrant_port` builds and bounded runs prove the generated dispatcher handles InitHeap then reaches guest main. The earlier `scratch/logs/re02-third-run.log` fail-fast at BIOS `A0:0x2F` was a generic framework rand gap, not a missing seed. Against psxport `be03593f`, `scratch/logs/bios-rand-vagrant-bios-trace.log` records exactly one `srand` (`A0:0x30`) and 97 `rand` (`A0:0x2F`) calls. `scratch/logs/bios-rand-vagrant-final-run.log` then reaches the no-frame watchdog without `[recomp-MISS]` or unimplemented-BIOS fatal; its sampled stack is in `Core::mem_w32` beneath generated `0x8002411C` and callers, which is not enough to classify the stall. A deliberately broken first run with `recMainLo/Hi=0` produced a false miss for already-generated `0x80026864`; inspecting `rec_func_index` identified the routing-range root cause, and configuring the PS-EXE physical text range `[0x00010000,0x00062000)` removed it without adding a seed.
 - where: game/recomp_seeds.json (empty explicit executable seed lists) + game/core/game_config.cpp (physical main routing range) + game/core/recomp_register.cpp (generated registry) + generated/ (gitignored emitter output)
-- gap: This is the verified resident bootstrap frontier, not a gameplay claim. Overlay modules are not in this smallest substrate, and boot stops at the separate platform-HLE dependency before any loader executes. Future `[recomp-MISS]` failures may extend the explicit lists only with their runtime rationale.
+- gap: This is the verified resident bootstrap frontier, not a gameplay claim. Overlay modules are not in this smallest substrate, and the later no-frame stall remains unclassified. Future `[recomp-MISS]` failures may extend the explicit lists only with their runtime rationale.
 - notes: Reproduce from a provisioned executable with `mkdir -p generated && PSXPORT_SHARDS=8 python3 "${PSXPORT_DIR:-external/psxport}/tools/recomp/emit.py" scratch/bin/vagrant/SLUS_010.40 generated/recompiled.c --seeds game/recomp_seeds.json`, then configure/build normally. Generated code remains gitignored and must never be edited.
 
 ## overlays
@@ -67,7 +71,7 @@ measures it against this executable.
 - deps:
 - evidence: MEASURED 2026-08-14 by `tools/re_overlay.py` on the owned disc: 22 code-image directory entries = boot executable + 21 `.PRG`; `MENU/MENUA.PRG` is exactly 0 bytes and therefore has no code/base; all 20 non-empty `.PRG` images are verified. M2 independently derives placement from each image's own absolute `jal` targets × non-leaf function-entry offsets: BATTLE/TITLE/ENDING = `0x80068800`; INITBTL/SCREFF2/MAINMENU = `0x800F9800`; MENU0-5,7-9,B-F = `0x80102800`. Margins are printed per image (minimum accepted: MENU1 and SCREFF2, 2.00x; maximum: TITLE, 12.71x), with zero undecided. M3 parses each rood-reverse PRG config, first requires OUR extracted image's SHA-1 to equal that config's SHA-1, then compares M2's answer with its independent `vram`: 20 checked, 20 identity matches, 20 address agreements, 0 missing/mismatch/extra. Resident executable M1 independently finds all three values in four contiguous words at `0x80010000..0x8001000C`, though only 1/14 candidate call sites yields a disc descriptor; the other 13 are reported as unresolved rather than used to name files. `--selftest`: 7/7 PASS, 0 SKIP — PS-EXE-header truth, shifted-image answer moves by -4, destroyed entries refuse, one-byte image mutation fails SHA before address, +4 reference-vram mutation fails address after SHA, bad LBA rejected/good accepted, and +4 shipping slot plus +4 BATTLE seed are both named by `--check-config`. `--check-config`: 24/24, comparing the three shipped `GameConfig` slots plus all 20 explicit seed mappings back to this measurement.
 - where: tools/re_overlay.py (instrument and shipping gate) + game/recomp_seeds.json (20 explicit overlay_bases) + game/core/game_config.cpp (3 overlaySlots)
-- gap: The mappings are complete. The resident substrate currently stops at BIOS `A0:0x2F` before a loader runs; runtime rewriting is outside this static instrument's reach. That is a runtime integration gap under RE-04, not an unmeasured module/base.
+- gap: The mappings are complete. The resident substrate reaches an unclassified no-frame stall before a loader is observed; runtime rewriting is outside this static instrument's reach. That is a runtime integration gap under RE-04, not an unmeasured module/base.
 - notes: Three slots serve 20 non-empty modules; the twenty-first `.PRG`, MENUA, is 0 bytes and correctly absent from the seed map. M1's 13 unresolved candidate sites remain explicit coverage limits and are not inputs to the per-file verdict.
 
 ## cd
@@ -114,7 +118,7 @@ measures it against this executable.
 ### RE-08 — platform HLE windows: the hardware-sync primitives GameConfig.hle installs into
 - status: todo
 - deps: RE-01
-- evidence: Nothing measured. Split OUT of RE-01 on 2026-08-12 when RE-01's crt0 group became re-verified: game_config.cpp's .hle group was tagged RE-01 but is not consumed by crt0_setup, so leaving it there would have made a done RE-01 imply a done HLE.
+- evidence: Nothing measured. The bounded run reaches a no-frame watchdog after `_initRand`, but its sampled stack is in `Core::mem_w32`, not `Core::io_read`; that is not evidence of a hardware-sync primitive. Split OUT of RE-01 on 2026-08-12 when RE-01's crt0 group became re-verified: game_config.cpp's .hle group was tagged RE-01 but is not consumed by crt0_setup, so leaving it there would have made a done RE-01 imply a done HLE.
 - where: game/core/game_config.cpp (.hle = {})
 - gap: ZERO means 'install nothing', which is the honest state: initBuiltins() registers no handler and says so, and a run that needs one hangs in the guest's real spin loop. The windows are zero too, so register_() refuses everything — this game has not stated its memory map, and a window guessed from another game's map is how a handler lands on an unrelated function. What IS known from RE-01: the executable reaches the BIOS through tail-jump thunks (libcInit 0x80026864 = 'addiu $t2,$zero,0xa0 / jr $t2 / addiu $t1,$zero,0x39'), and there are two more such thunks immediately after it (t1=0x44, t1=0x70), so a thunk TABLE exists around 0x80026864 and is the place to start.
-- notes: Needs a booting substrate to observe which spin primitives are actually reached; do not pre-populate from another port's window list.
+- notes: First classify the no-frame stall and prove an actual I/O read loop before populating any window or handler; do not pre-populate from another port's window list.

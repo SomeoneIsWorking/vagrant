@@ -24,8 +24,10 @@ any non-zero guest address appearing in game/core/game_config.cpp, or generated/
 
 SUPERSEDED first by RE-01's measured non-zero boot group, then fully falsified by RE-02's resident
 substrate. `generated/` is reproducibly emitted from the verified PS-EXE entry, `vagrant_port` builds,
-and the bounded run executes crt0 and guest main before failing closed at BIOS `A0:0x2F`. This does not
-mean the game works: overlay execution, CD/platform HLE, frame/pad/render ownership, and gameplay remain
+and bounded runs execute crt0, guest main, and `_initRand`; with psxport `be03593f` the current boundary
+is a no-frame watchdog whose sampled stack is in `Core::mem_w32` beneath generated `0x8002411C`,
+without a recompilation miss or BIOS fatal. The sample does not classify the stall.
+This does not mean the game works: overlay execution, CD/platform HLE, frame/pad/render ownership, and gameplay remain
 open in `docs/re-frontier.md`. Grepped for downstream reliance: no source or tool uses C003 as a current
 premise.
 

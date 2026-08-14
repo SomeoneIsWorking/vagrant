@@ -4,9 +4,14 @@ A PC-native port of **Vagrant Story** (PS1, USA, `SLUS_010.40`) built on the
 [psxport](https://github.com/SomeoneIsWorking/psxport) static-recompilation framework, vendored here as
 `external/psxport`.
 
-## Status: scaffolding. It does not run
+## Status: verified resident bootstrap, not gameplay
 
-Created 2026-08-12. There is no recompiled substrate or port binary. What exists:
+Created 2026-08-12. An owner-provisioned, gitignored resident substrate now builds and runs. It
+executes measured crt0 and guest main and, against psxport `be03593f`, completes `_initRand` before
+the no-frame watchdog aborts. The sampled backtrace is in `OtAttr::trackStoreSlow -> Core::mem_w32`
+beneath generated guest functions; it is not evidence of a specific hardware-sync primitive. The
+bounded run has no recompilation miss or unimplemented-BIOS fatal; overlays and gameplay have not
+been reached. What exists:
 
 - disc → executable provisioning from **your own** disc image (nothing game-derived is in this repo),
 - the framework seam (`GameConfig` / `GameHooks`), compiling against the pinned framework,
@@ -16,8 +21,8 @@ Created 2026-08-12. There is no recompiled substrate or port binary. What exists
 - a vendored CC0 **matching decompilation** of this exact executable, `external/rood-reverse`, whose
   target images are *measured* to be byte-identical to the ones on this disc (21/21).
 
-`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-02 still
-blocks emitting a substrate.
+`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-04 and
+RE-08 own the loader and still-unmeasured platform-HLE boundaries exposed by the resident bootstrap.
 
 ## Getting started
 
@@ -44,8 +49,8 @@ cmake -S . -B build && cmake --build build --target vagrant_seam -j"$(nproc)"
 python3 tools/re_frontier.py next                   # what to work on
 ```
 
-`run.sh` is the eventual play launcher; today it does every real step and then stops, naming what blocks
-the recompile.
+`run.sh` is the eventual play launcher; today it provisions, emits, builds, and runs only this honest
+resident-bootstrap boundary. Agents must never invoke it.
 
 ## Requirements
 

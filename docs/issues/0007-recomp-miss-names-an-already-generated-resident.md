@@ -23,6 +23,9 @@ it was already among the emitter's 743 functions.
 ## Evidence
 
 `scratch/logs/re02-first-run.log` shows the false miss; the reproducible emitter output indexes the
-entry; `scratch/logs/re02-third-run.log` handles InitHeap and reaches guest main, then stops at the
-distinct BIOS `A0:0x2F` fatal. `python3 tools/re_crt0.py --selftest` feeds zero `kRecMainLo` through
-the shipping configuration gate and requires the named header mismatch.
+entry; `scratch/logs/re02-third-run.log` handles InitHeap and reaches guest main, then records the
+historical next boundary at BIOS `A0:0x2F`. That separate framework rand gap was later resolved by
+psxport `be03593f`; the current run reaches a later no-frame watchdog with no recompilation miss. Its
+sampled stack is in `Core::mem_w32` beneath generated `0x8002411C`, which does not classify the stall.
+`python3 tools/re_crt0.py --selftest` feeds zero `kRecMainLo` through the shipping
+configuration gate and requires the named header mismatch.
