@@ -164,16 +164,21 @@ paths — run it before this repo is ever published.
 `scratch/raw/`, `scratch/logs/`). **Never `/tmp`** — a small RAM-backed tmpfs on this machine; diagnose
 "disk quota exceeded" with `quota -s`, not `df`.
 
-## Where the framework source comes from — NEVER edit `external/psxport`
+## Where the framework source comes from — `external/psxport` is the shared tree
 
-It is a **read-only pinned consumer**. Framework edits happen in the workspace's framework DEV CLONE
-(`../psxport`) and nowhere else; `run.sh` re-syncs this submodule to the recorded gitlink, so an edit
-made here is liable to be silently reverted mid-gate. Build against in-progress framework work without
-touching the submodule:
+`external/psxport` is **not a submodule** (2026-08-16): it is a SYMLINK to the workspace's shared
+framework clone (`$PSX/psxport`) when one exists, or a private clone at this repo's `psxport.pin` on a
+fresh machine. `tools/psxport_sync.py --auto` (called by `run.sh`) establishes whichever applies. A
+framework edit made through either path is the SAME directory, live in every port at once — commit and
+push framework work in `psxport/`, never here. `psxport.pin` records the framework commit this game
+was built and VERIFIED against; `tools/psxport_sync.py --bump` updates it, and the gate's `--check`
+fails when the framework you built against is not the recorded one.
+
+Build against in-progress framework work:
 
 ```sh
-cmake -S . -B build -DPSXPORT_DIR=/path/to/psxport      # or: PSXPORT_DIR=... ./run.sh   (user only)
+cmake -S . -B build -DPSXPORT_DIR=/path/to/psxport      # or just ./run.sh — it resolves external/psxport
 ```
 
-`PSXPORT_DIR` defaults to the submodule, so a bare clone of this repo builds standalone — keep it that
-way.
+`PSXPORT_DIR` defaults to `external/psxport`, so a bare clone of this repo builds standalone — keep it
+that way.

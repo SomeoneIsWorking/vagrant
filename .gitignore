@@ -21,9 +21,9 @@ generated/
 # tooling puts it; a copy dropped loose in the repo root is caught by review, not by a pattern that
 # breaks the audit. Same tradeoff spyro's .gitignore documents.
 
-# The framework submodule's own working-tree noise (its build/ is where discdump is built from)
-external/psxport/build/
-external/psxport/scratch/
+# The framework. Not tracked: either a symlink to the workspace shared clone (local) or a
+# private clone at psxport.pin (fresh machine). Managed by tools/psxport_sync.py.
+/external/psxport
 # The vendored decomp builds into its own tree; it is a REFERENCE, we never build it here, but a
 # curious session might.
 external/rood-reverse/build/

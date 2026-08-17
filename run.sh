@@ -29,27 +29,31 @@ JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null |
 # Default: the pinned submodule, so `git clone && ./run.sh` works standalone. Override to build against
 # the workspace's framework dev clone without touching the submodule. ANNOUNCED either way — a binary
 # built from in-progress framework work must never be mistaken for one built from the pin.
+# external/psxport is NOT a git submodule any more (2026-08-16): it is a symlink to the workspace's
+# shared framework clone when there is one — so a framework edit is live in every port at once, which
+# is the point — or a private clone at psxport.pin otherwise. Establish whichever applies before we
+# look at it. tools/psxport_sync.py explains the two submodule incidents that motivated the change.
+python3 tools/psxport_sync.py --auto || die "could not resolve external/psxport"
 PSXPORT_DIR="${PSXPORT_DIR:-external/psxport}"
 [ -f "$PSXPORT_DIR/cmake/psxport.cmake" ] || die "PSXPORT_DIR=$PSXPORT_DIR is not a psxport checkout"
 if [ "$PSXPORT_DIR" = "external/psxport" ]; then
-  say "framework: external/psxport (pinned submodule $(git -C external/psxport rev-parse --short HEAD 2>/dev/null || echo '?'))"
+  say "framework: external/psxport -> $(readlink -f external/psxport 2>/dev/null || echo '?') @ $(git -C external/psxport rev-parse --short HEAD 2>/dev/null || echo '?')$(
+        [ -n "$(git -C external/psxport status --porcelain 2>/dev/null)" ] && echo ' +dirty')"
 else
   say "framework: *** $PSXPORT_DIR *** (DEV CLONE $(git -C "$PSXPORT_DIR" rev-parse --short HEAD 2>/dev/null || echo '?')$(
         [ -n "$(git -C "$PSXPORT_DIR" status --porcelain 2>/dev/null)" ] && echo ' +dirty')) — NOT the recorded pin"
 fi
 
-# ---- 0b. sync git submodules --------------------------------------------------------------------
+# ---- 0b. sync git submodules (this repo's own: external/rood-reverse; the framework's nested
+# vendors are the SHARED clone's concern now) ------------------------------------------------
 # ONE implementation, shared by every port: external/psxport/scripts/sync-submodules.sh. It lives
-# INSIDE the submodule, so on a fresh clone it does not exist yet — init first, then call it.
+# INSIDE the framework (external/psxport is a symlink to the shared clone), which psxport_sync.py
+# --auto above has established — that is the prerequisite for this block.
 # KNOWN DEFECT, do not trust its all-clear: it certifies pins it never checked, because
 # `git submodule status --recursive` aborts on beetle-psx's URL-less nested deps/lightning/gnulib and
 # the script's `|| true` swallows the non-zero exit. See
 # external/psxport/docs/workspace/KNOWN-DEFECT-sync-submodules.md.
-if command -v git >/dev/null && [ -f .gitmodules ]; then
-  if [ ! -f external/psxport/scripts/sync-submodules.sh ]; then
-    say "initializing git submodules…"
-    git submodule update --init external/psxport || die "submodule init failed"
-  fi
+if command -v git >/dev/null && [ -f .gitmodules ] && [ -f external/psxport/scripts/sync-submodules.sh ]; then
   bash external/psxport/scripts/sync-submodules.sh || die "submodule sync failed"
 fi
 

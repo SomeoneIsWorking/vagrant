@@ -19,13 +19,14 @@ endif()
 
 project(vagrantstory CXX C)
 
-# PSXPORT_DIR — WHERE THE FRAMEWORK SOURCE COMES FROM. Defaults to the pinned submodule, so a fresh
-# clone of this repo alone builds standalone: that property is what "each game is its own project using
-# psxport as the framework" means, and it must stay testable.
+# PSXPORT_DIR — WHERE THE FRAMEWORK SOURCE COMES FROM. Defaults to external/psxport, which is no
+# longer a git submodule (2026-08-16): tools/psxport_sync.py --auto (called by run.sh) makes it a
+# SYMLINK to the workspace's shared framework clone when one exists, or a private clone at this
+# repo's psxport.pin on a fresh machine. So a fresh clone of this repo alone still builds standalone:
+# that property is what "each game is its own project using psxport as the framework" means, and it
+# must stay testable.
 #
-# Point it at the workspace's framework DEV CLONE to build against in-progress framework work WITHOUT
-# editing the submodule (the submodule is a READ-ONLY pinned consumer; framework edits happen in one
-# place only — external/psxport/docs/workspace/PROTOCOL.md):
+# Point it at a specific framework checkout to build against in-progress framework work:
 #
 #   cmake -S . -B build -DPSXPORT_DIR=/path/to/psxport
 #
@@ -33,12 +34,26 @@ project(vagrantstory CXX C)
 # from it — never re-spell `external/psxport` at a call site, or the two halves of a build can come
 # from different checkouts.
 set(PSXPORT_DIR "${CMAKE_SOURCE_DIR}/external/psxport" CACHE PATH
-    "psxport framework source directory (default: the external/psxport submodule)")
+    "psxport framework source directory (default: external/psxport)")
 if(NOT EXISTS "${PSXPORT_DIR}/cmake/psxport.cmake")
   message(FATAL_ERROR "PSXPORT_DIR=${PSXPORT_DIR} has no cmake/psxport.cmake — "
-                      "run `git submodule update --init external/psxport`, or point PSXPORT_DIR at a psxport checkout.")
+                      "run `python3 tools/psxport_sync.py --auto`, or point PSXPORT_DIR at a psxport checkout.")
 endif()
 message(STATUS "psxport framework: ${PSXPORT_DIR}")
+
+# RECORD WHAT THIS CONFIGURE RESOLVED, so `tools/psxport_sync.py --check` can compare the framework
+# you actually BUILT against with the one psxport.pin RECORDS. The framework is no longer a git
+# submodule (external/psxport is a symlink to the workspace's shared clone, or a private clone at the
+# pin — see tools/psxport_sync.py); the pin is provenance, and this file is what keeps it honest.
+execute_process(COMMAND git -C "${PSXPORT_DIR}" rev-parse HEAD
+                OUTPUT_VARIABLE PSXPORT_RESOLVED_SHA OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET RESULT_VARIABLE _psxport_rev_rc)
+if(NOT _psxport_rev_rc EQUAL 0)
+  set(PSXPORT_RESOLVED_SHA "unknown")   # honest: never silently record a plausible-looking sha
+endif()
+file(WRITE "${CMAKE_BINARY_DIR}/psxport_resolved.txt"
+     "dir = ${PSXPORT_DIR}\ncommit = ${PSXPORT_RESOLVED_SHA}\n")
+message(STATUS "psxport commit: ${PSXPORT_RESOLVED_SHA}")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
