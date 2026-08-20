@@ -23,6 +23,11 @@ command -v cmake      >/dev/null || die "cmake not found"
 command -v python3    >/dev/null || die "python3 not found"
 command -v pkg-config >/dev/null || die "pkg-config not found"
 pkg-config --exists sdl3 || die "SDL3 not found (Linux: SDL3-devel/libsdl3-dev; macOS: brew install sdl3)"
+CC="${CC:-clang}"
+CXX="${CXX:-clang++}"
+is_clang() { case "$("$1" --version 2>/dev/null)" in *clang*) return 0;; *) return 1;; esac; }
+is_clang "$CC" || die "CC=$CC is not Clang"
+is_clang "$CXX" || die "CXX=$CXX is not Clang"
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
 # ---- 0a. WHICH FRAMEWORK CHECKOUT IS THIS RUN BUILT FROM? ---------------------------------------
@@ -70,7 +75,8 @@ PSXPORT_SHARDS=8 python3 "$PSXPORT_DIR/tools/recomp/emit.py" \
   scratch/bin/vagrant/SLUS_010.40 generated/recompiled.c --seeds game/recomp_seeds.json \
   || die "resident substrate emission failed"
 say "building the port…"
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPSXPORT_DIR="$(cd "$PSXPORT_DIR" && pwd)" >/dev/null \
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPSXPORT_DIR="$(cd "$PSXPORT_DIR" && pwd)" \
+  -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" >/dev/null \
   || die "cmake configure failed"
 cmake --build build -j "$JOBS" --target vagrant_port || die "port build failed"
 
