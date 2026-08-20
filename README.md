@@ -14,8 +14,10 @@ CD, reads, XA, overlays, and gameplay have not been reached. What exists:
 
 - disc → executable provisioning from **your own** disc image (nothing game-derived is in this repo),
 - the framework seam (`GameConfig` / `GameHooks`), compiling against the pinned framework,
-- two measured RE groups: crt0/boot (RE-01) and all 20 non-empty `.PRG` load-base mappings into three
-  overlay slots (RE-03), each gated back to the owned images by its instrument,
+- four measured RE groups: crt0/boot (RE-01), the 743-function resident substrate (RE-02), all 20
+  non-empty `.PRG` load-base mappings into three overlay slots (RE-03), and the libpad delivery buffers
+  plus driver pointer table (RE-06). The address groups are gated back to the owned images by their
+  instruments; the resident bootstrap still lacks a frame owner that services the measured buffers,
 - the project registries (`docs/re-frontier.md`, `docs/codemap.md`, `docs/info/`, `docs/issues/`),
 - a vendored CC0 **matching decompilation** of this exact executable, `external/rood-reverse`, whose
   target images are *measured* to be byte-identical to the ones on this disc (21/21).

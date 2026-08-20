@@ -94,12 +94,23 @@ measures it against this executable.
 - notes:
 
 ### RE-06 — pad driver buffers
-- status: todo
+- status: re-verified
 - deps: RE-01
-- evidence:
-- where: game/core/game_config.cpp (padSlot0Buf, padSlot1Buf, padDriverFn, padSlotPtrTable, padSlotPtrStride)
-- gap: Nothing located. The splat config shows `libpad/PADENTRY` linked, so it is libpad rather than a custom SIO driver — which says which SHAPE to look for, not where.
-- notes:
+- evidence: `tools/re_pad.py` scans the owned SHA-verified PS-EXE without an address input and finds
+  exactly one two-slot setup shape: `_sysInit` materialises `0x8005DFF0`, derives the second buffer
+  at +34, and calls `PadInitDirect 0x8002DCC4` with those two pointers. The callee preserves a0/a1
+  in s1/s2, materialises driver state `0x8003FCC0`, and stores them at +0x30/+0x120, independently
+  deriving pointer table `0x8003FCF0` with stride 240. `--check-config` compares all four shipping
+  constants and field bindings to the bytes; `--selftest` is 3/3 and proves both a destroyed call
+  shape (0 matches over 83,948 candidates) and a +4 shipped-buffer edit are rejected.
+- where: `tools/re_pad.py` -> `game/core/game_config.cpp` (`padSlot0Buf`, `padSlot1Buf`,
+  `padSlotPtrTable`, `padSlotPtrStride`)
+- gap: The addresses are complete, but the current resident boot has no owned frame loop calling
+  `Pad::serviceFrame`; this step supplies the delivery destination, not live interactive gameplay.
+- notes: `padDriverFn` stays zero deliberately: psxport does not read that legacy field. The runtime
+  writes through the pointer table and falls back to the two fixed buffers. The matching decomp's
+  `vs_main_padBuffer` name and `char[2][34]` type corroborate the byte-derived result but are not an
+  input to it.
 
 ## ownership
 

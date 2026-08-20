@@ -3,8 +3,9 @@
 //
 // READ THIS BEFORE FILLING ANYTHING IN.
 //
-// **Exactly THREE groups are filled in: crt0/boot (RE-01), recompiled-main range (RE-02), and the
-// three measured overlay slots (RE-03). Other guest-address groups remain ZERO until measured.**
+// **Exactly FOUR groups are filled in: crt0/boot (RE-01), recompiled-main range (RE-02), the three
+// measured overlay slots (RE-03), and pad delivery (RE-06). Other guest-address groups remain ZERO
+// until measured.**
 // Zero is the
 // honest value and it is deliberate: psxport fails fast on a zero it needs, whereas a
 // plausible-looking WRONG address does not fail cleanly — it breaks boot or diverges the byte-compare
@@ -221,6 +222,15 @@ static_assert(kGp == kBssZeroLo - 4u,
               "load/stores in code (measured — 4 candidate encodings in the whole image, all 4 inside "
               "byte-ramp DATA tables), so nothing but that instruction pair can confirm gp");
 
+// RE-06, MEASURED by tools/re_pad.py from the unique _sysInit -> PadInitDirect
+// call sequence and PadInitDirect's own stores into its per-port driver
+// records.
+static constexpr uint32_t kPadSlot0Buf = 0x8005DFF0u;
+static constexpr uint32_t kPadSlot1Buf = 0x8005E012u;
+static constexpr uint32_t kPadSlotPtrTable = 0x8003FCF0u;
+static constexpr uint32_t kPadSlotPtrStride = 240u;
+static_assert(kPadSlot1Buf - kPadSlot0Buf == 34u);
+
 // DESIGNATED initialisers, deliberately. GameConfig is initialised POSITIONALLY by the older
 // consumers in this workspace, and the framework appends fields to it — which means a positional list
 // silently re-binds every value after an inserted field. Binding by name makes an upstream insert a
@@ -300,10 +310,19 @@ static const GameConfig g_vagrant_cfg = {
     .cdSearchFile = 0,
     .dmaCallbackTable = 0,
 
-    // --- pad driver -------------------------------------------------------------- RE-06, NOT DONE --
-    .padSlot0Buf = 0, .padSlot1Buf = 0, .padDriverFn = 0,
-    .padSlotPtrTable = 0,
-    .padSlotPtrStride = 0,
+    // --- pad driver ------------------------------------------------------- RE-06, MEASURED --
+    // tools/re_pad.py finds the unique _sysInit sequence that calls
+    // PadInitDirect with two 34-byte buffers, then follows that function's own
+    // stores of a0/a1 into its 240-byte per-port driver records. The tool
+    // derives these values from the SHA-bound executable and compares the
+    // shipped constants and field bindings back to the measurement.
+    // padDriverFn remains zero because psxport never reads that legacy field;
+    // Pad::serviceFrame writes through the table/fixed buffers.
+    .padSlot0Buf = kPadSlot0Buf,
+    .padSlot1Buf = kPadSlot1Buf,
+    .padDriverFn = 0,
+    .padSlotPtrTable = kPadSlotPtrTable,
+    .padSlotPtrStride = kPadSlotPtrStride,
 
     // --- platform HLE (the hardware-sync primitives) ------------------------------- RE-04/08 --
     .hle = {},

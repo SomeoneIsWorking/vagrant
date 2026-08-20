@@ -14,14 +14,15 @@ methodology is `…/docs/porting-a-new-psx-game.md`.
 
 ## THE STATE OF THIS PORT: resident substrate reaches the no-frame watchdog
 
-Created 2026-08-12. Three groups are measured: the **crt0/boot group** (`RE-01`,
+Created 2026-08-12. Four groups are measured: the **crt0/boot group** (`RE-01`,
 `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), and all 20 non-empty `.PRG`
-overlay mappings into three slots (`RE-03`, `tools/re_overlay.py`). The gitignored substrate emits
+overlay mappings into three slots (`RE-03`, `tools/re_overlay.py`), plus libpad delivery buffers and
+its pointer table (`RE-06`, `tools/re_pad.py`). The gitignored substrate emits
 743 resident functions from the PS-EXE entry, builds `vagrant_port`, executes crt0 and guest main,
 and completes `_initRand`. RE-04 now owns blocking `DsControlB` (`0x80025BE4`); the bounded run
 executes `_diskReset` Pause and Setmode and reaches a later watchdog sampled under `0x8001355C`.
 There is no recompilation miss or unimplemented-BIOS fatal; this is not gameplay. Async CD, reads,
-XA, overlays, and every other guest-address group in
+XA, overlays, and every other unmeasured guest-address group in
 `game/core/game_config.cpp` is `0` with its open step in `docs/re-frontier.md` named. A framework
 defect found while measuring crt0 (issue #3) would give a BIOS
 `InitHeap` a zero-size heap; measured 2026-08-12, that is **latent here** — no code in this image can
@@ -140,7 +141,8 @@ citation attached. Full detail: `docs/references.md`.
   That says which SHAPES to look for; it says nothing about where they are in this image.
 
 Everything else about this game — the loader contract beyond its three static slot words, the frame
-loop, OT/packet-pool dance, pad buffers, scene model, and platform HLE windows — is **unknown**. Do
+loop, OT/packet-pool dance, scene model, and platform HLE windows — is **unknown**. The libpad buffer
+destinations are measured; no live frame owner services them yet. Do
 not let a plausible-sounding sentence in a doc elsewhere stand in for it.
 
 ## The rules that bite hardest here
