@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: crt0
 depends: game/core/game_config.cpp
-reconfirmed: 2026-08-14 12:57:01
-verified_at: 2026-08-14 12:57:01
+reconfirmed: 2026-08-21 01:04:32
+verified_at: 2026-08-21 01:04:32
 ---
 
 ## Claim
@@ -32,3 +32,7 @@ Reverified after RE-02: shipped boot constants and citation gate remain exact; l
 ## Re-confirmed 2026-08-14 12:57:01
 
 Reconfirmed after psxport be03593f integration: the symbolic and concrete crt0 measurements remain unchanged, and the live resident path continues to corroborate measured InitHeap and guest-main dispatch before a later, still-unclassified no-frame stall.
+
+## Re-confirmed 2026-08-21 01:04:32
+
+2026-08-21: Vagrant re_crt0 concrete execution passed 24/24; psxport build/tools/crt0_extract independently decoded the same SHA-bound executable and agreed on all 8 shared fields, heap pointer stores, and applied stack/heap arithmetic.

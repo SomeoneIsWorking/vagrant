@@ -6,16 +6,20 @@ in this repo goes through it rather than through a second implementation, so "wh
 ONE answer.
 
 WHICH framework checkout it is built from is the same decision CMake makes: $PSXPORT_DIR, defaulting
-to the pinned submodule, so a bare clone works standalone. $PSXPORT_DISCDUMP overrides with a
-prebuilt binary (useful for an agent that must not write into a submodule's build tree).
+to external/psxport, so a bare clone works standalone. Its verified-Clang CMake build lives under
+this repo's gitignored scratch/build/psxport; $PSXPORT_DISCDUMP overrides with a prebuilt binary.
 
 Nothing here caches a file list: a stale listing is a silent trap, and the reads are cheap.
 """
 import os
+import re
+import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_BUILD = Path(ROOT) / "scratch/build/psxport"
 
 
 def psxport_dir():
@@ -43,31 +47,74 @@ def find(build_if_missing=True):
         )
         raise SystemExit(2)
 
+    build_dir = Path(os.environ.get("PSXPORT_DISCDUMP_BUILD", DEFAULT_BUILD))
     for name in ("discdump", "discdump.exe"):
-        cand = os.path.join(px, "build", "tools", name)
+        cand = build_dir / "tools" / name
         if os.access(cand, os.X_OK):
-            return cand
+            return str(cand.resolve())
     if not build_if_missing:
-        print(f"[discdump] not built under {px}/build/tools", file=sys.stderr)
+        print(f"[discdump] not built under {build_dir}/tools", file=sys.stderr)
         raise SystemExit(2)
 
-    print(f"[discdump] building it from {px} (first run only)…", file=sys.stderr)
+    return build(Path(px), build_dir)
+
+
+def _require_clang(compiler, variable):
+    if not shutil.which(compiler):
+        raise SystemExit(f"[discdump] {variable}={compiler} was not found")
+    probe = subprocess.run(
+        [compiler, "--version"], capture_output=True, text=True, check=False
+    )
+    if probe.returncode or "clang" not in (probe.stdout + probe.stderr).lower():
+        raise SystemExit(f"[discdump] {variable}={compiler} is not Clang")
+
+
+def build(psxport=None, build_dir=None, cc=None, cxx=None):
+    """Incrementally build the authoritative disc reader with a verified Clang toolchain."""
+    psxport = Path(psxport or psxport_dir()).resolve()
+    build_dir = Path(build_dir or os.environ.get("PSXPORT_DISCDUMP_BUILD", DEFAULT_BUILD))
+    cc = cc or os.environ.get("CC", "clang")
+    cxx = cxx or os.environ.get("CXX", "clang++")
+    _require_clang(cc, "CC")
+    _require_clang(cxx, "CXX")
+
+    print(f"[discdump] building it from {psxport} (incremental)…", file=sys.stderr)
     jobs = str(os.cpu_count() or 4)
     for cmd in (
-        ["cmake", "-S", px, "-B", os.path.join(px, "build"), "-DCMAKE_BUILD_TYPE=Release"],
-        ["cmake", "--build", os.path.join(px, "build"), "-j", jobs, "--target", "discdump"],
+        [
+            "cmake",
+            "-S",
+            str(psxport),
+            "-B",
+            str(build_dir),
+            "-DCMAKE_BUILD_TYPE=Release",
+            f"-DCMAKE_C_COMPILER={cc}",
+            f"-DCMAKE_CXX_COMPILER={cxx}",
+        ],
+        ["cmake", "--build", str(build_dir), "-j", jobs, "--target", "discdump"],
     ):
-        r = subprocess.run(cmd, stdout=subprocess.DEVNULL)
+        r = subprocess.run(cmd, stdout=subprocess.DEVNULL, check=False)
         if r.returncode != 0:
             print(f"[discdump] FAILED: {' '.join(cmd)}", file=sys.stderr)
             raise SystemExit(2)
-    return find(build_if_missing=False)
+    compiler_files = sorted((build_dir / "CMakeFiles").glob("*/CMakeCXXCompiler.cmake"))
+    if not compiler_files or not re.search(
+        r'^set\(CMAKE_CXX_COMPILER_ID "Clang"\)$',
+        compiler_files[-1].read_text(),
+        re.MULTILINE,
+    ):
+        raise SystemExit("[discdump] configured build is not using Clang")
+    for name in ("discdump", "discdump.exe"):
+        candidate = build_dir / "tools" / name
+        if os.access(candidate, os.X_OK):
+            return str(candidate.resolve())
+    raise SystemExit(f"[discdump] build produced no executable under {build_dir}/tools")
 
 
 def listing(disc, dd=None):
     """Every file on the disc, as a list of (path, lba, size). Raises SystemExit(2) on a bad read."""
     dd = dd or find()
-    out = subprocess.run([dd, "list", disc], capture_output=True, text=True)
+    out = subprocess.run([dd, "list", disc], capture_output=True, text=True, check=False)
     if out.returncode != 0:
         print(f"[discdump] list failed on {disc}:\n{out.stdout}{out.stderr}", file=sys.stderr)
         raise SystemExit(2)
@@ -79,7 +126,7 @@ def listing(disc, dd=None):
     files = []
     for line in out.stdout.splitlines():
         s = line.strip()
-        if not s or s.startswith("disc:") or s.startswith("root dir") or (s.endswith("/") and " " not in s):
+        if not s or s.startswith(("disc:", "root dir")) or (s.endswith("/") and " " not in s):
             continue
         parts = s.split()
         if len(parts) >= 5 and parts[1] == "LBA":
@@ -96,7 +143,9 @@ def get(disc, path_on_disc, outdir, dd=None):
     `discdump list` prints it — the backslash form does NOT resolve. Returns the written path."""
     dd = dd or find()
     os.makedirs(outdir, exist_ok=True)
-    out = subprocess.run([dd, "get", path_on_disc, disc, outdir], capture_output=True, text=True)
+    out = subprocess.run(
+        [dd, "get", path_on_disc, disc, outdir], capture_output=True, text=True, check=False
+    )
     dest = os.path.join(outdir, os.path.basename(path_on_disc))
     if out.returncode != 0 or not os.path.isfile(dest):
         print(f"[discdump] get {path_on_disc} failed:\n{out.stdout}{out.stderr}", file=sys.stderr)

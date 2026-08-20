@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: re-02,recompiler
 depends: game/recomp_seeds.json, game/core/game_config.cpp, game/core/recomp_register.cpp, external/psxport
-reconfirmed: 2026-08-14 13:33:18
-verified_at: 2026-08-14 13:33:18
+reconfirmed: 2026-08-21 02:22:25
+verified_at: 2026-08-21 02:22:25
 ---
 
 ## Claim
@@ -41,3 +41,15 @@ Psxport be03593f resolves the historical rand HLE boundary without changing Vagr
 ## Re-confirmed 2026-08-14 13:33:18
 
 Reconfirmed on the RE-04 bounded run using the framework content landed as psxport 2306a7c5: the same 743-function resident substrate reaches generated DsControlB and advances beyond _diskReset after the native blocking-control owner, with no recomp-MISS. Seed/root contract unchanged.
+
+## Re-confirmed 2026-08-21 01:04:32
+
+2026-08-21: the full vagrant_port rebuilt with Clang against the current shared framework; direct headless execution loaded the same generated 743-function substrate, entered guest main, and reached the known 0x8001355C no-frame watchdog with no recomp-MISS or BIOS fatal.
+
+## Re-confirmed 2026-08-21 02:09:08
+
+After recording landed psxport `eb2465b2`, the hash gate kept the unchanged 743-function substrate, the exact Clang rebuild passed, and plain `./run.sh` entered guest crt0/main and reached generated `0x8001355C` with no recomp-MISS or BIOS fatal.
+
+## Re-confirmed 2026-08-21 02:22:25
+
+Final recorded psxport `be381503` preserves the same hash-current 743-function substrate and plain-launch route through guest crt0/main to generated `0x8001355C`, with no recomp-MISS or BIOS fatal.

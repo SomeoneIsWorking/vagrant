@@ -73,6 +73,7 @@ bases are not in this executable's header and must be observed on the loader.
 """
 import hashlib
 import os
+import re
 import struct
 import sys
 
@@ -96,6 +97,11 @@ SN_LINK_RECORD = 0x80030FBC        # __text, __textlen, __data, __datalen, __bss
 
 RA_SENTINEL = 0xDEADBE00      # a value crt0's `sw $ra` cannot be confused with a real address
 MAX_STEPS = 200000            # the .bss loop is ~13k iterations; anything past this is not this crt0
+
+
+def cpp_assignment(name, old, new):
+    """A whitespace-independent, single C++ constant-assignment mutation."""
+    return rf"(\b{re.escape(name)}\s*=\s*){re.escape(old)}\b", rf"\g<1>{new}"
 
 
 class Refuse(Exception):
@@ -804,17 +810,21 @@ def selftest(exe_path):
     # game_config.cpp TEXT and requires the SAME functions the gate calls to report a failure — not a
     # helper beside them. A gate whose red path has never run is decoration.
     print("== NEGATIVE class: a hand-edit of the SHIPPED file must be REPORTED, not tolerated ==")
-    import io
     import contextlib
+    import io
 
-    def cfg_neg(name, old, new, gate):
-        if old not in cfg_text:
-            ok(f"negative: {name}", False,
-               f"anchor {old!r} is not in game_config.cpp — this case exercised NOTHING")
+    def cfg_neg(name, pattern, replacement, gate):
+        mutated, count = re.subn(pattern, replacement, cfg_text, count=1)
+        if count != 1:
+            ok(
+                f"negative: {name}",
+                False,
+                f"pattern {pattern!r} matched {count} times in game_config.cpp — this case exercised NOTHING",
+            )
             return
         with contextlib.redirect_stdout(io.StringIO()):
             try:
-                f = gate(cfg_text.replace(old, new, 1))
+                f = gate(mutated)
             except Refuse as e:
                 f = [str(e).splitlines()[0]]
         ok(f"negative: {name}", bool(f), (f[0][:150] if f else "REPORTED NO FAILURE — the gate is "
@@ -822,23 +832,53 @@ def selftest(exe_path):
 
     cfg = lambda t: check_config(img, out, t)
     cit = lambda t: gate_citations(img, out, cite, tr, t)
-    cfg_neg("kHeapSizePtr moved +4 (the recorded sabotage)",
-            "kHeapSizePtr   = 0x80030FB8u", "kHeapSizePtr   = 0x80030FBCu", cfg)
-    cfg_neg("kLibcInit pointed at a real nop (the recorded sabotage)",
-            "kLibcInit      = 0x80026864u", "kLibcInit      = 0x8001F564u", cfg)
-    cfg_neg("recMainLo zero makes the router bypass generated resident functions",
-            "kRecMainLo      = 0x00010000u", "kRecMainLo      = 0x00000000u", cfg)
-    cfg_neg("recMainHi moved beyond the PS-EXE text",
-            "kRecMainHi      = 0x00062000u", "kRecMainHi      = 0x00062800u", cfg)
-    cfg_neg("a right-valued constant bound to the WRONG field (.gp = kLibcInit)",
-            ".gp = kGp,", ".gp = kLibcInit,", cfg)
-    cfg_neg("a constant deleted outright", "kGameMain      = 0x80042C38u", "kGameMainX = 0u", cfg)
+    cfg_neg(
+        "kHeapSizePtr moved +4 (the recorded sabotage)",
+        *cpp_assignment("kHeapSizePtr", "0x80030FB8u", "0x80030FBCu"),
+        cfg,
+    )
+    cfg_neg(
+        "kLibcInit pointed at a real nop (the recorded sabotage)",
+        *cpp_assignment("kLibcInit", "0x80026864u", "0x8001F564u"),
+        cfg,
+    )
+    cfg_neg(
+        "recMainLo zero makes the router bypass generated resident functions",
+        *cpp_assignment("kRecMainLo", "0x00010000u", "0x00000000u"),
+        cfg,
+    )
+    cfg_neg(
+        "recMainHi moved beyond the PS-EXE text",
+        *cpp_assignment("kRecMainHi", "0x00062000u", "0x00062800u"),
+        cfg,
+    )
+    cfg_neg(
+        "a right-valued constant bound to the WRONG field (.gp = kLibcInit)",
+        r"(\.gp\s*=\s*)kGp\b",
+        r"\g<1>kLibcInit",
+        cfg,
+    )
+    cfg_neg(
+        "a constant deleted outright",
+        cpp_assignment("kGameMain", "0x80042C38u", "0u")[0],
+        "kGameMainX = 0u",
+        cfg,
+    )
     # Anchor on address+word, not the bare word: the prose above the block quotes `24423678` too, and
     # a bare-word anchor mutated THAT instead and reported nothing. Caught by this very assertion.
-    cfg_neg("one raw word in the citation block retyped (the original defect)",
-            "8001F548  24423678", "8001F548  24427836", cit)
-    cfg_neg("one citation line deleted", f"//   {img.pc0:08X}  3c028003", "// (removed)", cit)
-    cfg_neg("the whole citation block removed", CIT_BEGIN, "// nothing to see here", cit)
+    cfg_neg(
+        "one raw word in the citation block retyped (the original defect)",
+        r"8001F548  24423678",
+        "8001F548  24427836",
+        cit,
+    )
+    cfg_neg(
+        "one citation line deleted",
+        re.escape(f"//   {img.pc0:08X}  3c028003"),
+        "// (removed)",
+        cit,
+    )
+    cfg_neg("the whole citation block removed", re.escape(CIT_BEGIN), "// nothing to see here", cit)
 
     print(f"\n== selftest: {ran} assertions, {len(fails)} FAILED ==")
     for f in fails:
@@ -904,19 +944,27 @@ def gate_config():
     # Each pair is (what the mutation breaks, old text, new text). The mutations are small and
     # plausible — an off-by-one, a value "corrected" from a reference — because those are the edits
     # the asserts exist to catch, not absurd ones any compiler would reject anyway.
-    for name, a, b in [
-        ("gp off by one word",       "kGp            = 0x80033674u", "kGp            = 0x80033670u"),
-        ("bss end shrunk by a word", "kBssZeroHi     = 0x800401A8u", "kBssZeroHi     = 0x800401A4u"),
-        ("heapBase moved off .bss end", "kHeapBase      = 0x800401A8u", "kHeapBase      = 0x800401B0u"),
-        ("gameMain outside the image", "kGameMain      = 0x80042C38u", "kGameMain      = 0x80090000u"),
-        ("_stacksize no longer adjacent", "kStackTopBase2 = 0x8004913Cu", "kStackTopBase2 = 0x80049140u"),
+    for name, pattern, replacement in [
+        ("gp off by one word", *cpp_assignment("kGp", "0x80033674u", "0x80033670u")),
+        ("bss end shrunk by a word", *cpp_assignment("kBssZeroHi", "0x800401A8u", "0x800401A4u")),
+        ("heapBase moved off .bss end", *cpp_assignment("kHeapBase", "0x800401A8u", "0x800401B0u")),
+        ("gameMain outside the image", *cpp_assignment("kGameMain", "0x80042C38u", "0x80090000u")),
+        (
+            "_stacksize no longer adjacent",
+            *cpp_assignment("kStackTopBase2", "0x8004913Cu", "0x80049140u"),
+        ),
     ]:
-        if a not in text:
-            ok(name, False, f"the mutation anchor {a!r} is NOT in game_config.cpp — this gate is "
-                            f"stale and exercised NOTHING for this case")
+        mutated, count = re.subn(pattern, replacement, text, count=1)
+        if count != 1:
+            ok(
+                name,
+                False,
+                f"the mutation pattern {pattern!r} matched {count} times in game_config.cpp — "
+                "this gate is stale and exercised NOTHING for this case",
+            )
             continue
         p = os.path.join(out_dir, name.replace(" ", "_") + ".cpp")
-        open(p, "w", encoding="utf-8").write(text.replace(a, b))
+        open(p, "w", encoding="utf-8").write(mutated)
         rc, msg, err = compile_(p, name.replace(" ", "_"))
         ok(name, rc != 0 and bool(msg), f"exit={rc}  {msg.strip()[:120] if msg else 'NO static-assert diagnostic'}")
 

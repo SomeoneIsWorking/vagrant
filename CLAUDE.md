@@ -7,8 +7,7 @@ this repo supplies the game — the seam, the RE, and the native reimplementatio
 
 **The framework rules are NOT restated here. Read `external/psxport/CLAUDE.md`** — it is the authority
 for how a game consumes psxport: the CVar ladder, the seam, `generated/` being sacrosanct, RE-first,
-diagnostics through `lucent`, the registries, never editing `external/psxport`, and the standing USER
-directive that **`./run.sh` is the user's and agents must never invoke it**. The workspace map is
+diagnostics through `lucent`, the registries, and never editing `external/psxport`. The workspace map is
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
@@ -29,18 +28,31 @@ defect found while measuring crt0 (issue #3) would give a BIOS
 call BIOS `malloc` (issue #3 has the census), so this game can neither exhibit the bug nor demonstrate
 its fix. If something here looks like it works, check `docs/codemap.md` — the honest inventory is short.
 
+`./run.sh` is the stable project launcher. With no arguments it resolves the framework and the disc,
+identity-checks and hash-provisions the resident substrate, configures both CMake trees with Clang,
+builds `vagrant_port`, and launches that current target. It does not claim gameplay: the expected stop
+remains the no-frame watchdog after guest main. The shell file is deliberately only a Python dispatch;
+all policy lives in `tools/run.py`. An explicit CHD path overrides the normal
+`PSXPORT_VAGRANT_DISC`/`.env`/drop-in resolution order. The current bootstrap target is explicitly
+headless: it has no frame loop or gameplay window yet, and entering the window presentation path would
+make the watchdog diagnose host-surface setup instead of the measured guest boundary.
+
 What DOES build today, and is the gate for a change to the seam:
 
 ```sh
-cmake -S . -B build && cmake --build build --target vagrant_seam -j$(nproc)
+cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+cmake --build build --target vagrant_seam vagrant_cd_contract_test -j$(nproc)
+ctest --test-dir build --output-on-failure
 ```
 
 `vagrant_seam` is an OBJECT library over the shared game sources: config, hooks, process entry, and
 the `DsControlB` owner. It proves those sources still satisfy the pinned framework's seam without
 requiring generated code. `vagrant_cd_contract_test` compiles the owner's exact classifier and checks
 every accepted ID plus query/read/unknown refusals. When `generated/rec_sources.cmake` exists,
-`vagrant_port` is the resident-substrate gate. **A
-change to a MEASURED constant in
+`vagrant_port` is the resident-substrate gate. A second CTest entry runs psxport's shared
+`tools/check_cpp_style.py` against this repo: it format-checks all tracked first-party C/C++ and uses
+CMake's real compile database for `clang-tidy`; generated and external code are excluded. **A change
+to a MEASURED constant in
 `game_config.cpp` must also pass its source instrument: `python3 tools/re_crt0.py --selftest` for the
 boot group, or `python3 tools/re_overlay.py --selftest && python3 tools/re_overlay.py --check-config`
 for overlay slots/seeds. These diff shipped values back to the owned bytes. Compiling is not

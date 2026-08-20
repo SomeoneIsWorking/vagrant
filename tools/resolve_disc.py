@@ -32,9 +32,10 @@ def _from_dotenv(path):
     """Return (value, key) from .env, or (None, None). Does not evaluate the file as shell."""
     if not os.path.isfile(path):
         return None, None
-    txt = open(path, encoding="utf-8", errors="replace").read()
+    with open(path, encoding="utf-8", errors="replace") as dotenv:
+        txt = dotenv.read()
     for key in (ENV_KEY, GENERIC_KEY):
-        m = re.search(r"^[ \t]*" + key + r"[ \t]*=[ \t]*(.+?)[ \t]*$", txt, re.M)
+        m = re.search(r"^[ \t]*" + key + r"[ \t]*=[ \t]*(.+?)[ \t]*$", txt, re.MULTILINE)
         if m:
             return m.group(1).strip().strip('"').strip("'"), key
         # NOTE: no quote-stripping subtleties beyond this — a path with a literal quote in it is

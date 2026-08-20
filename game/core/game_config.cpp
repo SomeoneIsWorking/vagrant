@@ -37,17 +37,16 @@
 // (0x80049138 = 0x00200000) minus 8, i.e. sp = fp = 0x801FFFF8 — measured, see tools/re_crt0.py. The
 // header/CNF values are what the BIOS shell sets up before jumping to the entry point; crt0 then
 // overwrites it. Do not "fix" the boot group to agree with the header.
-static constexpr uint32_t kPsExeEntry     = 0x8001F544u;   // header pc0
-static constexpr uint32_t kRecMainLo      = 0x00010000u;   // header t_addr, physical
-static constexpr uint32_t kRecMainHi      = 0x00062000u;   // t_addr + t_size, physical
+static constexpr uint32_t kPsExeEntry = 0x8001F544u; // header pc0
+static constexpr uint32_t kRecMainLo = 0x00010000u;  // header t_addr, physical
+static constexpr uint32_t kRecMainHi = 0x00062000u;  // t_addr + t_size, physical
 #ifdef VAGRANT_HAVE_SUBSTRATE
 static_assert(kRecMainLo == REC_MAIN_LO && kRecMainHi == REC_MAIN_HI,
               "GameConfig main routing range drifted from the emitted substrate");
 #endif
-static constexpr uint32_t kPsExeTextAddr  = 0x80010000u;   // header t_addr
-static constexpr uint32_t kPsExeTextSize  = 0x00052000u;   // header t_size
-static_assert(kPsExeEntry >= kPsExeTextAddr &&
-              kPsExeEntry < kPsExeTextAddr + kPsExeTextSize,
+static constexpr uint32_t kPsExeTextAddr = 0x80010000u; // header t_addr
+static constexpr uint32_t kPsExeTextSize = 0x00052000u; // header t_size
+static_assert(kPsExeEntry >= kPsExeTextAddr && kPsExeEntry < kPsExeTextAddr + kPsExeTextSize,
               "the PS-EXE entry must lie inside the loaded text — if this fires, the header was "
               "misread and every number in this file's comment block is suspect");
 
@@ -176,17 +175,17 @@ static_assert(kPsExeEntry >= kPsExeTextAddr &&
 // These are named constants used ONCE in the struct below and re-used by the static_asserts under it.
 // Naming them is what lets those asserts be real: an assert written over two literal copies of the
 // same value is a check that can never fire, which is the shape of a lying diagnostic.
-static constexpr uint32_t kBssZeroLo     = 0x80033678u;   // __ra_temp — first word the loop clears
-static constexpr uint32_t kBssZeroHi     = 0x800401A8u;   // exclusive end of the clear loop
-static constexpr uint32_t kStackTopBase  = 0x80049138u;   // _ramsize   global (holds 0x00200000)
-static constexpr uint32_t kStackTopBase2 = 0x8004913Cu;   // _stacksize global (holds 0x00004000)
-static constexpr uint32_t kHeapBase      = 0x800401A8u;   // heap start == end of .bss
-static constexpr uint32_t kHeapSizePtr   = 0x80030FB8u;   // __heapsize  (crt0 writes 0x001BBE50)
-static constexpr uint32_t kHeapBasePtr   = 0x80030FB4u;   // __heapbase  (crt0 writes 0x800401A8)
-static constexpr uint32_t kGp            = 0x80033674u;   // crt0's lui/addiu pair
-static constexpr uint32_t kLibcInit      = 0x80026864u;   // BIOS A0:0x39 InitHeap thunk
-static constexpr uint32_t kGameMain      = 0x80042C38u;   // vs_main_exec — crt0's second and last call
-static constexpr uint32_t kCrt0          = kPsExeEntry;   // __SN_ENTRY_POINT
+static constexpr uint32_t kBssZeroLo = 0x80033678u;     // __ra_temp — first word the loop clears
+static constexpr uint32_t kBssZeroHi = 0x800401A8u;     // exclusive end of the clear loop
+static constexpr uint32_t kStackTopBase = 0x80049138u;  // _ramsize   global (holds 0x00200000)
+static constexpr uint32_t kStackTopBase2 = 0x8004913Cu; // _stacksize global (holds 0x00004000)
+static constexpr uint32_t kHeapBase = 0x800401A8u;      // heap start == end of .bss
+static constexpr uint32_t kHeapSizePtr = 0x80030FB8u;   // __heapsize  (crt0 writes 0x001BBE50)
+static constexpr uint32_t kHeapBasePtr = 0x80030FB4u;   // __heapbase  (crt0 writes 0x800401A8)
+static constexpr uint32_t kGp = 0x80033674u;            // crt0's lui/addiu pair
+static constexpr uint32_t kLibcInit = 0x80026864u;      // BIOS A0:0x39 InitHeap thunk
+static constexpr uint32_t kGameMain = 0x80042C38u;      // vs_main_exec — crt0's second and last call
+static constexpr uint32_t kCrt0 = kPsExeEntry;          // __SN_ENTRY_POINT
 
 // static: a constexpr free function is implicitly inline, i.e. external linkage, and `in_text` is a
 // name another TU could plausibly define differently — internal linkage keeps that an ODR non-event.
@@ -196,10 +195,9 @@ static constexpr bool in_text(uint32_t a) {
 // Every relation below is one the measurement established. If a later edit "corrects" a field from a
 // reference — the exact temptation this repo has, with a matching decomp sitting in external/ — the
 // build fails and names the relation, instead of the port booting into a subtly wrong crt0.
-static_assert(in_text(kBssZeroLo) && in_text(kBssZeroHi) && in_text(kStackTopBase) &&
-              in_text(kStackTopBase2) && in_text(kHeapBase) && in_text(kHeapSizePtr) &&
-              in_text(kHeapBasePtr) && in_text(kGp) && in_text(kLibcInit) && in_text(kGameMain) &&
-              in_text(kCrt0),
+static_assert(in_text(kBssZeroLo) && in_text(kBssZeroHi) && in_text(kStackTopBase) && in_text(kStackTopBase2) &&
+                  in_text(kHeapBase) && in_text(kHeapSizePtr) && in_text(kHeapBasePtr) && in_text(kGp) &&
+                  in_text(kLibcInit) && in_text(kGameMain) && in_text(kCrt0),
               "every boot-group address must lie inside the ONE loaded image — this game has no "
               "separate .data/.bss segment (header d_size = b_size = 0), so an address outside "
               "[t_addr, t_addr+t_size) cannot be one crt0 touched");
@@ -238,18 +236,23 @@ static_assert(kPadSlot1Buf - kPadSlot0Buf == 34u);
 // C++20 requires designators in declaration order; keep them so when adding one.
 static const GameConfig g_vagrant_cfg = {
     // --- crt0 / boot -------------------------------------- RE-01, MEASURED (see the block above) --
-    .bssZeroLo = kBssZeroLo, .bssZeroHi = kBssZeroHi,
-    .stackTopBase = kStackTopBase, .stackTopBase2 = kStackTopBase2,
+    .bssZeroLo = kBssZeroLo,
+    .bssZeroHi = kBssZeroHi,
+    .stackTopBase = kStackTopBase,
+    .stackTopBase2 = kStackTopBase2,
     .heapBase = kHeapBase,
-    .heapSizePtr = kHeapSizePtr, .heapBasePtr = kHeapBasePtr,
+    .heapSizePtr = kHeapSizePtr,
+    .heapBasePtr = kHeapBasePtr,
     .gp = kGp,
     .libcInit = kLibcInit,
-    .gameMain = kGameMain, .crt0 = kCrt0,
+    .gameMain = kGameMain,
+    .crt0 = kCrt0,
 
     // --- recompiled MAIN .text range (physical) ---------------- RE-02, PS-EXE header + emitter --
     // The emitter reports these same bounds as REC_MAIN_LO/HI. Keep the measured physical range
     // available to the compile-only seam too, where generated/ intentionally need not exist.
-    .recMainLo = kRecMainLo, .recMainHi = kRecMainHi,
+    .recMainLo = kRecMainLo,
+    .recMainHi = kRecMainHi,
 
     // --- disc key ----------------------------------------------- this port's own env name, not RE --
     // Not an RE fact but a port fact, and it belongs here because the framework must not know it: the
@@ -263,24 +266,34 @@ static const GameConfig g_vagrant_cfg = {
     // port asks for nothing: there is no native boot here yet, so any movie is the GUEST's to play on
     // the substrate. The disc does carry MOV/*.STR files; naming one here without knowing which the
     // boot plays would be a guess wearing a citation.
-    .bootFmv = { nullptr, nullptr, nullptr, nullptr },
+    .bootFmv = {nullptr, nullptr, nullptr, nullptr},
 
     // --- per-frame OT / packet pool ---------------------------------------------- RE-05, NOT DONE --
-    .otRegionBase = 0, .otRegionStride = 0,
-    .packetPoolBase = 0, .packetPoolStride = 0,
+    .otRegionBase = 0,
+    .otRegionStride = 0,
+    .packetPoolBase = 0,
+    .packetPoolStride = 0,
     .otBasePtr = 0,
     .dwellCounter = 0,
-    .poolPtrCur = 0, .poolPtrLast = 0,
-    .clearOtagR = 0, .putDrawEnv = 0, .drawSync = 0,
+    .poolPtrCur = 0,
+    .poolPtrLast = 0,
+    .clearOtagR = 0,
+    .putDrawEnv = 0,
+    .drawSync = 0,
     .irqEventClasses = {0, 0, 0},
-    .dualviewRenderOrch = 0, .dualviewSubmit = 0,
+    .dualviewRenderOrch = 0,
+    .dualviewSubmit = 0,
 
     // --- scheduler task layout ------------------------------- N/A until a native frame loop exists --
     // The framework's PcScheduler is not wired for this port: GameHooks' scheduler entries are
     // fail-fast stubs, so these values would have no reader even if they were known.
-    .taskTableBase = 0, .taskSlotStride = 0, .taskCount = 0,
+    .taskTableBase = 0,
+    .taskSlotStride = 0,
+    .taskCount = 0,
     .curTaskPtr = 0,
-    .stageStart = 0, .stageDemo = 0, .stageGame = 0,
+    .stageStart = 0,
+    .stageDemo = 0,
+    .stageGame = 0,
 
     // --- overlay router slots --------------------------------------------------- RE-03, MEASURED --
     // This game HAS overlay modules — 21 .PRG files on the disc (BATTLE, TITLE, ENDING, INITBTL,
@@ -291,14 +304,21 @@ static const GameConfig g_vagrant_cfg = {
     // four contiguous resident words at 0x80010000..0x8001000C. The callbacks remain null because
     // the current substrate is resident-only; RE-04 must observe loader execution before overlay
     // emission/registration can be owned.
-    .overlaySlots = { {0x80068800, nullptr}, {0x800F9800, nullptr}, {0x80102800, nullptr} },
+    .overlaySlots = {{0x80068800, nullptr}, {0x800F9800, nullptr}, {0x80102800, nullptr}},
 
     // --- CD chokepoints --------------------------------------------------------------- RE-04 --
     // tools/re_cd.py measures the full _diskReset -> DsControlB -> DsCommand/DsSync -> CD_sync
     // chain. The synchronous DsControlB owner is registered by game/cd/ds_control.cpp; asynchronous
     // commands, callbacks, reads and XA remain zero/unowned until separately measured.
-    .cdInit = 0, .cdCommand = 0, .cdSync = 0, .cdReadPrim = 0, .cdFileLoad = 0, .cdAsyncRead = 0,
-    .voicePlay = 0, .voiceStop = 0, .lastSectorTracker = 0,
+    .cdInit = 0,
+    .cdCommand = 0,
+    .cdSync = 0,
+    .cdReadPrim = 0,
+    .cdFileLoad = 0,
+    .cdAsyncRead = 0,
+    .voicePlay = 0,
+    .voiceStop = 0,
+    .lastSectorTracker = 0,
     .cdInlineLoad = 0,
     .cdCmdStream = 0,
     .cdCallbackTable = {0, 0, 0, 0},
@@ -306,7 +326,8 @@ static const GameConfig g_vagrant_cfg = {
     .cdGetSector = 0,
     .cdReadyCbPtr = 0,
     .cdLastPosBuf = 0,
-    .cdReadStock = 0, .cdReadSync = 0,
+    .cdReadStock = 0,
+    .cdReadSync = 0,
     .cdSearchFile = 0,
     .dmaCallbackTable = 0,
 
@@ -378,11 +399,13 @@ static const GameConfig g_vagrant_cfg = {
 //     (`vs_main_initHeap` 0x80043F74). So this port can demonstrate neither the bug nor the fix, and
 //     a green boot here says nothing about either.
 
-const GameConfig* vagrant_game_config() { return &g_vagrant_cfg; }
+const GameConfig *vagrant_game_config() {
+  return &g_vagrant_cfg;
+}
 
 // Installs BOTH halves of the seam, because a Core's ctor snapshots them together — installing a
 // config without its hooks leaves a Core holding a half-seam.
 void vagrant_install_game_config() {
-  extern const GameHooks* vagrant_game_hooks();   // game/core/game_hooks.cpp
+  extern const GameHooks *vagrant_game_hooks(); // game/core/game_hooks.cpp
   psxport_install_game(&g_vagrant_cfg, vagrant_game_hooks());
 }

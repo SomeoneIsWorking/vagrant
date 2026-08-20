@@ -1,4 +1,5 @@
-#pragma once
+#ifndef VAGRANT_GAME_CD_DS_CONTROL_CONTRACT_H
+#define VAGRANT_GAME_CD_DS_CONTROL_CONTRACT_H
 
 #include <cstdint>
 
@@ -25,3 +26,5 @@ constexpr bool ownedControl(uint32_t command) {
 }
 
 } // namespace vagrant_cd
+
+#endif // VAGRANT_GAME_CD_DS_CONTROL_CONTRACT_H

@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: overlays,re-03
 depends: tools/re_overlay.py#measure, game/core/game_config.cpp, game/recomp_seeds.json
-reconfirmed: 2026-08-14 12:36:37
-verified_at: 2026-08-14 12:36:37
+reconfirmed: 2026-08-21 01:04:32
+verified_at: 2026-08-21 01:04:32
 ---
 
 ## Claim
@@ -24,3 +24,7 @@ Falsified if any owned non-empty PRG no longer matches its recorded SHA, M2 beco
 ## Re-confirmed 2026-08-14 12:36:37
 
 Reverified after RE-02: overlay shipping check 24/24 and selftest 7/7 remain green; loader reachability remains explicitly unobserved.
+
+## Re-confirmed 2026-08-21 01:04:32
+
+2026-08-21: re_overlay --selftest --check-config passed 7/7 with 20 measured non-empty modules, zero skips, and both shipping slot/seed negative mutations detected.

@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot,re-01
 depends: game/core/game_config.cpp,tools/re_crt0.py
-reconfirmed: 2026-08-14 12:57:01
-verified_at: 2026-08-14 12:57:01
+reconfirmed: 2026-08-21 01:04:32
+verified_at: 2026-08-21 01:04:32
 ---
 
 ## Claim
@@ -52,3 +52,7 @@ Reverified after RE-02: re_crt0 selftest 24/24, static-assert gate 6/6, live Ini
 ## Re-confirmed 2026-08-14 12:57:01
 
 Reconfirmed after psxport be03593f integration: re_crt0 shipping gate remains exact and the bounded resident run executes measured InitHeap and guest main and completes _initRand with no recompilation miss or BIOS fatal. Its later no-frame watchdog sample is in Core::mem_w32 beneath generated 0x8002411C and is not yet classified; this adds no gameplay claim.
+
+## Re-confirmed 2026-08-21 01:04:32
+
+2026-08-21: after repository clang-format, re_crt0 passed 24/24 and its static-assert compile gate passed 6/6; the direct port run logged the exact measured bss, sp/fp, gp, heap a0/a1, libcInit, and guest-main values.

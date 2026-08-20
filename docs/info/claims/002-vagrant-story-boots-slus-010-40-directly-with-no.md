@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot
 depends: game/core/game_config.cpp, tools/re_crt0.py
-reconfirmed: 2026-08-14 12:36:31
-verified_at: 2026-08-14 12:36:31
+reconfirmed: 2026-08-21 01:04:32
+verified_at: 2026-08-21 01:04:32
 ---
 
 ## Claim
@@ -32,3 +32,7 @@ Re-verified 2026-08-14 after the RE-03-only game_config.cpp change: tools/re_crt
 ## Re-confirmed 2026-08-14 12:36:31
 
 Reverified after RE-02: PS-EXE identity/header gate and bounded resident boot agree; crt0 selftest 24/24.
+
+## Re-confirmed 2026-08-21 01:04:32
+
+2026-08-21: re_crt0 concrete execution passed 24/24 and the direct Clang-built port loaded the same PS-EXE entry, applied crt0, and entered guest main with no LoadExec or second-image path.

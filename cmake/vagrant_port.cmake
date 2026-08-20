@@ -39,11 +39,20 @@ target_compile_options(vagrant_seam PRIVATE -g)
 # the refusal side of the ownership boundary.
 include(CTest)
 if(BUILD_TESTING)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
   add_executable(vagrant_cd_contract_test tests/test_ds_control_contract.cpp)
   set_target_properties(vagrant_cd_contract_test PROPERTIES
     CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
   target_include_directories(vagrant_cd_contract_test PRIVATE game)
   add_test(NAME vagrant_cd_contract_test COMMAND vagrant_cd_contract_test)
+  add_test(
+    NAME vagrant_launcher_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_launcher.py)
+  add_test(
+    NAME vagrant_cpp_quality
+    COMMAND ${Python3_EXECUTABLE} ${PSXPORT_DIR}/tools/check_cpp_style.py
+            --root ${CMAKE_SOURCE_DIR} --compile-commands ${CMAKE_BINARY_DIR})
 endif()
 
 if(NOT PSXPORT_BUILD_PORT)

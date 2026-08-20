@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: re-04,cd
 depends: game/core/game_hooks.cpp, game/cd/ds_control.cpp#ds_control_b, game/cd/ds_control_contract.h#ownedControl, cmake/vagrant_port.cmake, external/psxport
-reconfirmed: 2026-08-14 13:48:12
-verified_at: 2026-08-14 13:48:12
+reconfirmed: 2026-08-21 02:22:25
+verified_at: 2026-08-21 02:22:25
 ---
 
 ## Claim
@@ -28,3 +28,15 @@ Reconfirmed after formatter and final combined build: re_cd 3/3, DsControlB owne
 ## Re-confirmed 2026-08-14 13:48:12
 
 Reconfirmed after the shared GAME_SRC and classifier gate landed in the dirty tree: no-generated vagrant_seam compiles ds_control.cpp; vagrant_cd_contract_test accepts 9/9 allowed and refuses 3/3 query/read/unknown cases; the rebuilt live port records Pause and Setmode then reaches the same later 0x8001355C watchdog with zero recomp-MISS, BIOS fatal, or DsControlB refusal.
+
+## Re-confirmed 2026-08-21 01:04:32
+
+2026-08-21: re_cd shipping gate/selftest passed 3/3; the Clang-built vagrant_cd_contract_test passed; direct headless vagrant_port execution advanced beyond disk reset to the same 0x8001355C boundary without a recomp-MISS, BIOS fatal, or unsupported-control refusal.
+
+## Re-confirmed 2026-08-21 02:09:08
+
+Against recorded psxport `eb2465b2`, re_cd again passed 3/3, the shipping classifier CTest passed, and plain `./run.sh` advanced beyond disk reset to generated `0x8001355C` without recomp-MISS, BIOS fatal, or unsupported-control refusal.
+
+## Re-confirmed 2026-08-21 02:22:25
+
+After the final psxport `be381503` Clang rebuild and classifier CTest, plain `./run.sh` again advanced beyond disk reset to generated `0x8001355C` without recomp-MISS, BIOS fatal, or unsupported-control refusal.

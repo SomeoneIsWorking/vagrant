@@ -12,10 +12,18 @@ struct UnsupportedCommand {
   const char *classification;
 };
 
-// This is the contract expectation, not a second classifier: every value is
-// fed through the exact helper included by ds_control.cpp.
+// This is the contract expectation, not a second classifier: every value is fed through the exact
+// helper included by ds_control.cpp.
 constexpr std::array<uint8_t, 9> kExpectedOwnedCommands = {
-    0x01, 0x02, 0x07, 0x08, 0x09, 0x0D, 0x0E, 0x15, 0x16,
+    0x01,
+    0x02,
+    0x07,
+    0x08,
+    0x09,
+    0x0D,
+    0x0E,
+    0x15,
+    0x16,
 };
 
 constexpr std::array<UnsupportedCommand, 3> kUnsupportedCommands = {{
@@ -30,25 +38,22 @@ int main() {
   size_t accepted = 0;
   for (uint8_t command : kExpectedOwnedCommands) {
     if (!vagrant_cd::ownedControl(command)) {
-      std::fprintf(stderr, "FAIL: allowed command 0x%02X was refused\n",
-                   command);
+      std::fprintf(stderr, "FAIL: allowed command 0x%02X was refused\n", command);
       return 1;
     }
     ++accepted;
   }
-  std::printf("allowed: %zu/%zu accepted\n", accepted,
-              kExpectedOwnedCommands.size());
+  std::printf("allowed: %zu/%zu accepted\n", accepted, kExpectedOwnedCommands.size());
 
   size_t refused = 0;
   for (const UnsupportedCommand &command : kUnsupportedCommands) {
     if (vagrant_cd::ownedControl(command.command)) {
-      std::fprintf(stderr, "FAIL: unsupported %s command 0x%02X was accepted\n",
-                   command.classification, command.command);
+      std::fprintf(
+          stderr, "FAIL: unsupported %s command 0x%02X was accepted\n", command.classification, command.command);
       return 1;
     }
     ++refused;
   }
-  std::printf("unsupported: %zu/%zu refused (query, read, unknown)\n", refused,
-              kUnsupportedCommands.size());
+  std::printf("unsupported: %zu/%zu refused (query, read, unknown)\n", refused, kUnsupportedCommands.size());
   return 0;
 }

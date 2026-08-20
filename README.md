@@ -46,16 +46,32 @@ git -C external/psxport/vendor/beetle-psx submodule update --init deps/libchdr  
 cp .env.example .env && $EDITOR .env                # point it at your own disc image (.env is gitignored)
 python3 tools/extract_exe.py                        # extract + identity-check SLUS_010.40
 python3 tools/verify_decomp_targets.py              # does the vendored decomp target our bytes? (21/21)
-cmake -S . -B build && cmake --build build --target vagrant_seam -j"$(nproc)"
+cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+cmake --build build --target vagrant_seam vagrant_cd_contract_test -j"$(nproc)"
+ctest --test-dir build --output-on-failure
 python3 tools/re_frontier.py next                   # what to work on
 ```
 
-`run.sh` is the eventual play launcher; today it provisions, emits, builds, and runs only this honest
-resident-bootstrap boundary. Agents must never invoke it.
+The CTest command also runs psxport's shared non-mutating C++ quality gate: `clang-format` checks
+every tracked first-party C/C++ file, while `clang-tidy` checks every compile-backed first-party
+translation unit through CMake's real `compile_commands.json`. Generated, external, build, and
+scratch trees are excluded.
+
+`./run.sh` is the default project launcher. With no arguments it uses the disc configured through
+`PSXPORT_VAGRANT_DISC`, `.env`, or a root-level CHD; an explicit CHD path is also accepted. It
+identity-checks the executable, only re-emits the resident substrate when its hashed inputs changed,
+builds with Clang, and launches `vagrant_port`. Today that current target is still the honest
+headless resident-bootstrap boundary described above, not gameplay. The launcher will grow a window
+when the port owns a real frame loop; until then, headless execution keeps the watchdog on the measured
+guest boundary rather than host surface setup. The normal one-command verification is:
+
+```sh
+ctest --test-dir build --output-on-failure
+```
 
 ## Requirements
 
-cmake ≥ 3.21, pkg-config, SDL3, zlib, zstd, python3, a C++20 toolchain.
+cmake ≥ 3.21, pkg-config, SDL3, zlib, zstd, python3, Clang/clang-format/clang-tidy.
 
 ## Legal
 
