@@ -1,5 +1,6 @@
 // game_hooks.cpp — the Vagrant Story GameHooks vtable: the behaviour the PSX-generic framework calls
-// into. This port owns NO game behaviour natively, so the table is deliberately tiny.
+// into. The table stays deliberately tiny: it composes the measured CD/VBlank owners, while their
+// implementations remain in the cohesive subsystem modules that own them.
 //
 // There are exactly two kinds of member here, and the distinction is the point (the shape is taken
 // from spider1/game/core/game_hooks.cpp, which learned it the hard way):
@@ -12,8 +13,8 @@
 //               to say so loudly and abort. A silent stub would let a half-wired path look like it
 //               worked, which is the fake-green the porting doc warns about.
 //
-// bootInit is the ONE hook with real work: dispatch the verified guest main() and let the substrate
-// run the game. The zero guard remains a hard configuration-integrity check.
+// bootInit dispatches verified guest main(); registerOverrides composes the measured subsystem
+// owners. The zero guard remains a hard configuration-integrity check.
 #include "cfg.h"
 #include "core.h"
 #include "game_iface.h"
