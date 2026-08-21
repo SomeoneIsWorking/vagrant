@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-21
 tags: re-10,vsync,vblank,boot
 depends: tools/re_vblank.py#measure, game/sync/vblank.cpp#vagrant_start_intr_vsync
-reconfirmed: 2026-08-21 03:34:14
-verified_at: 2026-08-21 03:34:14
+reconfirmed: 2026-08-21 03:34:49
+verified_at: 2026-08-21 03:34:49
 ---
 
 ## Claim
@@ -32,3 +32,7 @@ Final expanded tools/re_vblank.py derives and cross-checks callback wrapper 0x80
 ## Re-confirmed 2026-08-21 03:34:14
 
 Post-landing tools/re_vblank.py --check-source --selftest passed 3/3; constants and shipping handler/super-call/field-rate wiring all match the SHA-bound executable.
+
+## Re-confirmed 2026-08-21 03:34:49
+
+Post-landing 3/3 executable-backed VBlank gate also proved startIntrVSync callback wrapper 0x8001F904 uses the same callback vector as public VSyncCallback.
