@@ -12,10 +12,12 @@ and Setmode through blocking libds control ownership. It also completes `StartSo
 through the measured libapi callback table. The resident VBlank route is now measured too: the host
 supplies video-standard display-field timing, while the intact guest handler at `0x8001FFEC` advances
 Sony's counter and dispatches its eight callbacks. The bounded run advances through `VSync` into GPU
-setup, then enters `_loadMenuSound`'s first `vs_main_diskLoadFile`. Its asynchronous libds read never
-completes, and the watchdog samples that polling loop's `vs_main_gametimeUpdate -> VSync`; VBlank is
-healthy, but the TITLE overlay and its presenter are not reached. There is no recompilation miss or
-unimplemented-BIOS fatal. What exists:
+setup and completes four asynchronous WAVE reads plus the 271-sector TITLE.PRG read. The controller
+paces each sector at the measured 2x-drive period in guest cycles and returns ReadN status `0x22`,
+so the intact guest VBlank callback releases libds Busy state and each final callback's queued Pause
+dispatches normally. The honest boundary is now the first direct TITLE call: resident `jal`
+`0x80042BD8` targets `0x80071334`, but the port has not emitted or registered the loaded overlay, so
+dispatch fails fast before its presenter. What exists:
 
 - disc → executable provisioning from **your own** disc image (nothing game-derived is in this repo),
 - the framework seam (`GameConfig` / `GameHooks`), compiling against the pinned framework,
@@ -30,7 +32,8 @@ unimplemented-BIOS fatal. What exists:
   target images are *measured* to be byte-identical to the ones on this disc (21/21).
 
 `docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-04's
-asynchronous read/ready-callback path is the next runtime prerequisite; RE-05 is statically partial.
+first asynchronous load contract is now reached; emitting and routing the TITLE overlay is RE-05's
+next runtime prerequisite.
 
 ## Getting started
 

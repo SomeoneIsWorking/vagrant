@@ -141,8 +141,8 @@ def configure_and_build(psxport, cc, cxx):
 
 def launch(psxport):
     say(
-        "launching the resident bootstrap (known stop: async CD queue wait before the TITLE "
-        "presenter; watchdog reports no present)…"
+        "launching the resident bootstrap (known stop: TITLE.PRG loads, then fail-fast reports "
+        "the first un-emitted TITLE function 0x80071334 before its presenter)…"
     )
     os.environ.setdefault("PSXPORT_ASSET_DIR", str(psxport))
     os.environ["PSXPORT_VK_HEADLESS"] = "1"

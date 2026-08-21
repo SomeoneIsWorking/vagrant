@@ -4,9 +4,9 @@ kind: claim
 status: holds
 created: 2026-08-21
 tags: launcher,substrate
-depends: run.sh, tools/run.py#launch
-reconfirmed: 2026-08-21
-verified_at: 2026-08-21 11:17:52
+depends: tools/run.py#launch, tests/test_launcher.py, psxport.pin, external/psxport
+reconfirmed: 2026-08-21 13:13:23
+verified_at: 2026-08-21 13:13:23
 ---
 
 ## Claim
@@ -40,3 +40,7 @@ Post-landing launcher selftest passed inside CTest 3/3; the final pre-landing no
 ## Re-confirmed 2026-08-21
 
 Post-landing plain no-argument launcher used pinned psxport 9f1bb927, retained the current substrate, and reached the documented async-CD boundary.
+
+## Re-confirmed 2026-08-21 13:13:23
+
+Against recorded psxport pin ce2c83ad, plain ./run.sh selected the shared framework at that exact commit, verified the retail executable identity, configured/build with Clang, printed the current TITLE.PRG/0x80071334 boundary, and reached that fail-fast target without an argument or hidden mode flag.
