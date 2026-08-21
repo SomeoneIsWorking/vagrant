@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: re-04,cd
 depends: game/core/game_hooks.cpp, game/cd/ds_control.cpp#ds_control_b, game/cd/ds_control_contract.h#ownedControl, cmake/vagrant_port.cmake, external/psxport
-reconfirmed: 2026-08-21 03:34:14
-verified_at: 2026-08-21 03:34:14
+reconfirmed: 2026-08-21 03:35:32
+verified_at: 2026-08-21 03:35:32
 ---
 
 ## Claim
@@ -52,3 +52,7 @@ After the then-recorded psxport `be381503` Clang rebuild and classifier CTest, p
 ## Re-confirmed 2026-08-21 03:34:14
 
 Post-landing CTest 3/3 passed, including vagrant_cd_contract_test; the added VBlank registration leaves measured DsControlB ownership intact.
+
+## Re-confirmed 2026-08-21 03:35:32
+
+Post-comment landing: hook composition changed comments only; post-RE10 CTest 3/3 still passed the DsControlB shipping contract and full Clang policy.
