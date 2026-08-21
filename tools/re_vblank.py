@@ -2,10 +2,12 @@
 """Measure Vagrant's resident VBlank/VSync delivery route from the owned PS-EXE.
 
 Sony libetc waits on a counter incremented by the guest's installed VBlank handler. This tool derives
-VSync, its wait helper, startIntrVSync, the handler, callback table, registrar, and public wrapper
-without taking any address as a search input. It then gates the game-owned host-turn seam that
-dispatches the intact handler at the framework's video-standard-derived field rate.
+VSync, its wait helper, startIntrVSync, the handler, callback table, registrar, callback-system
+wrapper, and public wrapper without taking any address as a search input. It then gates the
+game-owned host-turn seam that dispatches the intact handler at the framework's
+video-standard-derived field rate.
 """
+
 import os
 import re
 import struct
@@ -48,8 +50,13 @@ def measure(img, verify_identity=True):
         raise Refuse("VSync's two blocking paths do not call one wait helper")
     counter = based_address(img.r32(vsync + 0x60), img.r32(vsync + 0x64), 2)
     for hi_off, mem_off, reg in ((0xC8, 0xCC, 4), (0x124, 0x128, 2)):
-        if based_address(img.r32(vsync + hi_off), img.r32(vsync + mem_off), reg) != counter:
-            raise Refuse("VSync's query, wait target, and completion paths do not share one counter")
+        if (
+            based_address(img.r32(vsync + hi_off), img.r32(vsync + mem_off), reg)
+            != counter
+        ):
+            raise Refuse(
+                "VSync's query, wait target, and completion paths do not share one counter"
+            )
 
     helper, helper_scanned = unique_shape(
         img,
@@ -70,8 +77,13 @@ def measure(img, verify_identity=True):
             f"VSync calls 0x{wait_helper:08X}, not unique counter wait helper 0x{helper:08X}"
         )
     for hi_off, mem_off in ((0x0C, 0x10), (0x70, 0x74)):
-        if based_address(img.r32(helper + hi_off), img.r32(helper + mem_off), 2) != counter:
-            raise Refuse("VSync wait helper does not poll the counter returned by VSync")
+        if (
+            based_address(img.r32(helper + hi_off), img.r32(helper + mem_off), 2)
+            != counter
+        ):
+            raise Refuse(
+                "VSync wait helper does not poll the counter returned by VSync"
+            )
 
     start, start_scanned = unique_shape(
         img,
@@ -89,11 +101,13 @@ def measure(img, verify_identity=True):
             0x50: 0x03E00008,
         },
     )
-    callback_table = materialized_address(img.r32(start + 0x04), img.r32(start + 0x08), 4)
+    callback_table = materialized_address(
+        img.r32(start + 0x04), img.r32(start + 0x08), 4
+    )
     start_counter = based_address(img.r32(start + 0x20), img.r32(start + 0x24), 1)
     handler = materialized_address(img.r32(start + 0x30), img.r32(start + 0x34), 5)
     registrar = materialized_address(img.r32(start + 0x40), img.r32(start + 0x44), 2)
-    interrupt_callback = jal_target(start + 0x38, img.r32(start + 0x38))
+    callback_register = jal_target(start + 0x38, img.r32(start + 0x38))
     if start_counter != counter:
         raise Refuse("startIntrVSync does not clear the counter polled by VSync")
 
@@ -121,15 +135,25 @@ def measure(img, verify_identity=True):
         )
     handler_counter = based_address(img.r32(handler), img.r32(handler + 0x04), 2)
     stored_counter = based_address(img.r32(handler + 0x28), img.r32(handler + 0x2C), 1)
-    handler_table = materialized_address(img.r32(handler + 0x18), img.r32(handler + 0x1C), 16)
+    handler_table = materialized_address(
+        img.r32(handler + 0x18), img.r32(handler + 0x1C), 16
+    )
     if handler_counter != counter or stored_counter != counter:
-        raise Refuse("resident VBlank handler does not read, increment, and write the VSync counter")
+        raise Refuse(
+            "resident VBlank handler does not read, increment, and write the VSync counter"
+        )
     if handler_table != callback_table:
-        raise Refuse("resident VBlank handler does not dispatch startIntrVSync's callback table")
+        raise Refuse(
+            "resident VBlank handler does not dispatch startIntrVSync's callback table"
+        )
 
-    registrar_table = materialized_address(img.r32(registrar), img.r32(registrar + 0x04), 2)
+    registrar_table = materialized_address(
+        img.r32(registrar), img.r32(registrar + 0x04), 2
+    )
     if registrar_table != callback_table or img.r32(registrar + 0x08) != 0x00042080:
-        raise Refuse("startIntrVSync's returned registrar does not index its callback table by selector*4")
+        raise Refuse(
+            "startIntrVSync's returned registrar does not index its callback table by selector*4"
+        )
 
     wrapper, wrapper_scanned = unique_shape(
         img,
@@ -146,6 +170,18 @@ def measure(img, verify_identity=True):
         },
     )
     callback_vector = based_address(img.r32(wrapper + 0x04), img.r32(wrapper + 0x08), 2)
+    callback_register_vector = based_address(
+        img.r32(callback_register), img.r32(callback_register + 0x04), 2
+    )
+    if (
+        callback_register_vector != callback_vector
+        or img.r32(callback_register + 0x10) != 0x8C420008
+        or img.r32(callback_register + 0x18) != 0x0040F809
+    ):
+        raise Refuse(
+            "startIntrVSync's callback-system wrapper does not call vector +8 from "
+            "VSyncCallback's vector"
+        )
 
     bootstraps = []
     for va in range(img.lo, img.hi - 0x18, 4):
@@ -175,7 +211,7 @@ def measure(img, verify_identity=True):
         "handler": handler,
         "callback_table": callback_table,
         "registrar": registrar,
-        "interrupt_callback": interrupt_callback,
+        "callback_register": callback_register,
         "wrapper": wrapper,
         "callback_vector": callback_vector,
         "bootstrap": bootstraps[0],
@@ -204,7 +240,9 @@ def check_source(measured, text):
     for name, value in expected.items():
         shipped = source_constant(text, name)
         ok = shipped == value
-        print(f"  [{'ok' if ok else 'FAIL':>4}] {name} shipped=0x{shipped:08X} measured=0x{value:08X}")
+        print(
+            f"  [{'ok' if ok else 'FAIL':>4}] {name} shipped=0x{shipped:08X} measured=0x{value:08X}"
+        )
         if not ok:
             failures.append(name)
 
@@ -241,7 +279,9 @@ def selftest(img, measured):
     img.data = bytes(mutable)
     try:
         measure(img, verify_identity=False)
-        raise AssertionError("VBlank handler with destroyed counter increment was accepted")
+        raise AssertionError(
+            "VBlank handler with destroyed counter increment was accepted"
+        )
     except Refuse as error:
         if "scanned" not in str(error) or "matched 0" not in str(error):
             raise AssertionError(f"negative lacked denominator: {error}")
@@ -271,7 +311,10 @@ def main(argv):
     do_selftest = "--selftest" in args
     args = [arg for arg in args if arg not in ("--check-source", "--selftest")]
     if len(args) > 1:
-        print("usage: re_vblank.py [--check-source] [--selftest] [SLUS_010.40]", file=sys.stderr)
+        print(
+            "usage: re_vblank.py [--check-source] [--selftest] [SLUS_010.40]",
+            file=sys.stderr,
+        )
         return 2
     try:
         img = Image(args[0] if args else DEFAULT_EXE)
@@ -290,8 +333,8 @@ def main(argv):
             f"0x{measured['callback_table']:08X}"
         )
         print(
-            f"  public VSyncCallback 0x{measured['wrapper']:08X}; callback bootstrap "
-            f"0x{measured['bootstrap']:08X}"
+            f"  callback register wrapper 0x{measured['callback_register']:08X}; public "
+            f"VSyncCallback 0x{measured['wrapper']:08X}; bootstrap 0x{measured['bootstrap']:08X}"
         )
         print(
             "  boundary: the host supplies display-field timing; the intact guest handler owns "
