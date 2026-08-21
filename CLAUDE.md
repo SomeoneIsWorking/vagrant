@@ -13,15 +13,17 @@ methodology is `…/docs/porting-a-new-psx-game.md`.
 
 ## THE STATE OF THIS PORT: resident substrate reaches the no-frame watchdog
 
-Created 2026-08-12. Five groups are measured: the **crt0/boot group** (`RE-01`,
+Created 2026-08-12. Six groups are measured: the **crt0/boot group** (`RE-01`,
 `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), and all 20 non-empty `.PRG`
 overlay mappings into three slots (`RE-03`, `tools/re_overlay.py`), plus libpad delivery buffers and
-its pointer table (`RE-06`, `tools/re_pad.py`), and the boot SPU DMA callback route (`RE-09`,
-`tools/re_spu_transfer.py`). The gitignored substrate emits
+its pointer table (`RE-06`, `tools/re_pad.py`), the boot SPU DMA callback route (`RE-09`,
+`tools/re_spu_transfer.py`), and resident VBlank delivery (`RE-10`, `tools/re_vblank.py`). The gitignored substrate emits
 743 resident functions from the PS-EXE entry, builds `vagrant_port`, executes crt0 and guest main,
 and completes `_initRand`. RE-04 now owns blocking `DsControlB` (`0x80025BE4`); the bounded run
 executes `_diskReset` Pause and Setmode, dispatches the DMA4 completion that clears
-`_waitTransferAvailable`, and reaches a later watchdog in Sony `VSync` (`0x8001F6C4` → `0x8001F83C`).
+`_waitTransferAvailable`. The measured guest VBlank handler advances Sony's counter and callbacks;
+the run returns from `VSync`, configures the GPU standard, and reaches the no-present watchdog during
+later GPU/DMA work.
 There is no recompilation miss or unimplemented-BIOS fatal; this is not gameplay. Async CD, reads,
 XA, overlays, and every other unmeasured guest-address group in
 `game/core/game_config.cpp` is `0` with its open step in `docs/re-frontier.md` named. A framework
@@ -57,8 +59,9 @@ CMake's real compile database for `clang-tidy`; generated and external code are 
 to a MEASURED constant in
 `game_config.cpp` must also pass its source instrument: `python3 tools/re_crt0.py --selftest` for the
 boot group, or `python3 tools/re_overlay.py --selftest && python3 tools/re_overlay.py --check-config`
-for overlay slots/seeds, or `python3 tools/re_spu_transfer.py --check-config --selftest` for the DMA4
-callback route. These diff shipped values back to the owned bytes. Compiling is not
+for overlay slots/seeds, `python3 tools/re_spu_transfer.py --check-config --selftest` for the DMA4
+callback route, or `python3 tools/re_vblank.py --check-source --selftest` for resident VBlank
+delivery. These diff shipped values back to the owned bytes. Compiling is not
 enough: the `static_assert`s only check the constants' internal RELATIONS, and `hi - lo == 0x46B20` holds
 just as well when both values are wrong — which is exactly how a reviewer moved `kHeapSizePtr` +4 and
 pointed `kLibcInit` at an unrelated nop with every gate green (workspace `PROTOCOL.md`, "THE SHIPPED

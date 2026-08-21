@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot
 depends: game/core/game_config.cpp, tools/re_crt0.py
-reconfirmed: 2026-08-21 02:47:31
-verified_at: 2026-08-21 02:47:31
+reconfirmed: 2026-08-21 03:31:41
+verified_at: 2026-08-21 03:31:41
 ---
 
 ## Claim
@@ -40,3 +40,7 @@ Reverified after RE-02: PS-EXE identity/header gate and bounded resident boot ag
 ## Re-confirmed 2026-08-21 02:47:31
 
 2026-08-21: re_crt0 executable identity/check-config/citations/selftest and Clang rebuild passed after RE-09 GameConfig extension.
+
+## Re-confirmed 2026-08-21 03:31:41
+
+RE-10 final gate reran tools/re_crt0.py --selftest clean; explicit Clang rebuild and real no-argument launcher again loaded the SHA-matched SLUS_010.40 at entry 0x8001F544

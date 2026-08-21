@@ -20,6 +20,7 @@
 #include <stdlib.h>
 
 void vagrant_cd_register_overrides();
+void vagrant_vblank_register_overrides();
 
 // ── boot ────────────────────────────────────────────────────────────────────────────────────────
 static void vagrant_bootInit(Core *c) {
@@ -37,6 +38,7 @@ static void vagrant_bootInit(Core *c) {
 // ── neutral ─────────────────────────────────────────────────────────────────────────────────────
 static void vagrant_registerOverrides(Game *) {
   vagrant_cd_register_overrides();
+  vagrant_vblank_register_overrides();
 }
 
 static void vagrant_renderFadeState(Core *, FadeState *out) {

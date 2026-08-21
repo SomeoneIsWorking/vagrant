@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-21
 tags: re-09,spu,dma,boot
 depends: tools/re_spu_transfer.py#measure, game/core/game_config.cpp#kDmaCallbackTable
-reconfirmed: 2026-08-21 02:59:16
-verified_at: 2026-08-21 02:59:16
+reconfirmed: 2026-08-21 03:31:41
+verified_at: 2026-08-21 03:31:41
 ---
 
 ## Claim
@@ -28,3 +28,7 @@ Reconfirmed after final instrument cleanup: 3/3 executable-backed selftest passe
 ## Re-confirmed 2026-08-21 02:59:16
 
 2026-08-21: against landed psxport 2b5ef7b5, RE-09 selftest passed 3/3 and real no-argument launcher dispatched callback 0x8001DE94 from slot 0x80032138 before the VSync watchdog.
+
+## Re-confirmed 2026-08-21 03:31:41
+
+RE-10 final tools/re_spu_transfer.py --check-config --selftest passed 3/3; real default launcher again dispatched measured DMA4 callbacks before GPU setup

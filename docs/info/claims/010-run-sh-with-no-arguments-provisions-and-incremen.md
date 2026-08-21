@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-21
 tags: launcher,substrate
 depends: run.sh, tools/run.py#launch
-reconfirmed: 2026-08-21 02:59:16
-verified_at: 2026-08-21 02:59:16
+reconfirmed: 2026-08-21 03:31:41
+verified_at: 2026-08-21 03:31:41
 ---
 
 ## Claim
@@ -28,3 +28,7 @@ After RE-09, launcher tests pass and the real no-argument route remains incremen
 ## Re-confirmed 2026-08-21 02:59:16
 
 2026-08-21: against landed psxport 2b5ef7b5, launcher CTest passed and real no-argument run provisioned/built/launched the intended target, dispatched DMA4, and reached the documented VSync watchdog.
+
+## Re-confirmed 2026-08-21 03:31:41
+
+Launcher CTest passed and real no-argument ./run.sh provisioned, incrementally Clang-built, launched vagrant_port, printed the current no-present boundary, and reached it after resident VBlank/GPU setup

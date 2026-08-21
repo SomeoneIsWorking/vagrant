@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: re-02,recompiler
 depends: game/recomp_seeds.json, game/core/game_config.cpp, game/core/recomp_register.cpp, external/psxport
-reconfirmed: 2026-08-21 02:59:16
-verified_at: 2026-08-21 02:59:16
+reconfirmed: 2026-08-21 03:31:41
+verified_at: 2026-08-21 03:31:41
 ---
 
 ## Claim
@@ -61,3 +61,7 @@ The then-recorded psxport `be381503` preserved the same hash-current 743-functio
 ## Re-confirmed 2026-08-21 02:59:16
 
 2026-08-21: repinned to landed psxport 2b5ef7b5, rebuilt with Clang, and real default launcher preserved the 743-function substrate with no recomp-MISS or BIOS fatal through the RE-09 DMA route.
+
+## Re-confirmed 2026-08-21 03:31:41
+
+Explicit Clang build regenerated no seeds, linked the 743-function substrate, and the real no-argument run reached GPU/DMA work with no recomp-MISS

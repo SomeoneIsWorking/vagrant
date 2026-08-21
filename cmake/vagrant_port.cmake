@@ -5,7 +5,8 @@
 #   psxport            the framework static library (+ psxport_smoke, its agnosticism proof). Always
 #                      configured, so `cmake --build build --target psxport_smoke` works from a bare
 #                      clone of this repo with nothing game-specific present.
-#   vagrant_seam       AN OBJECT LIBRARY over the shared game TUs (config / hooks / main / CD owner).
+#   vagrant_seam       AN OBJECT LIBRARY over the shared game TUs (config / hooks / main / CD and
+#                      VBlank owners).
 #                      It COMPILES but does not link, which is exactly the check possible before a
 #                      substrate exists: it proves this port's GameConfig/GameHooks still satisfy the
 #                      pinned framework's seam — every designator binds, every hook signature matches.
@@ -25,6 +26,7 @@ set(GAME_SRC
   game/core/game_hooks.cpp
   game/core/main.cpp
   game/cd/ds_control.cpp
+  game/sync/vblank.cpp
 )
 add_library(vagrant_seam OBJECT ${GAME_SRC})
 set_target_properties(vagrant_seam PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)

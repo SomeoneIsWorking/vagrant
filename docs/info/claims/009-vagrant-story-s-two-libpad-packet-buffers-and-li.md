@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-20
 tags: [input, re]
 depends: tools/re_pad.py#measure, game/core/game_config.cpp
-reconfirmed: 2026-08-21 02:47:31
-verified_at: 2026-08-21 02:47:31
+reconfirmed: 2026-08-21 03:31:41
+verified_at: 2026-08-21 03:31:41
 ---
 
 ## Claim
@@ -28,3 +28,7 @@ if the owned executable identity changes, the setup shape stops being unique, Pa
 ## Re-confirmed 2026-08-21 02:47:31
 
 2026-08-21: re_pad check-config/selftest 3/3 passed after RE-09 GameConfig extension.
+
+## Re-confirmed 2026-08-21 03:31:41
+
+RE-10 final tools/re_pad.py --check-config --selftest passed 3/3 including destroyed-call and shifted-shipping negatives

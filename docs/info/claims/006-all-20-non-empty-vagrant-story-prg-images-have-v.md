@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: overlays,re-03
 depends: tools/re_overlay.py#measure, game/core/game_config.cpp, game/recomp_seeds.json
-reconfirmed: 2026-08-21 02:47:31
-verified_at: 2026-08-21 02:47:31
+reconfirmed: 2026-08-21 03:31:41
+verified_at: 2026-08-21 03:31:41
 ---
 
 ## Claim
@@ -32,3 +32,7 @@ Reverified after RE-02: overlay shipping check 24/24 and selftest 7/7 remain gre
 ## Re-confirmed 2026-08-21 02:47:31
 
 2026-08-21: re_overlay check-config/selftest remains 7/7 over all non-empty PRGs after RE-09 GameConfig extension.
+
+## Re-confirmed 2026-08-21 03:31:41
+
+RE-10 final tools/re_overlay.py --check-config --selftest passed all 7/7 both-answer checks and all 24 shipping mappings

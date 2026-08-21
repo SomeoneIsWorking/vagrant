@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: crt0
 depends: game/core/game_config.cpp
-reconfirmed: 2026-08-21 02:47:31
-verified_at: 2026-08-21 02:47:31
+reconfirmed: 2026-08-21 03:31:41
+verified_at: 2026-08-21 03:31:41
 ---
 
 ## Claim
@@ -40,3 +40,7 @@ Reconfirmed after psxport be03593f integration: the symbolic and concrete crt0 m
 ## Re-confirmed 2026-08-21 02:47:31
 
 2026-08-21: the byte-derived crt0 gate and independent-link-record assertions remain green after RE-09 GameConfig extension.
+
+## Re-confirmed 2026-08-21 03:31:41
+
+RE-10 final crt0 selftest reconfirmed the interpreter measurement and independent SN link-record witness before the Clang build and real launch

@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot,re-01
 depends: game/core/game_config.cpp,tools/re_crt0.py
-reconfirmed: 2026-08-21 02:47:31
-verified_at: 2026-08-21 02:47:31
+reconfirmed: 2026-08-21 03:31:41
+verified_at: 2026-08-21 03:31:41
 ---
 
 ## Claim
@@ -60,3 +60,7 @@ Reconfirmed after psxport be03593f integration: re_crt0 shipping gate remains ex
 ## Re-confirmed 2026-08-21 02:47:31
 
 2026-08-21: re_crt0 shipped-vs-measured config/citation/selftest/gate-config all passed after RE-09 GameConfig extension.
+
+## Re-confirmed 2026-08-21 03:31:41
+
+RE-10 final gate reran the full crt0 executable/config/citation/static-assert selftest with 0 failures; the real launcher logged the same applied crt0 plan

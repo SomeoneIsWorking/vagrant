@@ -19,7 +19,7 @@ intended behaviour of the real target being reproduced.
 Statuses: ✅ re-verified · 🟡 re-partial (honest gap) · 🔬 in-progress · ⛔ hack (debt, must remove) ·
 ⬜ todo · ➖ skip-by-design · ⏸ blocked (computed).
 
-## THE STATE OF THIS PORT, 2026-08-21: resident bootstrap reaches the VSync counter boundary
+## THE STATE OF THIS PORT, 2026-08-21: resident VBlank delivery is measured
 
 `RE-01` (crt0/boot), `RE-02` (resident seed set/substrate), and `RE-03` (all non-empty `.PRG` load
 bases) are `re-verified`. The emitter's mandatory PS-EXE entry root expands from 260 discovered seeds
@@ -27,9 +27,12 @@ to 743 resident functions with `main` and `main_reentry` empty. The built port e
 crt0 plan, handles InitHeap, enters guest main at `0x80042C38`, and, against pinned psxport
 `2b5ef7b5`, completes `_initRand`. RE-04 now owns blocking `DsControlB` at `0x80025BE4`; a bounded run completes
 `_diskReset`'s Pause and Setmode. RE-09 now supplies the measured libapi DMA callback table: the real
-run dispatches `0x8001DE94` from DMA4 slot `0x80032138`, clears the old `0x8001355C` SPU wait, and
-advances to a later watchdog in Sony `VSync` (`0x8001F6C4` → `0x8001F83C`).
-There is neither a recompilation miss nor an unimplemented-BIOS fatal, and there is no gameplay claim.
+run dispatches `0x8001DE94` from DMA4 slot `0x80032138` and clears the old `0x8001355C` SPU wait.
+RE-10 now preserves Sony's resident VBlank semantics: the host schedules display fields at the
+selected video standard, while intact guest handler `0x8001FFEC` increments counter `0x80032114` and
+dispatches the eight-entry callback table. The real run returns from `VSync`, configures the GPU
+standard, and continues DMA work until the no-present watchdog. There is neither a recompilation miss
+nor an unimplemented-BIOS fatal, and there is no gameplay claim.
 
 The resident substrate now executes the RE-01 plan through guest main. That does not mean gameplay
 boots: platform HLE and CD/overlay loading remain later frontier steps. The earlier fail-fast at the
@@ -62,7 +65,7 @@ measures it against this executable.
 - deps: RE-01
 - evidence: The framework emitter was run on the owned, SHA-verified SLUS_010.40 with this game's seed file and no overlay directory. Its built-in root contract is `{exe.entry} | explicit main seeds | pointer/table discoveries`; the measured PS-EXE entry is `0x8001F544`. With both explicit executable lists empty it reports `260 seeds -> 743 recompiled after jal discovery`, including entry `0x8001F544`, InitHeap thunk `0x80026864`, and main `0x80042C38`. `vagrant_port` builds and bounded runs prove the generated dispatcher handles InitHeap then reaches guest main. The earlier `scratch/logs/re02-third-run.log` fail-fast at BIOS `A0:0x2F` was a generic framework rand gap, not a missing seed. Against psxport `be03593f`, `scratch/logs/bios-rand-vagrant-bios-trace.log` records exactly one `srand` (`A0:0x30`) and 97 `rand` (`A0:0x2F`) calls. `scratch/logs/bios-rand-vagrant-final-run.log` then reaches the no-frame watchdog without `[recomp-MISS]` or unimplemented-BIOS fatal; its sampled stack is in `Core::mem_w32` beneath generated `0x8002411C` and callers, which is not enough to classify the stall. A deliberately broken first run with `recMainLo/Hi=0` produced a false miss for already-generated `0x80026864`; inspecting `rec_func_index` identified the routing-range root cause, and configuring the PS-EXE physical text range `[0x00010000,0x00062000)` removed it without adding a seed.
 - where: game/recomp_seeds.json (empty explicit executable seed lists) + game/core/game_config.cpp (physical main routing range) + game/core/recomp_register.cpp (generated registry) + generated/ (gitignored emitter output)
-- gap: This is the verified resident bootstrap frontier, not a gameplay claim. Overlay modules are not in this smallest substrate. Blocking `_diskReset` and boot SPU DMA completion now advance; RE-10 owns the next VSync/VBlank-counter prerequisite. Future `[recomp-MISS]` failures may extend the explicit lists only with their runtime rationale.
+- gap: This is the verified resident bootstrap frontier, not a gameplay claim. Overlay modules are not in this smallest substrate. Blocking `_diskReset`, boot SPU DMA completion, and resident VBlank waits now advance; dependency-ready RE-05 owns the next OT/packet-pool frame prerequisite. Future `[recomp-MISS]` failures may extend the explicit lists only with their runtime rationale.
 - notes: Reproduce from a provisioned executable with `mkdir -p generated && PSXPORT_SHARDS=8 python3 "${PSXPORT_DIR:-external/psxport}/tools/recomp/emit.py" scratch/bin/vagrant/SLUS_010.40 generated/recompiled.c --seeds game/recomp_seeds.json`, then configure/build normally. Generated code remains gitignored and must never be edited.
 
 ## overlays
@@ -72,7 +75,7 @@ measures it against this executable.
 - deps:
 - evidence: MEASURED 2026-08-14 by `tools/re_overlay.py` on the owned disc: 22 code-image directory entries = boot executable + 21 `.PRG`; `MENU/MENUA.PRG` is exactly 0 bytes and therefore has no code/base; all 20 non-empty `.PRG` images are verified. M2 independently derives placement from each image's own absolute `jal` targets × non-leaf function-entry offsets: BATTLE/TITLE/ENDING = `0x80068800`; INITBTL/SCREFF2/MAINMENU = `0x800F9800`; MENU0-5,7-9,B-F = `0x80102800`. Margins are printed per image (minimum accepted: MENU1 and SCREFF2, 2.00x; maximum: TITLE, 12.71x), with zero undecided. M3 parses each rood-reverse PRG config, first requires OUR extracted image's SHA-1 to equal that config's SHA-1, then compares M2's answer with its independent `vram`: 20 checked, 20 identity matches, 20 address agreements, 0 missing/mismatch/extra. Resident executable M1 independently finds all three values in four contiguous words at `0x80010000..0x8001000C`, though only 1/14 candidate call sites yields a disc descriptor; the other 13 are reported as unresolved rather than used to name files. `--selftest`: 7/7 PASS, 0 SKIP — PS-EXE-header truth, shifted-image answer moves by -4, destroyed entries refuse, one-byte image mutation fails SHA before address, +4 reference-vram mutation fails address after SHA, bad LBA rejected/good accepted, and +4 shipping slot plus +4 BATTLE seed are both named by `--check-config`. `--check-config`: 24/24, comparing the three shipped `GameConfig` slots plus all 20 explicit seed mappings back to this measurement.
 - where: tools/re_overlay.py (instrument and shipping gate) + game/recomp_seeds.json (20 explicit overlay_bases) + game/core/game_config.cpp (3 overlaySlots)
-- gap: The mappings are complete. The resident substrate reaches the RE-10 VSync boundary before a loader is observed; runtime rewriting is outside this static instrument's reach. That is a runtime integration gap, not an unmeasured module/base.
+- gap: The mappings are complete. The resident substrate reaches the no-present watchdog before a loader is observed; runtime rewriting is outside this static instrument's reach. That is a runtime integration gap, not an unmeasured module/base.
 - notes: Three slots serve 20 non-empty modules; the twenty-first `.PRG`, MENUA, is 0 bytes and correctly absent from the seed map. M1's 13 unresolved candidate sites remain explicit coverage limits and are not inputs to the per-file verdict.
 
 ## cd
@@ -140,13 +143,13 @@ measures it against this executable.
 - deps: RE-01
 - evidence: tools/re_spu_transfer.py uniquely derives StartSound 0x80013938 -> writer 0x800134D0 -> waiter 0x8001355C, state 0x800377F0, completion 0x8001347C, Sony libspu channel-4 adapter 0x8001E594, active low-level DMA owner 0x80020280, and callback table 0x80032128 from SHA-verified SLUS_010.40. Its 3/3 selftest destroys the adapter and shifts the shipped table +4. The real default launcher logs DMA4 dispatch of 0x8001DE94 from slot 0x80032138 and advances to a later VSync watchdog.
 - where: tools/re_spu_transfer.py -> game/core/game_config.cpp (dmaCallbackTable)
-- gap: SPU transfer completion is resolved. The next resident boundary is Sony VSync 0x8001F6C4 -> 0x8001F83C; no frame or gameplay is claimed.
+- gap: SPU transfer completion is resolved. RE-10 now owns the later Sony VSync/VBlank boundary; no frame or gameplay is claimed by this step.
 - notes: The first candidate 0x80031050 was falsified by a live slot watch; it is a different callback table. The instrument now proves startIntrDMA returns 0x80020280 and bootstrap stores it in the public DMACallback vector before accepting 0x80032128.
 
 ### RE-10 — resident VBlank counter delivery through Sony VSync
-- status: todo
+- status: re-verified
 - deps: RE-09
-- evidence: The RE-09 bounded run advances beyond _waitTransferAvailable and watchdog-samples generated VSync 0x8001F6C4 -> helper 0x8001F83C. Executable bytes show the helper repeatedly compares the target field against guest global 0x80032114; unlike the old SPU wait, the run does not yet prove which registered VBlank callback increments that counter.
-- where: game/core/game_config.cpp / psxport VBlank delivery substrate (owner not yet measured)
-- gap: Measure the VBlank callback/counter route and why it does not advance. Do not substitute a host tick or an HLE window until the executable proves the guest contract.
-- notes: This is the next resident substrate prerequisite. It is distinct from RE-08 hardware-sync windows: the current stack is a guest counter loop, not an I/O read loop.
+- evidence: tools/re_vblank.py uniquely derives Sony VSync 0x8001F6C4, wait helper 0x8001F83C, counter 0x80032114, startIntrVSync 0x8001FF94, guest handler 0x8001FFEC, callback table 0x800320F4, registrar 0x80020058, public VSyncCallback 0x8001F964, and bootstrap 0x8001FAFC from the SHA-verified executable. Its 3/3 both-answer selftest destroys the handler increment and shifts the shipped handler +4. The game-owned override super-calls intact startIntrVSync, then registers psxport's video-standard-derived field clock; every field dispatches intact guest handler 0x8001FFEC, so guest code owns the counter and all eight callbacks. scratch/logs/re10-final-default.log proves the opposite runtime answer: counter 0x80032114 advances 0 -> 179, VSync returns far enough for GP1 video-standard setup and DMA2/DMA4 work, and no recompilation miss or BIOS fatal occurs.
+- where: tools/re_vblank.py + game/sync/vblank.cpp + game/sync/vblank.h + game/core/game_hooks.cpp
+- gap: Resident VBlank delivery is resolved. The current honest boundary is the no-present watchdog after GPU setup and sustained SPU DMA; RE-05 is now dependency-ready to measure the OT and packet-pool frame owner. No gameplay or overlay loading is claimed.
+- notes: The root cause was not an HLE read window: startIntrVSync installed a guest interrupt handler that increments the counter, but the static runtime had no display interrupt/field-delivery source, so that intact handler never ran. The solution contains no host counter increment, fixed 60 Hz literal, or guessed HLE window; the framework only schedules fields at gpu_field_rate_millihz(c), and the original handler performs every guest-visible write.

@@ -9,22 +9,25 @@ A PC-native port of **Vagrant Story** (PS1, USA, `SLUS_010.40`) built on the
 Created 2026-08-12. An owner-provisioned, gitignored resident substrate now builds and runs. It
 executes measured crt0 and guest main, completes `_initRand`, and now completes `_diskReset`'s Pause
 and Setmode through blocking libds control ownership. It also completes `StartSound`'s DMA4 transfers
-through the measured libapi callback table. The next watchdog is later in Sony `VSync`
-(`0x8001F6C4` → `0x8001F83C`). The bounded run has no recompilation miss or unimplemented-BIOS fatal; async
-CD, reads, XA, overlays, and gameplay have not been reached. What exists:
+through the measured libapi callback table. The resident VBlank route is now measured too: the host
+supplies video-standard display-field timing, while the intact guest handler at `0x8001FFEC` advances
+Sony's counter and dispatches its eight callbacks. The bounded run advances through `VSync` into GPU
+setup and sustained DMA work before the no-present watchdog. It has no recompilation miss or
+unimplemented-BIOS fatal; async CD, reads, XA, overlays, and gameplay have not been reached. What exists:
 
 - disc → executable provisioning from **your own** disc image (nothing game-derived is in this repo),
 - the framework seam (`GameConfig` / `GameHooks`), compiling against the pinned framework,
-- five measured RE groups: crt0/boot (RE-01), the 743-function resident substrate (RE-02), all 20
+- six measured RE groups: crt0/boot (RE-01), the 743-function resident substrate (RE-02), all 20
   non-empty `.PRG` load-base mappings into three overlay slots (RE-03), and the libpad delivery buffers
-  plus driver pointer table (RE-06), and the boot SPU DMA callback route (RE-09). The address groups are gated back to the owned images by their
-  instruments; the resident bootstrap still lacks a frame owner that services the measured buffers,
+  plus driver pointer table (RE-06), the boot SPU DMA callback route (RE-09), and resident VBlank
+  delivery (RE-10). The address groups are gated back to the owned images by their instruments; the
+  resident bootstrap still lacks a frame owner that services the measured buffers,
 - the project registries (`docs/re-frontier.md`, `docs/codemap.md`, `docs/info/`, `docs/issues/`),
 - a vendored CC0 **matching decompilation** of this exact executable, `external/rood-reverse`, whose
   target images are *measured* to be byte-identical to the ones on this disc (21/21).
 
 `docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-04 owns
-the loader, while RE-10 owns the newly exposed VBlank-counter boundary.
+the loader, while dependency-ready RE-05 owns the newly exposed OT/packet-pool frame boundary.
 
 ## Getting started
 
