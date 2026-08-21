@@ -18,7 +18,7 @@ registries, and the matching CC0 reference are joined by six measured groups: cr
 744-function resident substrate rooted at the PS-EXE entry plus Sony's measured interrupt reentry
 (RE-02), and all 20 non-empty `.PRG`
 overlay mappings into three slots (RE-03), plus the two libpad buffers and driver pointer table
-(RE-06), boot SPU DMA completion (RE-09), and resident VBlank delivery (RE-10). Against pinned psxport `ce2c83ad`, `vagrant_port`
+(RE-06), boot SPU DMA completion (RE-09), and resident VBlank delivery (RE-10). Against pinned psxport `3418a79b`, `vagrant_port`
 executes crt0 and guest main, completes `_initRand` and `_diskReset`, then dispatches the measured
 DMA4 callback. The old `0x8001355C` wait clears; the measured guest VBlank handler advances counter
 `0x80032114`, letting Sony `VSync` return and GPU/DMA setup continue. The honest boundary is now
@@ -45,7 +45,7 @@ fix without first gaining a substrate.
 
 | | |
 |---|---|
-| `external/psxport/` | the PSX-generic framework (recorded pin `ce2c83ad`): MIPS→C recompiler, runtime substrate, GTE/SPU/MDEC/CD/GPU backends, SDK HLE, SBS differential harness, SDL_GPU renderer. **Not ours** — fix framework bugs upstream in the workspace dev clone, never in this shared checkout. |
+| `external/psxport/` | the PSX-generic framework (recorded pin `3418a79b`): MIPS→C recompiler, runtime substrate, GTE/SPU/MDEC/CD/GPU backends, SDK HLE, SBS differential harness, SDL_GPU renderer. **Not ours** — fix framework bugs upstream in the workspace dev clone, never in this shared checkout. |
 | `game/`, `tools/`, `generated/` | this port: the seam, the RE, the provisioning, and (eventually) the recompiled substrate. |
 | `external/rood-reverse/` | a CC0 **matching decompilation** of this exact executable — a read-only REFERENCE, never built or linked here. See `docs/references.md`. |
 

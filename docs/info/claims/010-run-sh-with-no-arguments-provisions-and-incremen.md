@@ -5,21 +5,21 @@ status: holds
 created: 2026-08-21
 tags: launcher,substrate
 depends: tools/run.py#launch, tests/test_launcher.py, psxport.pin, external/psxport
-reconfirmed: 2026-08-21
-verified_at: 2026-08-21 13:14:25
+reconfirmed: 2026-08-21 14:13:38
+verified_at: 2026-08-21 14:13:38
 ---
 
 ## Claim
 
-./run.sh with no arguments provisions and incrementally builds the verified resident substrate, then executes scratch/bin/vagrant_port; its honest current runtime boundary is the no-frame watchdog in Sony VSync after measured SPU DMA completion, not gameplay.
+./run.sh with no arguments provisions and incrementally builds the verified resident substrate, then executes scratch/bin/vagrant_port; its honest current runtime boundary is the first direct un-emitted TITLE function at 0x80071334 after five complete asynchronous reads, not gameplay.
 
 ## Evidence
 
-2026-08-21: vagrant_launcher_test positive/refusal cases passed; real ./run.sh runs resolved the configured USA CHD, matched SHA-1 fababcfd..., built with Clang, loaded all 4 RmlUi assets, and reached the watchdog with no recomp miss or BIOS fatal. Repeated runs reported recomp up to date and rebuilt no generated TU. After RE-09, the real route dispatches DMA4 callback 0x8001DE94 from measured slot 0x80032138, advances beyond generated 0x8001355C, and samples the next watchdog in VSync 0x8001F6C4/0x8001F83C.
+2026-08-21: `vagrant_launcher_test` positive/refusal cases passed; real `./run.sh` runs resolved the configured USA CHD, matched SHA-1 fababcfd..., built with Clang, and reached the documented fail-fast target without an argument or hidden mode flag. Repeated runs reported the recompilation up to date and rebuilt no generated translation unit. The live route dispatches the measured DMA4 and VBlank callbacks, completes four WAVE reads and the 271-sector TITLE.PRG read, then reports the missing generated owner for 0x80071334.
 
 ## What would falsify it
 
-if no-argument ./run.sh selects another executable, rewrites unchanged generated sources, omits framework assets, or reaches a runtime boundary other than the documented watchdog without the claim being refreshed
+if no-argument ./run.sh selects another executable, rewrites unchanged generated sources, omits framework assets, or reaches a runtime boundary other than the documented TITLE-overlay fail-fast without the claim being refreshed
 
 ## Re-confirmed 2026-08-21 02:44:52
 
@@ -48,3 +48,7 @@ Against recorded psxport pin ce2c83ad, plain ./run.sh selected the shared framew
 ## Re-confirmed 2026-08-21
 
 Post-landing zero-argument launcher resolved psxport ce2c83ad, built the current product, completed five asynchronous reads, and reached the documented TITLE overlay miss 0x80071334.
+
+## Re-confirmed 2026-08-21 14:13:38
+
+Against recorded psxport pin 3418a79b, a scoped-clean plain ./run.sh generated the consumer-owned SDL_GPU shader header, built with verified Clang, launched the current product, completed all five asynchronous reads, and reached the documented TITLE overlay miss 0x80071334. A second unchanged no-argument run reported the recompilation up to date, compiled no C/C++ translation unit, and reached the same boundary.

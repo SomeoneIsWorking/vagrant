@@ -10,11 +10,11 @@ updated: 2026-08-21
 
 ## Evidence
 
-The pinned deterministic CDC trace at `scratch/logs/re14-pinned-ce2c83ad-compact-runtime.log`
+The pinned deterministic CDC trace at `scratch/logs/re18-3418a79b-direct-runtime.log`
 records five ReadN operations. Four are WAVE reads through `vs_main_diskLoadFile 0x8004493C`; the
 fifth transfers 271 sectors, LBA 256000 through 256270, for TITLE.PRG. Its final callback is the
 sixth observed `DsEndReadySystem` call because call one belongs to initialization, not a read. The
-real zero-argument route in `scratch/logs/re14-pinned-ce2c83ad-default-launcher.log` then fails fast
+real zero-argument route in `scratch/logs/re18-3418a79b-default-launcher.log` then fails fast
 at `0x80071334`, with caller return address `0x80042BE0`.
 
 Reproduce the detailed transition against the framework recorded in `psxport.pin` without a private

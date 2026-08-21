@@ -48,4 +48,4 @@ state wrong. The resolution below fixes the shared controller instead and moves 
 the separately recorded TITLE overlay-emission gap.
 
 ### Resolution (2026-08-21)
-Resolved by pinned psxport ce2c83ad. Deterministic guest-cycle drive deadlines plus active-read INT1 status 0x22 let the intact guest VBlank callback set libds idle and dispatch queued Pause; the pinned default run completes four WAVE reads and all 271 TITLE.PRG sectors, then reaches the separate overlay-emission miss 0x80071334 recorded as issue #16.
+Resolved and reconfirmed against pinned psxport 3418a79b. Deterministic guest-cycle drive deadlines plus active-read INT1 status 0x22 let the intact guest VBlank callback set libds idle and dispatch queued Pause; the pinned default run completes four WAVE reads and all 271 TITLE.PRG sectors, then reaches the separate overlay-emission miss 0x80071334 recorded as issue #16.
