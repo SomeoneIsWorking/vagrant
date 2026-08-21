@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-20
 tags: [input, re]
 depends: tools/re_pad.py#measure, game/core/game_config.cpp
-reconfirmed: 2026-08-21 03:31:41
-verified_at: 2026-08-21 03:31:41
+reconfirmed: 2026-08-21
+verified_at: 2026-08-21 11:17:52
 ---
 
 ## Claim
@@ -32,3 +32,7 @@ if the owned executable identity changes, the setup shape stops being unique, Pa
 ## Re-confirmed 2026-08-21 03:31:41
 
 RE-10 final tools/re_pad.py --check-config --selftest passed 3/3 including destroyed-call and shifted-shipping negatives
+
+## Re-confirmed 2026-08-21
+
+Post-landing re_pad passed 3/3 for both fixed buffers and the live driver pointer table.

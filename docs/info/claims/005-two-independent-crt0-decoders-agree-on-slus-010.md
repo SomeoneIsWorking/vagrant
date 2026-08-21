@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: crt0
 depends: game/core/game_config.cpp
-reconfirmed: 2026-08-21 03:31:41
-verified_at: 2026-08-21 03:31:41
+reconfirmed: 2026-08-21
+verified_at: 2026-08-21 11:17:52
 ---
 
 ## Claim
@@ -44,3 +44,7 @@ Reconfirmed after psxport be03593f integration: the symbolic and concrete crt0 m
 ## Re-confirmed 2026-08-21 03:31:41
 
 RE-10 final crt0 selftest reconfirmed the interpreter measurement and independent SN link-record witness before the Clang build and real launch
+
+## Re-confirmed 2026-08-21
+
+Post-landing independent crt0 extraction and Vagrant re_crt0 remained in full agreement on the measured boot group.

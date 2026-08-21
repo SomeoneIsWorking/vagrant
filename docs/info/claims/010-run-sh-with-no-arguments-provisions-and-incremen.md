@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-21
 tags: launcher,substrate
 depends: run.sh, tools/run.py#launch
-reconfirmed: 2026-08-21 03:34:14
-verified_at: 2026-08-21 03:34:14
+reconfirmed: 2026-08-21
+verified_at: 2026-08-21 11:17:52
 ---
 
 ## Claim
@@ -36,3 +36,7 @@ Launcher CTest passed and real no-argument ./run.sh provisioned, incrementally C
 ## Re-confirmed 2026-08-21 03:34:14
 
 Post-landing launcher selftest passed inside CTest 3/3; the final pre-landing no-argument run used the same launcher logic and reached the no-present watchdog after 179 VBlank transitions.
+
+## Re-confirmed 2026-08-21
+
+Post-landing plain no-argument launcher used pinned psxport 9f1bb927, retained the current substrate, and reached the documented async-CD boundary.

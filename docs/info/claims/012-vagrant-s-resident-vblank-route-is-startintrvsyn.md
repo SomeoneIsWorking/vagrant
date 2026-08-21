@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-21
 tags: re-10,vsync,vblank,boot
 depends: tools/re_vblank.py#measure, game/sync/vblank.cpp#vagrant_start_intr_vsync, game/recomp_seeds.json#main_reentry, external/psxport
-reconfirmed: 2026-08-21 03:34:49
-verified_at: 2026-08-21 03:34:49
+reconfirmed: 2026-08-21
+verified_at: 2026-08-21 11:17:52
 ---
 
 ## Claim
@@ -40,3 +40,7 @@ Post-landing 3/3 executable-backed VBlank gate also proved startIntrVSync callba
 ## Re-confirmed 2026-08-21
 
 Correct HookEntryInt delivery exposed the saved setjmp PC as a genuine mid-function recompilation entry. tools/re_vblank.py now derives buffer 0x80031084, PC 0x8001FAD0, and HookEntryInt 0x80026954 and rejects the missing seed (4/4). The forced negative scratch/logs/re05-reentry.log fails exactly at 0x8001FAD0; with the emitter's main_reentry discovery fixed and pinned at psxport 9f1bb927, scratch/logs/re05-pinned-final-irq-dma.log reaches that entry and advances the intact VBlank counter through 173 without a recompilation miss.
+
+## Re-confirmed 2026-08-21
+
+Post-landing re_vblank passed 4/4; pinned runtime restored 0x8001FAD0, kept DMA4 callbacks armed, and advanced guest VBlank 0 through 173.
