@@ -3,9 +3,9 @@
 //
 // READ THIS BEFORE FILLING ANYTHING IN.
 //
-// **Exactly FOUR groups are filled in: crt0/boot (RE-01), recompiled-main range (RE-02), the three
-// measured overlay slots (RE-03), and pad delivery (RE-06). Other guest-address groups remain ZERO
-// until measured.**
+// **Exactly FIVE groups are filled in: crt0/boot (RE-01), recompiled-main range (RE-02), the three
+// measured overlay slots (RE-03), pad delivery (RE-06), and the DMA callback table required by boot
+// SPU transfers (RE-09). Other guest-address groups remain ZERO until measured.**
 // Zero is the
 // honest value and it is deliberate: psxport fails fast on a zero it needs, whereas a
 // plausible-looking WRONG address does not fail cleanly — it breaks boot or diverges the byte-compare
@@ -229,6 +229,13 @@ static constexpr uint32_t kPadSlotPtrTable = 0x8003FCF0u;
 static constexpr uint32_t kPadSlotPtrStride = 240u;
 static_assert(kPadSlot1Buf - kPadSlot0Buf == 34u);
 
+// RE-09, MEASURED by tools/re_spu_transfer.py from libapi's low-level DMACallback owner. The owner
+// indexes this eight-word table by channel*4; Sony libspu's adapter fixes the channel to DMA4. The
+// framework already completes the real DMA4 transfer and reads this exact table at its deferred
+// callback boundary. Keeping the table zero consumed the completion without dispatching the guest's
+// registered callback, leaving StartSound's _isSpuTransfer flag permanently equal to one.
+static constexpr uint32_t kDmaCallbackTable = 0x80032128u;
+
 // DESIGNATED initialisers, deliberately. GameConfig is initialised POSITIONALLY by the older
 // consumers in this workspace, and the framework appends fields to it — which means a positional list
 // silently re-binds every value after an inserted field. Binding by name makes an upstream insert a
@@ -329,7 +336,8 @@ static const GameConfig g_vagrant_cfg = {
     .cdReadStock = 0,
     .cdReadSync = 0,
     .cdSearchFile = 0,
-    .dmaCallbackTable = 0,
+    // --- DMA completion callback table ---------------------------------- RE-09, MEASURED --
+    .dmaCallbackTable = kDmaCallbackTable,
 
     // --- pad driver ------------------------------------------------------- RE-06, MEASURED --
     // tools/re_pad.py finds the unique _sysInit sequence that calls

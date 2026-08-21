@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-20
 tags: [input, re]
 depends: tools/re_pad.py#measure, game/core/game_config.cpp
-reconfirmed: 2026-08-21 01:04:32
-verified_at: 2026-08-21 01:04:32
+reconfirmed: 2026-08-21 02:47:31
+verified_at: 2026-08-21 02:47:31
 ---
 
 ## Claim
@@ -24,3 +24,7 @@ if the owned executable identity changes, the setup shape stops being unique, Pa
 ## Re-confirmed 2026-08-21 01:04:32
 
 2026-08-21: re_pad --check-config --selftest re-derived slot buffers 0x8005DFF0/0x8005E012 and pointer table 0x8003FCF0 stride 240 from the SHA-bound executable; the unique-shape and +4 shipping mutations both refused, 3/3.
+
+## Re-confirmed 2026-08-21 02:47:31
+
+2026-08-21: re_pad check-config/selftest 3/3 passed after RE-09 GameConfig extension.

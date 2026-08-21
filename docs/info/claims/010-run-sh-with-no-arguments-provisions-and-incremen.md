@@ -4,17 +4,27 @@ kind: claim
 status: holds
 created: 2026-08-21
 tags: launcher,substrate
-depends: run.sh, tools/resolve_disc.py#resolve
+depends: run.sh, tools/run.py#launch
+reconfirmed: 2026-08-21 02:59:16
+verified_at: 2026-08-21 02:59:16
 ---
 
 ## Claim
 
-./run.sh with no arguments provisions and incrementally builds the verified resident substrate, then executes scratch/bin/vagrant_port; its honest current runtime boundary is the no-frame watchdog under 0x8001355C, not gameplay.
+./run.sh with no arguments provisions and incrementally builds the verified resident substrate, then executes scratch/bin/vagrant_port; its honest current runtime boundary is the no-frame watchdog in Sony VSync after measured SPU DMA completion, not gameplay.
 
 ## Evidence
 
-2026-08-21: vagrant_launcher_test positive/refusal cases passed; real ./run.sh runs resolved the configured USA CHD, matched SHA-1 fababcfd..., built with Clang, loaded all 4 RmlUi assets after the launcher fix, and reached the watchdog with no recomp miss or BIOS fatal. Repeated runs reported recomp up to date and rebuilt no generated TU. Reconfirmed after pinning and rebuilding against final psxport be381503: the launcher explicitly selected the still-frameless headless bootstrap, entered guest crt0/main, and sampled the watchdog under generated 0x8001355C.
+2026-08-21: vagrant_launcher_test positive/refusal cases passed; real ./run.sh runs resolved the configured USA CHD, matched SHA-1 fababcfd..., built with Clang, loaded all 4 RmlUi assets, and reached the watchdog with no recomp miss or BIOS fatal. Repeated runs reported recomp up to date and rebuilt no generated TU. After RE-09, the real route dispatches DMA4 callback 0x8001DE94 from measured slot 0x80032138, advances beyond generated 0x8001355C, and samples the next watchdog in VSync 0x8001F6C4/0x8001F83C.
 
 ## What would falsify it
 
 if no-argument ./run.sh selects another executable, rewrites unchanged generated sources, omits framework assets, or reaches a runtime boundary other than the documented watchdog without the claim being refreshed
+
+## Re-confirmed 2026-08-21 02:44:52
+
+After RE-09, launcher tests pass and the real no-argument route remains incremental, Clang-built, and headless; it dispatches measured DMA4 callback 0x8001DE94 and reaches the documented VSync watchdog instead of the retired 0x8001355C boundary.
+
+## Re-confirmed 2026-08-21 02:59:16
+
+2026-08-21: against landed psxport 2b5ef7b5, launcher CTest passed and real no-argument run provisioned/built/launched the intended target, dispatched DMA4, and reached the documented VSync watchdog.

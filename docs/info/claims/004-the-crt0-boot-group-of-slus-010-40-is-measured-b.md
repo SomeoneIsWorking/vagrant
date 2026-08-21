@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot,re-01
 depends: game/core/game_config.cpp,tools/re_crt0.py
-reconfirmed: 2026-08-21 01:04:32
-verified_at: 2026-08-21 01:04:32
+reconfirmed: 2026-08-21 02:47:31
+verified_at: 2026-08-21 02:47:31
 ---
 
 ## Claim
@@ -56,3 +56,7 @@ Reconfirmed after psxport be03593f integration: re_crt0 shipping gate remains ex
 ## Re-confirmed 2026-08-21 01:04:32
 
 2026-08-21: after repository clang-format, re_crt0 passed 24/24 and its static-assert compile gate passed 6/6; the direct port run logged the exact measured bss, sp/fp, gp, heap a0/a1, libcInit, and guest-main values.
+
+## Re-confirmed 2026-08-21 02:47:31
+
+2026-08-21: re_crt0 shipped-vs-measured config/citation/selftest/gate-config all passed after RE-09 GameConfig extension.

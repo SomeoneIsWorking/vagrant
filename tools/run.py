@@ -140,7 +140,7 @@ def configure_and_build(psxport, cc, cxx):
 
 
 def launch(psxport):
-    say("launching the resident bootstrap (known stop: watchdog after guest main at 0x8001355C)…")
+    say("launching the resident bootstrap (known stop: VSync watchdog after SPU DMA completion)…")
     os.environ.setdefault("PSXPORT_ASSET_DIR", str(psxport))
     os.environ["PSXPORT_VK_HEADLESS"] = "1"
     os.execv(PORT, [str(PORT)])

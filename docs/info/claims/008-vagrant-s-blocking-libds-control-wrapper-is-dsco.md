@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: re-04,cd
 depends: game/core/game_hooks.cpp, game/cd/ds_control.cpp#ds_control_b, game/cd/ds_control_contract.h#ownedControl, cmake/vagrant_port.cmake, external/psxport
-reconfirmed: 2026-08-21 02:22:25
-verified_at: 2026-08-21 02:22:25
+reconfirmed: 2026-08-21 02:59:16
+verified_at: 2026-08-21 02:59:16
 ---
 
 ## Claim
@@ -39,4 +39,12 @@ Against recorded psxport `eb2465b2`, re_cd again passed 3/3, the shipping classi
 
 ## Re-confirmed 2026-08-21 02:22:25
 
-After the final psxport `be381503` Clang rebuild and classifier CTest, plain `./run.sh` again advanced beyond disk reset to generated `0x8001355C` without recomp-MISS, BIOS fatal, or unsupported-control refusal.
+After the then-recorded psxport `be381503` Clang rebuild and classifier CTest, plain `./run.sh` again advanced beyond disk reset to generated `0x8001355C` without recomp-MISS, BIOS fatal, or unsupported-control refusal.
+
+## Re-confirmed 2026-08-21 02:47:31
+
+2026-08-21: re_cd check-config/selftest 3/3, shipping contract test, and real default launcher remain green after RE-09 integration.
+
+## Re-confirmed 2026-08-21 02:59:16
+
+2026-08-21: against landed psxport 2b5ef7b5, CD contract CTest passed and the default launcher advanced beyond disk reset and SPU DMA without unsupported-control refusal.

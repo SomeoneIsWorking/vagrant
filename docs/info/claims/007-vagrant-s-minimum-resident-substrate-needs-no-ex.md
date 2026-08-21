@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: re-02,recompiler
 depends: game/recomp_seeds.json, game/core/game_config.cpp, game/core/recomp_register.cpp, external/psxport
-reconfirmed: 2026-08-21 02:22:25
-verified_at: 2026-08-21 02:22:25
+reconfirmed: 2026-08-21 02:59:16
+verified_at: 2026-08-21 02:59:16
 ---
 
 ## Claim
@@ -52,4 +52,12 @@ After recording landed psxport `eb2465b2`, the hash gate kept the unchanged 743-
 
 ## Re-confirmed 2026-08-21 02:22:25
 
-Final recorded psxport `be381503` preserves the same hash-current 743-function substrate and plain-launch route through guest crt0/main to generated `0x8001355C`, with no recomp-MISS or BIOS fatal.
+The then-recorded psxport `be381503` preserved the same hash-current 743-function substrate and plain-launch route through guest crt0/main to generated `0x8001355C`, with no recomp-MISS or BIOS fatal.
+
+## Re-confirmed 2026-08-21 02:47:31
+
+2026-08-21: Clang rebuild and real default launcher use the unchanged generated 743-function resident substrate and advance through the new DMA callback route without recomp-MISS.
+
+## Re-confirmed 2026-08-21 02:59:16
+
+2026-08-21: repinned to landed psxport 2b5ef7b5, rebuilt with Clang, and real default launcher preserved the 743-function substrate with no recomp-MISS or BIOS fatal through the RE-09 DMA route.
