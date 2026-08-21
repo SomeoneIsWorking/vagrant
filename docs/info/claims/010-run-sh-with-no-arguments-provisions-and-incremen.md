@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-21
 tags: launcher,substrate
 depends: tools/run.py#launch, tests/test_launcher.py, psxport.pin, external/psxport
-reconfirmed: 2026-08-21 14:13:38
-verified_at: 2026-08-21 14:13:38
+reconfirmed: 2026-08-21
+verified_at: 2026-08-21 14:16:30
 ---
 
 ## Claim
@@ -52,3 +52,7 @@ Post-landing zero-argument launcher resolved psxport ce2c83ad, built the current
 ## Re-confirmed 2026-08-21 14:13:38
 
 Against recorded psxport pin 3418a79b, a scoped-clean plain ./run.sh generated the consumer-owned SDL_GPU shader header, built with verified Clang, launched the current product, completed all five asynchronous reads, and reached the documented TITLE overlay miss 0x80071334. A second unchanged no-argument run reported the recompilation up to date, compiled no C/C++ translation unit, and reached the same boundary.
+
+## Re-confirmed 2026-08-21
+
+Post-landing zero-argument launcher regenerated the consumer-owned shader header with Clang, then an unchanged second run compiled no C/C++ translation units and reached the same 0x80071334 boundary on psxport 3418a79b.
