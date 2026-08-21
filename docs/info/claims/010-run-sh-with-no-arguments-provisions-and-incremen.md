@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-21
 tags: launcher,substrate
 depends: tools/run.py#launch, tests/test_launcher.py, psxport.pin, external/psxport
-reconfirmed: 2026-08-21 13:13:23
-verified_at: 2026-08-21 13:13:23
+reconfirmed: 2026-08-21
+verified_at: 2026-08-21 13:14:25
 ---
 
 ## Claim
@@ -44,3 +44,7 @@ Post-landing plain no-argument launcher used pinned psxport 9f1bb927, retained t
 ## Re-confirmed 2026-08-21 13:13:23
 
 Against recorded psxport pin ce2c83ad, plain ./run.sh selected the shared framework at that exact commit, verified the retail executable identity, configured/build with Clang, printed the current TITLE.PRG/0x80071334 boundary, and reached that fail-fast target without an argument or hidden mode flag.
+
+## Re-confirmed 2026-08-21
+
+Post-landing zero-argument launcher resolved psxport ce2c83ad, built the current product, completed five asynchronous reads, and reached the documented TITLE overlay miss 0x80071334.
