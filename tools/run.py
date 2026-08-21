@@ -140,7 +140,10 @@ def configure_and_build(psxport, cc, cxx):
 
 
 def launch(psxport):
-    say("launching the resident bootstrap (known stop: no-present watchdog after VBlank/GPU setup)…")
+    say(
+        "launching the resident bootstrap (known stop: async CD queue wait before the TITLE "
+        "presenter; watchdog reports no present)…"
+    )
     os.environ.setdefault("PSXPORT_ASSET_DIR", str(psxport))
     os.environ["PSXPORT_VK_HEADLESS"] = "1"
     os.execv(PORT, [str(PORT)])

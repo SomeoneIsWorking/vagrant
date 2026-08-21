@@ -8,6 +8,7 @@ game-owned host-turn seam that dispatches the intact handler at the framework's
 video-standard-derived field rate.
 """
 
+import json
 import os
 import re
 import struct
@@ -23,6 +24,7 @@ from re_spu_transfer import (
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE = os.path.join(ROOT, "game", "sync", "vblank.cpp")
+SEEDS = os.path.join(ROOT, "game", "recomp_seeds.json")
 
 
 def measure(img, verify_identity=True):
@@ -203,6 +205,30 @@ def measure(img, verify_identity=True):
             f"matched {len(bootstraps)} ({shown})"
         )
 
+    bootstrap = bootstraps[0]
+    owner = bootstrap - 0x94
+    setjmp_call = bootstrap - 0x34
+    hook_entry_call = bootstrap - 0x0C
+    if (
+        img.r32(owner) != 0x27BDFFE8
+        or img.r32(owner + 0x08) >> 26 != 0x0F
+        or img.r32(owner + 0x0C) >> 26 != 0x09
+        or img.r32(setjmp_call) >> 26 != 0x03
+        or img.r32(setjmp_call + 0x04) != 0x26040038
+        or img.r32(hook_entry_call) >> 26 != 0x03
+        or img.r32(hook_entry_call + 0x04) != 0xAE020000
+    ):
+        raise Refuse(
+            "VBlank callback bootstrap does not contain the measured setjmp/HookEntryInt route"
+        )
+    owner_base = materialized_address(img.r32(owner + 0x08), img.r32(owner + 0x0C), 16)
+    jmp_buffer = owner_base + (img.r32(setjmp_call + 0x04) & 0xFFFF)
+    reentry = setjmp_call + 0x08
+    if img.r32(reentry) != 0x10400003:
+        raise Refuse(
+            "setjmp return PC is not the branch that distinguishes initial and restored entry"
+        )
+
     return {
         "vsync": vsync,
         "wait_helper": wait_helper,
@@ -214,7 +240,12 @@ def measure(img, verify_identity=True):
         "callback_register": callback_register,
         "wrapper": wrapper,
         "callback_vector": callback_vector,
-        "bootstrap": bootstraps[0],
+        "bootstrap": bootstrap,
+        "bootstrap_owner": owner,
+        "setjmp": jal_target(setjmp_call, img.r32(setjmp_call)),
+        "jmp_buffer": jmp_buffer,
+        "reentry": reentry,
+        "hook_entry_int": jal_target(hook_entry_call, img.r32(hook_entry_call)),
         "vsync_scanned": vsync_scanned,
         "helper_scanned": helper_scanned,
         "start_scanned": start_scanned,
@@ -230,7 +261,16 @@ def source_constant(text, name):
     return int(match.group(1), 0)
 
 
-def check_source(measured, text):
+def seed_reentries(text):
+    lines = [line for line in text.splitlines() if not line.lstrip().startswith("//")]
+    data = json.loads("\n".join(lines))
+    return [
+        int(value, 0) if isinstance(value, str) else value
+        for value in data.get("main_reentry", [])
+    ]
+
+
+def check_source(measured, text, seeds_text):
     expected = {
         "kStartIntrVSync": measured["start"],
         "kVBlankHandler": measured["handler"],
@@ -260,6 +300,14 @@ def check_source(measured, text):
         print(f"  [{'ok' if ok else 'FAIL':>4}] {name}")
         if not ok:
             failures.append(name)
+    reentries = seed_reentries(seeds_text)
+    seed_ok = reentries.count(measured["reentry"]) == 1
+    print(
+        f"  [{'ok' if seed_ok else 'FAIL':>4}] restored setjmp PC "
+        f"0x{measured['reentry']:08X} appears exactly once in main_reentry"
+    )
+    if not seed_ok:
+        failures.append("main_reentry")
     if failures:
         raise Refuse("shipping mismatch: " + ", ".join(failures))
 
@@ -269,7 +317,9 @@ def selftest(img, measured):
     checks = 0
     with open(SOURCE, encoding="utf-8") as source_file:
         text = source_file.read()
-    check_source(measured, text)
+    with open(SEEDS, encoding="utf-8") as seeds_file:
+        seeds_text = seeds_file.read()
+    check_source(measured, text, seeds_text)
     checks += 1
 
     original = img.data
@@ -295,14 +345,26 @@ def selftest(img, measured):
     if changed == text:
         raise AssertionError("shipping mutation anchor did not fire")
     try:
-        check_source(measured, changed)
+        check_source(measured, changed, seeds_text)
         raise AssertionError("+4 shipping handler was accepted")
     except Refuse as error:
         if "kVBlankHandler" not in str(error):
             raise AssertionError(f"shipping negative did not name field: {error}")
         print(f"  [ ok ] +4 shipping handler refused: {error}")
         checks += 1
-    print(f"re_vblank selftest: {checks}/3 PASS")
+
+    changed_seeds = seeds_text.replace(f'    "0x{measured["reentry"]:08X}"\n', "", 1)
+    if changed_seeds == seeds_text:
+        raise AssertionError("main_reentry mutation anchor did not fire")
+    try:
+        check_source(measured, text, changed_seeds)
+        raise AssertionError("missing restored setjmp PC was accepted")
+    except Refuse as error:
+        if "main_reentry" not in str(error):
+            raise AssertionError(f"seed negative did not name field: {error}")
+        print(f"  [ ok ] missing restored setjmp PC refused: {error}")
+        checks += 1
+    print(f"re_vblank selftest: {checks}/4 PASS")
 
 
 def main(argv):
@@ -337,12 +399,20 @@ def main(argv):
             f"VSyncCallback 0x{measured['wrapper']:08X}; bootstrap 0x{measured['bootstrap']:08X}"
         )
         print(
+            f"  interrupt bootstrap 0x{measured['bootstrap_owner']:08X}: setjmp buffer "
+            f"0x{measured['jmp_buffer']:08X} restores PC 0x{measured['reentry']:08X}; "
+            f"HookEntryInt 0x{measured['hook_entry_int']:08X}"
+        )
+        print(
             "  boundary: the host supplies display-field timing; the intact guest handler owns "
             "counter and callback semantics"
         )
         if do_check:
             with open(SOURCE, encoding="utf-8") as source_file:
-                check_source(measured, source_file.read())
+                source_text = source_file.read()
+            with open(SEEDS, encoding="utf-8") as seeds_file:
+                seeds_text = seeds_file.read()
+            check_source(measured, source_text, seeds_text)
         if do_selftest:
             selftest(img, measured)
         return 0

@@ -1,12 +1,13 @@
 ---
 id: C007
 kind: claim
-status: holds
+status: falsified
 created: 2026-08-14
 tags: re-02,recompiler
 depends: game/recomp_seeds.json, game/core/game_config.cpp, game/core/recomp_register.cpp, external/psxport
 reconfirmed: 2026-08-21 03:31:41
 verified_at: 2026-08-21 03:31:41
+falsified_on: 2026-08-21
 ---
 
 ## Claim
@@ -65,3 +66,9 @@ The then-recorded psxport `be381503` preserved the same hash-current 743-functio
 ## Re-confirmed 2026-08-21 03:31:41
 
 Explicit Clang build regenerated no seeds, linked the 743-function substrate, and the real no-argument run reached GPU/DMA work with no recomp-MISS
+
+## FALSIFIED 2026-08-21
+
+Correct HookEntryInt exception-exit semantics restore Sony libetc setjmp buffer 0x80031084 to mid-function PC 0x8001FAD0. The live runtime fails fast there when main_reentry is absent, and tools/re_vblank.py derives the saved-PC route from the SHA-bound executable. Vagrant therefore needs one explicit resident reentry seed even though it needs no explicit natural function seed.
+
+> Anything that cited this claim as proof must be re-checked. Grep the repo for it.

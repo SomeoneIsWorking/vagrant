@@ -6,8 +6,11 @@
 // about THIS executable and THIS disc, so the framework ships none of them and every game supplies its
 // own file. JSON with `//` comments; every key is optional.
 //
-// The executable seed sets are empty by measurement: the emitter independently roots traversal at
-// the PS-EXE entry and discovers its direct-call graph. Add only runtime-observed fail-fast misses;
+// Natural executable function seeds are empty: the emitter independently roots traversal at the
+// PS-EXE entry and discovers its direct-call graph. The one main_reentry below is different: Sony's
+// HookEntryInt restores a setjmp return PC in the middle of the interrupt bootstrap, so direct-call
+// discovery cannot find that dispatch entry. tools/re_vblank.py derives and gates it from the owned
+// executable. Add any future seed only after a runtime fail-fast plus executable-backed provenance;
 // duplicating the entry here would obscure the bootstrap contract instead of extending it.
 //
 // Two rules, both learned the hard way elsewhere in this workspace:
@@ -29,7 +32,11 @@
 // game_config.cpp back to the measurement; these values are not transcribed reference guesses.
 {
   "main": [],
-  "main_reentry": [],
+  "main_reentry": [
+    // Sony libetc's func_8001FA68 passes 0x80031084 to setjmp at 0x8001FAC8. HookEntryInt
+    // restores that buffer on interrupt exit, so execution resumes at the saved jal return PC.
+    "0x8001FAD0"
+  ],
   "overlay_bases": {
     "BATTLE": "0x80068800",
     "ENDING": "0x80068800",

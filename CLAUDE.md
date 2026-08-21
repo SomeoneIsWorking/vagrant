@@ -11,19 +11,24 @@ diagnostics through `lucent`, the registries, and never editing `external/psxpor
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
-## THE STATE OF THIS PORT: resident substrate reaches the no-frame watchdog
+## THE STATE OF THIS PORT: resident substrate waits in the asynchronous CD queue
 
-Created 2026-08-12. Six groups are measured: the **crt0/boot group** (`RE-01`,
+Created 2026-08-12. Six groups are re-verified and one frame group is measured-partial: the **crt0/boot group** (`RE-01`,
 `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), and all 20 non-empty `.PRG`
 overlay mappings into three slots (`RE-03`, `tools/re_overlay.py`), plus libpad delivery buffers and
 its pointer table (`RE-06`, `tools/re_pad.py`), the boot SPU DMA callback route (`RE-09`,
-`tools/re_spu_transfer.py`), and resident VBlank delivery (`RE-10`, `tools/re_vblank.py`). The gitignored substrate emits
-743 resident functions from the PS-EXE entry, builds `vagrant_port`, executes crt0 and guest main,
+`tools/re_spu_transfer.py`), resident VBlank delivery (`RE-10`, `tools/re_vblank.py`), and the
+overlay-owned presenter/dynamic-buffer contract (`RE-05`, `tools/re_frame.py`). The gitignored substrate emits
+744 resident functions from the PS-EXE entry plus the measured HookEntryInt return PC, builds `vagrant_port`, executes crt0 and guest main,
 and completes `_initRand`. RE-04 now owns blocking `DsControlB` (`0x80025BE4`); the bounded run
 executes `_diskReset` Pause and Setmode, dispatches the DMA4 completion that clears
 `_waitTransferAvailable`. The measured guest VBlank handler advances Sony's counter and callbacks;
-the run returns from `VSync`, configures the GPU standard, and reaches the no-present watchdog during
-later GPU/DMA work.
+the run returns from `VSync`, configures the GPU standard, then enters `_loadMenuSound`'s first
+`vs_main_diskLoadFile`. Its asynchronous libds read never completes because the read/ready-callback
+path is not owned. The watchdog samples the polling loop's `vs_main_gametimeUpdate -> VSync`; this is
+not a failed VBlank and not a reached frame loop. RE-05 independently measures the later
+overlay-owned presenters and dynamic OT/pool contract with `tools/re_frame.py`, but neither overlay
+executes yet.
 There is no recompilation miss or unimplemented-BIOS fatal; this is not gameplay. Async CD, reads,
 XA, overlays, and every other unmeasured guest-address group in
 `game/core/game_config.cpp` is `0` with its open step in `docs/re-frontier.md` named. A framework
@@ -35,7 +40,7 @@ its fix. If something here looks like it works, check `docs/codemap.md` — the 
 `./run.sh` is the stable project launcher. With no arguments it resolves the framework and the disc,
 identity-checks and hash-provisions the resident substrate, configures both CMake trees with Clang,
 builds `vagrant_port`, and launches that current target. It does not claim gameplay: the expected stop
-remains the no-frame watchdog after guest main. The shell file is deliberately only a Python dispatch;
+remains the no-present watchdog while the guest polls the first asynchronous sound-data read. The shell file is deliberately only a Python dispatch;
 all policy lives in `tools/run.py`. An explicit CHD path overrides the normal
 `PSXPORT_VAGRANT_DISC`/`.env`/drop-in resolution order. The current bootstrap target is explicitly
 headless: it has no frame loop or gameplay window yet, and entering the window presentation path would
@@ -60,8 +65,9 @@ to a MEASURED constant in
 `game_config.cpp` must also pass its source instrument: `python3 tools/re_crt0.py --selftest` for the
 boot group, or `python3 tools/re_overlay.py --selftest && python3 tools/re_overlay.py --check-config`
 for overlay slots/seeds, `python3 tools/re_spu_transfer.py --check-config --selftest` for the DMA4
-callback route, or `python3 tools/re_vblank.py --check-source --selftest` for resident VBlank
-delivery. These diff shipped values back to the owned bytes. Compiling is not
+callback route, `python3 tools/re_vblank.py --check-source --selftest` for resident VBlank
+delivery, or `python3 tools/re_frame.py --check-config --selftest` for the overlay-owned presentation
+contract and deliberately-zero fixed-layout fields. These diff shipped values back to the owned bytes. Compiling is not
 enough: the `static_assert`s only check the constants' internal RELATIONS, and `hi - lo == 0x46B20` holds
 just as well when both values are wrong — which is exactly how a reviewer moved `kHeapSizePtr` +4 and
 pointed `kLibcInit` at an unrelated nop with every gate green (workspace `PROTOCOL.md`, "THE SHIPPED
@@ -148,8 +154,8 @@ citation attached. Full detail: `docs/references.md`.
   `MENUA.PRG`, is 0 bytes). **RE-03 is measured:** BATTLE/TITLE/ENDING load at `0x80068800`;
   INITBTL/SCREFF2/MAINMENU at `0x800F9800`; the other 14 non-empty MENU modules at `0x80102800`.
   `tools/re_overlay.py` verifies all 20 from their own bytes plus SHA-bound rood configs; the 0-byte
-  MENUA has no code/base. The resident substrate reaches the no-frame watchdog before a loader is
-  observed, so the tool has not observed a running loader.
+  MENUA has no code/base. The resident substrate reaches the async sound-data read before an overlay
+  loader is observed, so the tool has not observed a running overlay loader.
 - **Top-level disc directories:** `BATTLE BG EFFECT ENDING EVENT GIM MAP MENU MOV MUSIC OBJ SE SMALL
   SOUND TITLE`, plus `SLUS_010.40`, `SYSTEM.CNF`, `DBGFNT.TIM` in the root (5,180 files listed).
 - **It is a heavy streamer.** `ENDING/ENDING.XA` alone is 68 MB, plus `MOV/`, `MUSIC/`, `SE/`. The CD

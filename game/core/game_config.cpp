@@ -275,7 +275,14 @@ static const GameConfig g_vagrant_cfg = {
     // boot plays would be a guess wearing a citation.
     .bootFmv = {nullptr, nullptr, nullptr, nullptr},
 
-    // --- per-frame OT / packet pool ---------------------------------------------- RE-05, NOT DONE --
+    // --- per-frame OT / packet pool --------------------------------------------- RE-05, MEASURED --
+    // tools/re_frame.py proves why every value in this legacy fixed-layout group remains zero.
+    // TITLE 0x80071A68 and BATTLE 0x8007629C are guest-owned presenters: both flip the resident
+    // parity word, install the indexed DRAWENV/DISPENV, and call DrawOTag themselves. BATTLE obtains
+    // its two 0x2088 OT blocks and two 0x20000 packet pools from the guest heap and stores only their
+    // runtime pointers in resident arrays. There is no fixed base/stride to put here. Supplying one
+    // would describe a different game's native frame loop. The instrument gates these zeros and
+    // rejects that counterfeit. Live overlay execution remains behind the async-CD prerequisite.
     .otRegionBase = 0,
     .otRegionStride = 0,
     .packetPoolBase = 0,

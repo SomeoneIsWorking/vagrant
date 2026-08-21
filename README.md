@@ -12,22 +12,25 @@ and Setmode through blocking libds control ownership. It also completes `StartSo
 through the measured libapi callback table. The resident VBlank route is now measured too: the host
 supplies video-standard display-field timing, while the intact guest handler at `0x8001FFEC` advances
 Sony's counter and dispatches its eight callbacks. The bounded run advances through `VSync` into GPU
-setup and sustained DMA work before the no-present watchdog. It has no recompilation miss or
-unimplemented-BIOS fatal; async CD, reads, XA, overlays, and gameplay have not been reached. What exists:
+setup, then enters `_loadMenuSound`'s first `vs_main_diskLoadFile`. Its asynchronous libds read never
+completes, and the watchdog samples that polling loop's `vs_main_gametimeUpdate -> VSync`; VBlank is
+healthy, but the TITLE overlay and its presenter are not reached. There is no recompilation miss or
+unimplemented-BIOS fatal. What exists:
 
 - disc → executable provisioning from **your own** disc image (nothing game-derived is in this repo),
 - the framework seam (`GameConfig` / `GameHooks`), compiling against the pinned framework,
-- six measured RE groups: crt0/boot (RE-01), the 743-function resident substrate (RE-02), all 20
+- six measured RE groups: crt0/boot (RE-01), the 744-function resident substrate, including Sony's measured HookEntryInt reentry (RE-02), all 20
   non-empty `.PRG` load-base mappings into three overlay slots (RE-03), and the libpad delivery buffers
   plus driver pointer table (RE-06), the boot SPU DMA callback route (RE-09), and resident VBlank
-  delivery (RE-10). The address groups are gated back to the owned images by their instruments; the
-  resident bootstrap still lacks a frame owner that services the measured buffers,
+  delivery (RE-10). RE-05 also measures the later overlay-owned presenters and proves their
+  heap-allocated OT/packet buffers cannot be encoded by the legacy fixed-layout GameConfig fields.
+  These facts are gated back to the owned images; live presentation remains downstream of async CD,
 - the project registries (`docs/re-frontier.md`, `docs/codemap.md`, `docs/info/`, `docs/issues/`),
 - a vendored CC0 **matching decompilation** of this exact executable, `external/rood-reverse`, whose
   target images are *measured* to be byte-identical to the ones on this disc (21/21).
 
-`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-04 owns
-the loader, while dependency-ready RE-05 owns the newly exposed OT/packet-pool frame boundary.
+`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-04's
+asynchronous read/ready-callback path is the next runtime prerequisite; RE-05 is statically partial.
 
 ## Getting started
 
