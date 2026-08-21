@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-21
 tags: launcher,substrate
 depends: run.sh, tools/run.py#launch
-reconfirmed: 2026-08-21 03:31:41
-verified_at: 2026-08-21 03:31:41
+reconfirmed: 2026-08-21 03:34:14
+verified_at: 2026-08-21 03:34:14
 ---
 
 ## Claim
@@ -32,3 +32,7 @@ After RE-09, launcher tests pass and the real no-argument route remains incremen
 ## Re-confirmed 2026-08-21 03:31:41
 
 Launcher CTest passed and real no-argument ./run.sh provisioned, incrementally Clang-built, launched vagrant_port, printed the current no-present boundary, and reached it after resident VBlank/GPU setup
+
+## Re-confirmed 2026-08-21 03:34:14
+
+Post-landing launcher selftest passed inside CTest 3/3; the final pre-landing no-argument run used the same launcher logic and reached the no-present watchdog after 179 VBlank transitions.

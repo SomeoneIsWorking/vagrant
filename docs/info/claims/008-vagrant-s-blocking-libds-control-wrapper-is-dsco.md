@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: re-04,cd
 depends: game/core/game_hooks.cpp, game/cd/ds_control.cpp#ds_control_b, game/cd/ds_control_contract.h#ownedControl, cmake/vagrant_port.cmake, external/psxport
-reconfirmed: 2026-08-21 02:59:16
-verified_at: 2026-08-21 02:59:16
+reconfirmed: 2026-08-21 03:34:14
+verified_at: 2026-08-21 03:34:14
 ---
 
 ## Claim
@@ -48,3 +48,7 @@ After the then-recorded psxport `be381503` Clang rebuild and classifier CTest, p
 ## Re-confirmed 2026-08-21 02:59:16
 
 2026-08-21: against landed psxport 2b5ef7b5, CD contract CTest passed and the default launcher advanced beyond disk reset and SPU DMA without unsupported-control refusal.
+
+## Re-confirmed 2026-08-21 03:34:14
+
+Post-landing CTest 3/3 passed, including vagrant_cd_contract_test; the added VBlank registration leaves measured DsControlB ownership intact.
