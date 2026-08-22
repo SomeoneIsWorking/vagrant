@@ -1,12 +1,13 @@
 ---
 id: C016
 kind: claim
-status: holds
+status: falsified
 created: 2026-08-21
 tags: cd,overlay,re-04,re-05
 depends: tools/re_async_cd.py#measure, tools/run.py#launch, psxport.pin, external/psxport
 reconfirmed: 2026-08-21
 verified_at: 2026-08-21 14:16:30
+falsified_on: 2026-08-22
 ---
 
 ## Claim
@@ -28,3 +29,9 @@ Against recorded psxport pin 3418a79b, scratch/logs/re18-3418a79b-direct-runtime
 ## Re-confirmed 2026-08-21
 
 Post-landing direct trace completed five reads totaling 384 contiguous sectors with all 389 intervals at 225792 ticks, correct Pause/status arbitration, no STUCK, and sole next miss 0x80071334.
+
+## FALSIFIED 2026-08-22
+
+Its explicit falsifier occurred: TITLE is emitted and the 0x80071334 call now advances into ov_title_func_80071334. The five-read evidence remains historical CD evidence but no longer describes the current terminal boundary.
+
+> Anything that cited this claim as proof must be re-checked. Grep the repo for it.

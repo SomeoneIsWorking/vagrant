@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keep Vagrant Story's generated resident substrate aligned with its real inputs."""
+"""Keep Vagrant Story's generated resident + TITLE substrate aligned with its inputs."""
 
 import hashlib
 import os
@@ -10,6 +10,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 EXE = ROOT / "scratch/bin/vagrant/SLUS_010.40"
+OVERLAY_DIR = ROOT / "scratch/bin/overlays"
+OVERLAYS = (OVERLAY_DIR / "TITLE.BIN",)
 SEEDS = ROOT / "game/recomp_seeds.json"
 GENERATED = ROOT / "generated"
 HASH_FILE = GENERATED / ".recomp.hash"
@@ -30,7 +32,9 @@ def recompiler_sources(psxport_dir):
 
 
 def recomp_version(emit):
-    match = re.search(r'^RECOMP_VERSION\s*=\s*"([^"]+)"', emit.read_text(), re.MULTILINE)
+    match = re.search(
+        r'^RECOMP_VERSION\s*=\s*"([^"]+)"', emit.read_text(), re.MULTILINE
+    )
     if not match:
         raise RecompError(f"could not read RECOMP_VERSION from {emit}")
     return match.group(1)
@@ -54,13 +58,32 @@ def generated_complete():
     if not manifest.is_file():
         return False
     listed = re.findall(r"^\s*(\S+\.c)\s*$", manifest.read_text(), re.MULTILINE)
-    return bool(listed) and all((GENERATED / name).is_file() for name in listed)
+    required = {"overlay_table.c", "ov_title_disp.c"}
+    if not required.issubset(listed) or not all(
+        (GENERATED / name).is_file() for name in listed
+    ):
+        return False
+    table = (GENERATED / "overlay_table.c").read_text()
+    dispatch = (GENERATED / "ov_title_disp.c").read_text()
+    return (
+        '"TITLE", ov_title_dispatch, ov_title_func_index' in table
+        and "const int g_rec_overlay_count = 1;" in table
+        and "ov_title_func_80071334" in dispatch
+    )
 
 
 def ensure(psxport_dir):
     sources = recompiler_sources(psxport_dir)
     version = recomp_version(sources[0])
-    wanted = f"{version}:{input_hash([EXE, SEEDS, *sources])}"
+    present = sorted(OVERLAY_DIR.glob("*.BIN")) if OVERLAY_DIR.is_dir() else []
+    if present != sorted(OVERLAYS):
+        expected = ", ".join(path.name for path in OVERLAYS)
+        actual = ", ".join(path.name for path in present) or "none"
+        raise RecompError(
+            f"overlay input inventory is {actual}; expected exactly {expected}. "
+            "Run tools/extract_overlays.py against the owned disc."
+        )
+    wanted = f"{version}:{input_hash([EXE, *OVERLAYS, SEEDS, *sources])}"
     have = HASH_FILE.read_text().strip() if HASH_FILE.is_file() else ""
     stamp = VERSION_FILE.read_text().strip() if VERSION_FILE.is_file() else ""
     force = os.environ.get("PSXPORT_FORCE_RECOMP", "") not in ("", "0")
@@ -70,7 +93,7 @@ def ensure(psxport_dir):
         return
 
     reason = "forced" if force else "inputs or generated output changed"
-    say(f"{reason} — emitting resident substrate (version {version})")
+    say(f"{reason} — emitting resident + TITLE substrate (version {version})")
     GENERATED.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env.setdefault("PSXPORT_SHARDS", "8")
@@ -81,15 +104,19 @@ def ensure(psxport_dir):
         str(GENERATED / "recompiled.c"),
         "--seeds",
         str(SEEDS),
+        "--overlays",
+        str(OVERLAY_DIR),
     ]
     result = subprocess.run(command, cwd=ROOT, env=env, check=False)
     if result.returncode:
-        raise RecompError("resident substrate emission failed")
+        raise RecompError("resident + TITLE substrate emission failed")
     if not generated_complete():
         raise RecompError("emitter returned success but generated/ is incomplete")
     actual_stamp = VERSION_FILE.read_text().strip() if VERSION_FILE.is_file() else ""
     if actual_stamp != version:
-        raise RecompError(f"emitter stamped version {actual_stamp!r}, expected {version!r}")
+        raise RecompError(
+            f"emitter stamped version {actual_stamp!r}, expected {version!r}"
+        )
     HASH_FILE.write_text(wanted + "\n")
     say(f"recomp current (version {version})")
 

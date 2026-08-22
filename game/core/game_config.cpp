@@ -3,9 +3,10 @@
 //
 // READ THIS BEFORE FILLING ANYTHING IN.
 //
-// **Exactly FIVE groups are filled in: crt0/boot (RE-01), recompiled-main range (RE-02), the three
-// measured overlay slots (RE-03), pad delivery (RE-06), and the DMA callback table required by boot
-// SPU transfers (RE-09). Other guest-address groups remain ZERO until measured.**
+// **Only measured groups are filled in: crt0/boot (RE-01), recompiled-main range (RE-02), the three
+// overlay slots (RE-03), pad delivery (RE-06), the DMA callback table required by boot SPU transfers
+// (RE-09), and the frame-policy fields explicitly measured by RE-05. Other guest-address groups
+// remain ZERO until measured.**
 // Zero is the
 // honest value and it is deliberate: psxport fails fast on a zero it needs, whereas a
 // plausible-looking WRONG address does not fail cleanly — it breaks boot or diverges the byte-compare
@@ -315,9 +316,9 @@ static const GameConfig g_vagrant_cfg = {
     // non-empty image, tools/re_overlay.py M2 derives the base from that image's own absolute `jal`
     // targets and function-entry offsets; M3 SHA-binds OUR bytes to rood-reverse and independently
     // checks its link address. All 20 agree, and the executable contains all three slot values in
-    // four contiguous resident words at 0x80010000..0x8001000C. The callbacks remain null because
-    // the current substrate is resident-only; RE-04 must observe loader execution before overlay
-    // emission/registration can be owned.
+    // four contiguous resident words at 0x80010000..0x8001000C. RE-11 now emits TITLE and the generic
+    // router identifies it from the loaded image signature. The callbacks remain null because the
+    // intact guest loader writes the slot; the other 19 modules remain deliberately un-emitted.
     .overlaySlots = {{0x80068800, nullptr}, {0x800F9800, nullptr}, {0x80102800, nullptr}},
 
     // --- CD chokepoints --------------------------------------------------------------- RE-04 --

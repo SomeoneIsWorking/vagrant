@@ -11,7 +11,8 @@
 #                      substrate exists: it proves this port's GameConfig/GameHooks still satisfy the
 #                      pinned framework's seam — every designator binds, every hook signature matches.
 #                      That is the gate for this repo today (`--target vagrant_seam`).
-#   vagrant_port       the game binary. Configured when the gitignored generated substrate exists.
+#   vagrant_port       the game binary. Configured when the gitignored generated resident + TITLE
+#                      substrate exists.
 
 option(PSXPORT_BUILD_PORT "Build the Vagrant Story native port binary (needs generated/)" ON)
 
@@ -51,6 +52,9 @@ if(BUILD_TESTING)
   add_test(
     NAME vagrant_launcher_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_launcher.py)
+  add_test(
+    NAME vagrant_overlay_inputs_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_overlay_inputs.py)
   add_test(
     NAME vagrant_cpp_quality
     COMMAND ${Python3_EXECUTABLE} ${PSXPORT_DIR}/tools/check_cpp_style.py

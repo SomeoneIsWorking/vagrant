@@ -11,27 +11,29 @@ diagnostics through `lucent`, the registries, and never editing `external/psxpor
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
-## THE STATE OF THIS PORT: resident substrate reaches the first TITLE overlay call
+## THE STATE OF THIS PORT: TITLE overlay executes; the first native picture does not
 
-Created 2026-08-12. Six groups are re-verified and one frame group is measured-partial: the
+Created 2026-08-12. Seven groups are re-verified and one frame group is measured-partial: the
 **crt0/boot group** (`RE-01`, `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), all
 20 non-empty `.PRG` overlay mappings into three slots (`RE-03`, `tools/re_overlay.py`), libpad
 delivery buffers and their pointer table (`RE-06`, `tools/re_pad.py`), the boot SPU DMA callback
 route (`RE-09`, `tools/re_spu_transfer.py`), resident VBlank delivery (`RE-10`,
 `tools/re_vblank.py`), and the overlay-owned presenter/dynamic-buffer contract (`RE-05`,
-`tools/re_frame.py`). The gitignored substrate emits 744 resident functions from the PS-EXE entry
-plus the measured HookEntryInt return PC, builds `vagrant_port`, executes crt0 and guest main, and
+`tools/re_frame.py`), plus SHA-bound TITLE extraction/emission/routing (`RE-11`,
+`tools/extract_overlays.py`). The gitignored substrate emits 799 resident functions plus 137 TITLE
+functions, builds `vagrant_port`, executes crt0 and guest main, and
 completes `_initRand`. RE-04 owns blocking `DsControlB` (`0x80025BE4`); the run completes
 `_diskReset` Pause and Setmode, dispatches DMA4 completion, advances through the measured guest
 VBlank handler, and completes four asynchronous WAVE reads plus the 271-sector TITLE.PRG read.
 Deterministic guest-cycle CD pacing and ReadN status `0x22` let the intact guest libds state machine
-leave Busy and dispatch each final callback's queued Pause. Resident `jal 0x80042BD8` then reaches
-direct TITLE target `0x80071334`, where dispatch fails fast because no generated overlay module owns
-the loaded TITLE image.
+leave Busy and dispatch each final callback's queued Pause. Resident `jal 0x80042BD8` now routes into
+TITLE target `0x80071334` (`vs_title_exec`) and reaches its real GPU/image and CD work.
 
-This is not gameplay and no presenter has executed. RE-05 independently measures the later
-overlay-owned presenters and dynamic OT/pool contract, but overlay emission, registration, and
-routing remain open. XA and every other unmeasured guest-address group in
+This is not gameplay and no non-black title picture is verified. A 15-second headless capture reaches
+only the initial black framework present; 30-second runs advance inside TITLE image/intro work but do
+not complete another frame (issue #17 / RE-12). RE-05 independently measures the later overlay-owned
+presenters and dynamic OT/pool contract. XA, the other 19 non-empty overlays, direct native graphics
+production, and every other unmeasured guest-address group in
 `game/core/game_config.cpp` stay `0` with their open steps named in `docs/re-frontier.md`. A framework
 defect found while measuring crt0 (issue #3) would give a BIOS
 `InitHeap` a zero-size heap; measured 2026-08-12, that is **latent here** — no code in this image can
@@ -39,10 +41,10 @@ call BIOS `malloc` (issue #3 has the census), so this game can neither exhibit t
 its fix. If something here looks like it works, check `docs/codemap.md` — the honest inventory is short.
 
 `./run.sh` is the stable project launcher. With no arguments it resolves the framework and the disc,
-identity-checks and hash-provisions the resident substrate, configures both CMake trees with Clang,
-builds `vagrant_port`, and launches that current target. It does not claim gameplay: the expected stop
-is the fail-fast at the first direct un-emitted TITLE function, `0x80071334`, after all five measured
-asynchronous reads complete. The shell file is deliberately only a Python dispatch; all policy lives
+identity-checks and hash-provisions the resident executable and TITLE overlay, configures both CMake
+trees with Clang, builds `vagrant_port`, and launches that current target. It does not claim gameplay
+or a finished picture: issue #17 records the live TITLE initialization boundary. The shell file is
+deliberately only a Python dispatch; all policy lives
 in `tools/run.py`. An explicit CHD path overrides the normal
 `PSXPORT_VAGRANT_DISC`/`.env`/drop-in resolution order. The current bootstrap target is explicitly
 headless: it has no frame loop or gameplay window yet, and entering the window presentation path would
@@ -60,7 +62,8 @@ ctest --test-dir build --output-on-failure
 the `DsControlB` owner. It proves those sources still satisfy the pinned framework's seam without
 requiring generated code. `vagrant_cd_contract_test` compiles the owner's exact classifier and checks
 every accepted ID plus query/read/unknown refusals. When `generated/rec_sources.cmake` exists,
-`vagrant_port` is the resident-substrate gate. A second CTest entry runs psxport's shared
+`vagrant_port` is the resident+TITLE substrate gate. The overlay-input CTest proves the matching and
+refusal sides of SHA provisioning and generated-entry completeness. Another CTest entry runs psxport's shared
 `tools/check_cpp_style.py` against this repo: it format-checks all tracked first-party C/C++ and uses
 CMake's real compile database for `clang-tidy`; generated and external code are excluded. **A change
 to a MEASURED constant in

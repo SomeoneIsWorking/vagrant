@@ -10,8 +10,9 @@ extern void shard_set_override(uint32_t, void (*)(Core *));
 static const RecompRegistry g_vagrant_recomp = {
     /* main_dispatch        */ main_dispatch,
     /* rec_func_index       */ rec_func_index,
-    // The first substrate is deliberately resident-only. Runtime-reached overlay calls therefore
-    // fail fast instead of executing an unverified module. Overlay emission is the next growth step.
+    // The generated table currently owns the SHA-verified TITLE module. Every other measured overlay
+    // remains absent and therefore fails fast if reached; the router never substitutes TITLE merely
+    // because another image occupies the same fixed slot.
     /* overlays             */ g_rec_overlays,
     /* overlay_count        */ g_rec_overlay_count,
     /* shard_set_override   */ shard_set_override,

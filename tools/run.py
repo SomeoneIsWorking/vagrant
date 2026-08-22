@@ -33,7 +33,9 @@ def command(args, *, env=None, quiet=False):
         check=False,
     )
     if result.returncode:
-        raise Refusal(f"command failed ({result.returncode}): {' '.join(map(str, args))}")
+        raise Refusal(
+            f"command failed ({result.returncode}): {' '.join(map(str, args))}"
+        )
 
 
 def checked_clang(name, default):
@@ -53,7 +55,9 @@ def preflight():
         if not shutil.which(tool):
             raise Refusal(f"{tool} was not found")
     if subprocess.run(["pkg-config", "--exists", "sdl3"], check=False).returncode:
-        raise Refusal("SDL3 was not found by pkg-config (install SDL3-devel/libsdl3-dev)")
+        raise Refusal(
+            "SDL3 was not found by pkg-config (install SDL3-devel/libsdl3-dev)"
+        )
     return checked_clang("CC", "clang"), checked_clang("CXX", "clang++")
 
 
@@ -77,11 +81,15 @@ def ensure_reference():
     if reference.is_file():
         return
     if not (ROOT / ".gitmodules").is_file():
-        raise Refusal("external/rood-reverse is absent and this checkout has no .gitmodules")
+        raise Refusal(
+            "external/rood-reverse is absent and this checkout has no .gitmodules"
+        )
     say("initializing the executable-identity reference…")
     command(["git", "submodule", "update", "--init", "external/rood-reverse"])
     if not reference.is_file():
-        raise Refusal("external/rood-reverse initialized without its SLUS_010.40 identity config")
+        raise Refusal(
+            "external/rood-reverse initialized without its SLUS_010.40 identity config"
+        )
 
 
 def build_discdump(psxport, cc, cxx):
@@ -90,7 +98,10 @@ def build_discdump(psxport, cc, cxx):
 
 def verify_clang_build(build, target):
     compiler_files = sorted((build / "CMakeFiles").glob("*/CMakeCXXCompiler.cmake"))
-    if not compiler_files or 'CMAKE_CXX_COMPILER_ID "Clang"' not in compiler_files[-1].read_text():
+    if (
+        not compiler_files
+        or 'CMAKE_CXX_COMPILER_ID "Clang"' not in compiler_files[-1].read_text()
+    ):
         raise Refusal(f"the configured {target} build is not using Clang")
 
 
@@ -104,6 +115,10 @@ def provision(disc, psxport, discdump):
     command(args, env=env)
     if not EXE.is_file():
         raise Refusal(f"executable provisioning produced no {EXE.relative_to(ROOT)}")
+    overlay_args = [sys.executable, ROOT / "tools/extract_overlays.py"]
+    if disc:
+        overlay_args.append(disc)
+    command(overlay_args, env=env)
     command([sys.executable, ROOT / "tools/ensure_recomp.py"], env=env)
 
 
@@ -141,8 +156,8 @@ def configure_and_build(psxport, cc, cxx):
 
 def launch(psxport):
     say(
-        "launching the resident bootstrap (known stop: TITLE.PRG loads, then fail-fast reports "
-        "the first un-emitted TITLE function 0x80071334 before its presenter)…"
+        "launching the current resident + TITLE-overlay bootstrap headlessly; later overlays and "
+        "gameplay remain fail-fast boundaries…"
     )
     os.environ.setdefault("PSXPORT_ASSET_DIR", str(psxport))
     os.environ["PSXPORT_VK_HEADLESS"] = "1"
@@ -172,9 +187,13 @@ def execute(
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(
-        description="Provision, build, and launch the current Vagrant Story resident-bootstrap port."
+        description="Provision, build, and launch the current Vagrant Story TITLE-overlay bootstrap."
     )
-    parser.add_argument("disc", nargs="?", help="Vagrant Story (USA) CHD; otherwise use env/.env/drop-in")
+    parser.add_argument(
+        "disc",
+        nargs="?",
+        help="Vagrant Story (USA) CHD; otherwise use env/.env/drop-in",
+    )
     return parser.parse_args(argv)
 
 

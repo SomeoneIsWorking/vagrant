@@ -1,12 +1,13 @@
 ---
 id: C010
 kind: claim
-status: holds
+status: falsified
 created: 2026-08-21
 tags: launcher,substrate
 depends: tools/run.py#launch, tests/test_launcher.py, psxport.pin, external/psxport
 reconfirmed: 2026-08-21
 verified_at: 2026-08-21 14:16:30
+falsified_on: 2026-08-22
 ---
 
 ## Claim
@@ -56,3 +57,9 @@ Against recorded psxport pin 3418a79b, a scoped-clean plain ./run.sh generated t
 ## Re-confirmed 2026-08-21
 
 Post-landing zero-argument launcher regenerated the consumer-owned shader header with Clang, then an unchanged second run compiled no C/C++ translation units and reached the same 0x80071334 boundary on psxport 3418a79b.
+
+## FALSIFIED 2026-08-22
+
+RE-11 intentionally changed the default product: ./run.sh now provisions TITLE.BIN and routes beyond the retired 0x80071334 overlay miss, so C010's stated current boundary is false.
+
+> Anything that cited this claim as proof must be re-checked. Grep the repo for it.
