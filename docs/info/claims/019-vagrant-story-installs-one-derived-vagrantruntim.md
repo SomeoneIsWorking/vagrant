@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-22
 tags: 
 depends: game/core/vagrant_runtime.cpp#VagrantRuntime::configureRenderPath, game/core/vagrant_runtime.cpp#VagrantRuntime::bootInit, game/core/vagrant_runtime.cpp#VagrantRuntime::registerOverrides, game/core/game_hooks.cpp, game/core/main.cpp, tests/test_vagrant_runtime.cpp
-reconfirmed: 2026-08-22 19:09:18
-verified_at: 2026-08-22 19:09:18
+reconfirmed: 2026-08-22 19:12:02
+verified_at: 2026-08-22 19:12:02
 ---
 
 ## Claim
@@ -44,3 +44,7 @@ or the bounded boot fails before the previously verified TITLE boundary
 ## Re-confirmed 2026-08-22 19:09:18
 
 2026-08-22 against recorded/built psxport 57a17a14: fresh 799-resident/137-TITLE emission, Clang build, vagrant_runtime_test, full CTest 6/6, shipping real-disc positive, and producer-disabled negative all pass.
+
+## Re-confirmed 2026-08-22 19:12:02
+
+Post-commit 4bd0718 authoritative Clang build and runtime test pass; VagrantRuntime still owns direct-native policy, lifecycle, and all measured override composition.

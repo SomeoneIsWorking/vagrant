@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-22
 tags: render,title,runtime
 depends: game/render/title_startup.cpp#title_draw_sprite, game/render/title_startup_recipe.cpp#TitleSpriteRecipe::decode, game/sync/vblank.cpp#vagrant_vblank_turn, game/core/vagrant_runtime.cpp#VagrantRuntime::registerOverrides, tools/re_title_startup.py#measure
-reconfirmed: 2026-08-22 19:09:18
-verified_at: 2026-08-22 19:09:18
+reconfirmed: 2026-08-22 19:12:02
+verified_at: 2026-08-22 19:12:02
 ---
 
 ## Claim
@@ -36,3 +36,7 @@ if the measured TITLE leaf/owner no longer gates the shipping super-call, the ow
 ## Re-confirmed 2026-08-22 19:09:18
 
 2026-08-22 against recorded/built psxport 57a17a14: the no-argument shipping run advances through the retained-super splash producer into coherent 24-bit intro frames; re_title_startup.py --check-source --selftest remains 3/3.
+
+## Re-confirmed 2026-08-22 19:12:02
+
+Post-commit 4bd0718 positive real-disc capture preserves the publisher-splash path and 6/6 CTests pass; the VBlank selection gives an immediate splash priority for its field.

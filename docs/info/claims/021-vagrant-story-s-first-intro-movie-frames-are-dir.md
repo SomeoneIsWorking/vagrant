@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-22
 tags: render,title,mdec,re-13
 depends: game/render/title_movie.cpp#title_movie_dct_out_callback, game/render/title_movie.cpp#TitleMovieProducer::present, game/sync/vblank.cpp#vagrant_vblank_turn, tools/re_title_movie.py#measure
-reconfirmed: 2026-08-22 19:09:18
-verified_at: 2026-08-22 19:09:18
+reconfirmed: 2026-08-22 19:12:02
+verified_at: 2026-08-22 19:12:02
 ---
 
 ## Claim
@@ -28,3 +28,7 @@ if the callback or completion word no longer derive from the exact TITLE bytes, 
 ## Re-confirmed 2026-08-22 19:09:18
 
 2026-08-22 against recorded/built psxport 57a17a14: fresh no-argument owned-disc present_200 is coherent at 678339/691200 nonblack (sha256 0c3a5510...); producer-disabled build completes 4000 DMA1 outputs and reaches 24-bit but present_200 is absent; instrument 3/3.
+
+## Re-confirmed 2026-08-22 19:12:02
+
+Post-commit 4bd0718 positive real-disc present_200 is coherent with SHA-256 0c3a55101d1b4e07a69c4eb39084d039d73936d920e3a32e1ea577900574ed7e; producer-disabled control retains 4000 DMA1 outputs and 24-bit 320x224 but produces no same-index capture; 6/6 CTests pass.

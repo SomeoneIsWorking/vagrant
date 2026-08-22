@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: re-04,cd
 depends: game/core/vagrant_runtime.cpp#VagrantRuntime::registerOverrides, game/cd/ds_control.cpp#ds_control_b, game/cd/ds_control_contract.h#ownedControl, cmake/vagrant_port.cmake
-reconfirmed: 2026-08-22 18:46:00
-verified_at: 2026-08-22 18:46:00
+reconfirmed: 2026-08-22 19:12:01
+verified_at: 2026-08-22 19:12:01
 ---
 
 ## Claim
@@ -72,3 +72,7 @@ Post-comment landing: hook composition changed comments only; post-RE10 CTest 3/
 ## Re-confirmed 2026-08-22 18:46:00
 
 2026-08-22: Clang build plus full CTest 6/6 and re_cd.py --check-config --selftest 3/3 pass after TITLE movie override composition; DsControlB ownership remains intact.
+
+## Re-confirmed 2026-08-22 19:12:01
+
+Post-commit 4bd0718 authoritative Clang build and 6/6 CTests pass; RE-13 only adds the TITLE movie producer and preserves the measured DsControlB path.
