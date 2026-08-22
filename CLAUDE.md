@@ -11,7 +11,7 @@ diagnostics through `lucent`, the registries, and never editing `external/psxpor
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
-## THE STATE OF THIS PORT: TITLE's first publisher splash renders natively
+## THE STATE OF THIS PORT: TITLE's first 24-bit intro frames render natively
 
 Created 2026-08-12. Seven groups are re-verified and one frame group is measured-partial: the
 **crt0/boot group** (`RE-01`, `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), all
@@ -37,10 +37,18 @@ guest VBlank. The owned-disc default run renders the legible “Published by Squ
 L.L.C.” splash at 29,499/691,200 non-black pixels. A separately compiled test-only disabled-producer
 control retains the guest super-call but produces only a black initial present and no second present.
 
-This is still not the title menu or gameplay. After the publisher/developer loops, TITLE switches to
-24-bit display and enters its intro/MDEC/FMV spine; no later native picture is presented before the
-watchdog (RE-13). RE-05 independently measures the later overlay-owned presenters and dynamic OT/pool
-contract. XA, the other 19 non-empty overlays, later native graphics production, and every other
+RE-13 now owns the next picture boundary. `tools/re_title_movie.py` derives the MDEC output callback,
+`MovieData::frameComplete`, 24-halfword slice width, and 480-halfword by 224-line RGB24 display from
+the SHA-bound retail overlay. The retained-super callback observes completion only after the guest
+has uploaded the final slice; the per-Core producer presents the live guest VRAM scanout at VBlank.
+The shipping real-disc run produces coherent animated intro frames, including `present_200` at
+678,339/691,200 non-black pixels. A producer-disabled build still completes 4,000 DMA1 outputs and
+reaches the same 24-bit mode but emits no `present_200`.
+
+This is still not the title menu or gameplay. Full intro completion, Start-skip, XA/audio teardown,
+and the transition into the measured TITLE menu presenter remain RE-14. RE-05 independently measures
+the later overlay-owned presenters and dynamic OT/pool contract. XA, the other 19 non-empty overlays,
+later native graphics production, and every other
 unmeasured guest-address group in
 `game/core/game_config.cpp` stay `0` with their open steps named in `docs/re-frontier.md`. A framework
 defect found while measuring crt0 (issue #3) would give a BIOS
@@ -57,7 +65,8 @@ names that debt; new behavior belongs on the derived runtime, not in `GameHooks`
 `./run.sh` is the stable project launcher. With no arguments it resolves the framework and the disc,
 identity-checks and hash-provisions the resident executable and TITLE overlay, configures both CMake
 trees with Clang, builds `vagrant_port`, and launches that current target. It does not claim gameplay
-or a finished title sequence: RE-13 records the live 24-bit intro/MDEC boundary. The shell file is
+or a finished title sequence: RE-13 records live 24-bit intro/MDEC frames, while RE-14 owns movie
+completion and the menu transition. The shell file is
 deliberately only a Python dispatch; all policy lives
 in `tools/run.py`. An explicit CHD path overrides the normal
 `PSXPORT_VAGRANT_DISC`/`.env`/drop-in resolution order. The current bootstrap target is explicitly
@@ -87,7 +96,8 @@ for overlay slots/seeds, `python3 tools/re_spu_transfer.py --check-config --self
 callback route, `python3 tools/re_vblank.py --check-source --selftest` for resident VBlank
 delivery, `python3 tools/re_frame.py --check-config --selftest` for the overlay-owned presentation
 contract and deliberately-zero fixed-layout fields, or
-`python3 tools/re_title_startup.py --check-source --selftest` for the first TITLE sprite contract.
+`python3 tools/re_title_startup.py --check-source --selftest` for the first TITLE sprite contract, or
+`python3 tools/re_title_movie.py --check-source --selftest` for the TITLE RGB24 movie contract.
 These diff shipped values back to the owned bytes. Compiling is not
 enough: the `static_assert`s only check the constants' internal RELATIONS, and `hi - lo == 0x46B20` holds
 just as well when both values are wrong — which is exactly how a reviewer moved `kHeapSizePtr` +4 and

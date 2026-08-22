@@ -3,6 +3,7 @@
 #include "core.h"
 #include "game.h"
 #include "game_iface.h"
+#include "vagrant_context.h"
 #include "vagrant_runtime.h"
 
 #include <cstdio>
@@ -44,6 +45,13 @@ int main() {
   }
   if (legacyHooks->bootInit != nullptr || legacyHooks->registerOverrides != nullptr) {
     std::fprintf(stderr, "boot or override ownership remained in legacy GameHooks\n");
+    return 1;
+  }
+
+  auto *context = static_cast<vagrant::VagrantContext *>(game->core.gameCtx);
+  context->titleMovie.frameCompleted();
+  if (!context->titleMovie.frameReady()) {
+    std::fprintf(stderr, "VagrantContext did not retain TITLE movie producer state\n");
     return 1;
   }
 

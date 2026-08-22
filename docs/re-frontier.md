@@ -19,7 +19,7 @@ intended behaviour of the real target being reproduced.
 Statuses: ✅ re-verified · 🟡 re-partial (honest gap) · 🔬 in-progress · ⛔ hack (debt, must remove) ·
 ⬜ todo · ➖ skip-by-design · ⏸ blocked (computed).
 
-## THE STATE OF THIS PORT, 2026-08-22: first TITLE splash renders; 24-bit intro is next
+## THE STATE OF THIS PORT, 2026-08-22: live 24-bit TITLE intro frames render; completion is next
 
 `RE-01` (crt0/boot), `RE-02` (resident seed set/substrate), and `RE-03` (all non-empty `.PRG` load
 bases) are `re-verified`. The emitter's mandatory PS-EXE entry root plus one measured Sony
@@ -41,9 +41,11 @@ routes into `0x80071334` (`vs_title_exec`) and reaches TITLE GPU/image and CD wo
 TITLE's immediate sprite leaf `0x8006A778`, retains its generated super-call, and directly presents
 the live guest-uploaded VRAM texture at guest VBlank. The owned-disc default run renders the legible
 publisher splash at 29,499/691,200 non-black pixels; the test-only disabled-producer build stays
-black and emits no second present. RE-13 is the live frontier: TITLE switches to 24-bit after the
-splash loops and reaches MDEC work without another native presentation. No title menu or gameplay is
-claimed.
+black and emits no second splash present. RE-13 derives TITLE's MDEC completion callback and RGB24
+scanout contract; the retained-super semantic producer presents coherent live guest-decoded intro
+frames. A producer-disabled real-disc build still completes 4,000 DMA1 outputs and reaches the same
+24-bit mode but emits no same-index `present_200`. RE-14 now owns full movie completion, Start-skip,
+XA/audio teardown, and the first title-menu picture. No title menu or gameplay is claimed.
 
 The resident substrate now executes the RE-01 plan through guest main. That does not mean gameplay
 boots: platform HLE and CD/overlay loading remain later frontier steps. The earlier fail-fast at the
@@ -141,16 +143,24 @@ measures it against this executable.
 - deps: RE-11
 - evidence: Owned SHA-bound TITLE.PRG instrument tools/re_title_startup.py uniquely derives immediate sprite leaf 0x8006A778, static packet 0x800DED28, publisher/developer owner 0x8006F54C, and its exactly two calls at 0x8006F67C/0x8006F778; --check-source gates the shipping address and retained generated super-call, while --selftest refuses a destroyed DrawPrim call, shifted shipping address, and mutated overlay identity (3/3). The VagrantRuntime-owned, per-Core producer decodes the measured leaf ABI after retaining guest writes/DrawPrim, emits the live guest-uploaded VRAM texture at intact guest VBlank, and presents directly. Real-disc no-argument ./run.sh writes scratch/screenshots/re12/positive_present_8.ppm at 29,499/691,200 non-black (4.27%), visually legible as Published by Square Electronic Arts L.L.C. A separately compiled test-only disabled-producer control retains the super-call but emits only uniformly black scratch/screenshots/re12/negative_present_1.ppm and no present_2 before the same downstream boundary.
 - where: tools/re_title_startup.py + game/render/title_startup.{h,cpp} + game/render/title_startup_recipe.{h,cpp} + game/core/vagrant_context.h + game/core/vagrant_runtime.cpp + game/sync/vblank.cpp
-- gap: NONE for TITLE publisher/developer first-picture production. This does not claim the later title menu or gameplay: after the two splash loops, TITLE switches GP1 to 24-bit and enters its intro/MDEC/FMV spine, then watchdogs without another native present; RE-13 owns that next boundary.
+- gap: NONE for TITLE publisher/developer first-picture production. This step does not claim the later title menu or gameplay. RE-13 now resolves its former next boundary by presenting live 24-bit intro frames; RE-14 owns movie completion and the menu transition.
 - notes: Issue #17 is resolved at the exact first-picture scope. C020 records the positive/negative real-output discriminator; I016 records the executable-backed instrument. Reconfirmed after bumping the recorded framework pin to ad5cf802: scratch/screenshots/re12/positive_ad5cf802_present_8.ppm is exactly 29,499/691,200 non-black and readable, while the compile-time producer-disabled scratch/screenshots/re12/negative_ad5cf802_present_1.ppm is 0/691,200 and no second present exists; both next switch GP1 to 24-bit.
 
 ### RE-13 — TITLE 24-bit intro/MDEC path to next native presentation
-- status: todo
+- status: re-verified
 - deps: RE-12
-- evidence: The owned-disc RE-12 positive and disabled-producer control both transition GP1 display depth to 24-BIT (0x08000011, 320x224); the control watchdog stack reaches ov_title_gen_800721D0 -> Core::mdec_dma_pump, while the shipping run also ceases presenting after the sprite splashes.
-- where: TITLE overlay intro/MDEC/FMV spine after publisher/developer loops
-- gap: Measure the intro stream/MDEC decode and its intended presenter, then build the next direct native producer from decoded game state. Do not extend the immediate-sprite owner into a generic guest renderer or present stale splash content.
-- notes: This is the live frontier after RE-12. Later title menu and gameplay remain downstream and unclaimed.
+- evidence: SHA-bound tools/re_title_movie.py derives MovieData init 0x8006F0A0, callback 0x8006F174, MovieData 0x800DEDA8/frameComplete 0x800DEDDC, DecDCTout 0x80071F70, 24-halfword slices, and the 480-halfword x 224 RGB24 display owner 0x8006FA54; 3/3 negative mutations pass. Against pinned psxport 57a17a14, the no-argument owned-disc shipping present_200 is a coherent intro frame at 678339/691200 nonblack (SHA256 0c3a55101d1b4e07a69c4eb39084d039d73936d920e3a32e1ea577900574ed7e), while the producer-disabled build completes 4000 DMA1 outputs, reaches the same 24-bit mode, and has present_200 absent.
+- where: tools/re_title_movie.py; game/render/title_movie.cpp; VagrantRuntime-owned per-Core TitleMovieProducer
+- gap: The first live intro frames render. Full movie completion, input skip, XA/audio, and the transition into TITLE's menu presenter remain unverified (RE-14).
+- notes: The callback's generated body remains linked and super-called; guest libpress owns STR/VLC/MDEC and VRAM uploads. Native code only observes the measured completion word and invokes the shared live-VRAM RGB24 scanout at guest VBlank.
+
+### RE-14 — TITLE intro completion and transition to the menu presenter
+- status: todo
+- deps: RE-13
+- evidence: RE-13 proves live guest-decoded RGB24 frames through present_200; no bounded run yet proves normal movie end/Start skip, teardown, or the first title-menu DrawOTag frame.
+- where: TITLE state spine after 0x8006FA54 _playIntroMovie returns; measured TITLE presenter 0x80071A68
+- gap: Run the intro to normal completion and exercise Start skip, verify cleanup/XA behavior, then root-cause the earliest missing title-menu producer without reusing the movie scanout as a generic renderer.
+- notes: Do not relabel the first rendered movie frame as a completed title sequence. RE-13 is only the path to the next native presentation.
 
 ## ownership
 

@@ -14,7 +14,7 @@ namespace vagrant {
 class TitleStartupProducer {
 public:
   void enqueue(const TitleSpriteRecipe &sprite);
-  void present(Core &core);
+  bool present(Core &core);
 
   std::size_t pendingCount() const {
     return pending_.size();
@@ -25,6 +25,6 @@ private:
 };
 
 void registerTitleStartupOverrides();
-void presentTitleStartup(Core &core);
+bool presentTitleStartup(Core &core);
 
 } // namespace vagrant

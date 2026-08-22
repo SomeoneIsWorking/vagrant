@@ -27,6 +27,7 @@ set(GAME_SRC
   game/core/game_hooks.cpp
   game/core/main.cpp
   game/core/vagrant_runtime.cpp
+  game/render/title_movie.cpp
   game/render/title_startup.cpp
   game/render/title_startup_recipe.cpp
   game/cd/ds_control.cpp
@@ -67,6 +68,7 @@ if(BUILD_TESTING)
     game/core/game_config.cpp
     game/core/game_hooks.cpp
     game/core/vagrant_runtime.cpp
+    game/render/title_movie.cpp
     game/render/title_startup.cpp
     game/render/title_startup_recipe.cpp)
   target_include_directories(vagrant_runtime_test PRIVATE game game/core)

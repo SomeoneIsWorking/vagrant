@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-22
 tags: 
 depends: game/core/vagrant_runtime.cpp#VagrantRuntime::configureRenderPath, game/core/vagrant_runtime.cpp#VagrantRuntime::bootInit, game/core/vagrant_runtime.cpp#VagrantRuntime::registerOverrides, game/core/game_hooks.cpp, game/core/main.cpp, tests/test_vagrant_runtime.cpp
-reconfirmed: 2026-08-22 18:14:40
-verified_at: 2026-08-22 18:14:40
+reconfirmed: 2026-08-22 19:09:18
+verified_at: 2026-08-22 19:09:18
 ---
 
 ## Claim
@@ -36,3 +36,11 @@ or the bounded boot fails before the previously verified TITLE boundary
 ## Re-confirmed 2026-08-22 18:14:40
 
 2026-08-22 against recorded/built psxport ad5cf802: derived-runtime/context tests, full Clang CTest 6/6, shipping real-disc positive, and compile-time producer-disabled negative all pass
+
+## Re-confirmed 2026-08-22 18:46:01
+
+2026-08-22: vagrant_runtime_test and full CTest 6/6 pass after composing per-Core TitleMovieProducer; shipping disassembly retains the generated TITLE callback super.
+
+## Re-confirmed 2026-08-22 19:09:18
+
+2026-08-22 against recorded/built psxport 57a17a14: fresh 799-resident/137-TITLE emission, Clang build, vagrant_runtime_test, full CTest 6/6, shipping real-disc positive, and producer-disabled negative all pass.

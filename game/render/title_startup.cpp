@@ -68,9 +68,9 @@ void TitleStartupProducer::enqueue(const TitleSpriteRecipe &sprite) {
   pending_.push_back(sprite);
 }
 
-void TitleStartupProducer::present(Core &core) {
+bool TitleStartupProducer::present(Core &core) {
   if (pending_.empty()) {
-    return;
+    return false;
   }
 
   RenderQueue &queue = core.game->activeRq();
@@ -124,6 +124,7 @@ void TitleStartupProducer::present(Core &core) {
   queue.flush(&core);
   core.game->fps60.present_vk(&core);
   lucent::debug("vagrant-title", "presented {} native TITLE sprite(s)", produced);
+  return true;
 }
 
 void registerTitleStartupOverrides() {
@@ -135,11 +136,9 @@ void registerTitleStartupOverrides() {
 #endif
 }
 
-void presentTitleStartup(Core &core) {
+bool presentTitleStartup(Core &core) {
   TitleStartupProducer *title = producer(core);
-  if (title) {
-    title->present(core);
-  }
+  return title && title->present(core);
 }
 
 } // namespace vagrant

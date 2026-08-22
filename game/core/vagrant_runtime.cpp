@@ -6,6 +6,7 @@
 #include "core.h"
 #include "legacy_game_interface.h"
 #include "producer_db.h"
+#include "render/title_movie.h"
 #include "render/title_startup.h"
 #include "vagrant_context.h"
 
@@ -36,6 +37,7 @@ void VagrantRuntime::registerOverrides(Game &) {
   vagrant_cd_register_overrides();
   vagrant_vblank_register_overrides();
   registerTitleStartupOverrides();
+  registerTitleMovieOverrides();
 }
 
 void VagrantRuntime::bootInit(Core &core) {

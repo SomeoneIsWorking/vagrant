@@ -1,10 +1,10 @@
-# Vagrant Story — a PC-native port (first TITLE splash stage)
+# Vagrant Story — a PC-native port (TITLE 24-bit intro stage)
 
 A PC-native port of **Vagrant Story** (PS1, USA, `SLUS_010.40`) built on the
 [psxport](https://github.com/SomeoneIsWorking/psxport) static-recompilation framework, vendored here as
 `external/psxport`.
 
-## Status: TITLE's first publisher splash renders; no title menu or gameplay
+## Status: TITLE's publisher splashes and first 24-bit intro frames render; no title menu or gameplay
 
 Created 2026-08-12. An owner-provisioned, gitignored resident + TITLE substrate now builds and runs. It
 executes measured crt0 and guest main, completes `_initRand`, and now completes `_diskReset`'s Pause
@@ -20,9 +20,12 @@ its measured base, and routed: resident `jal 0x80042BD8` now executes `0x8007133
 RE-12 now derives TITLE's immediate sprite leaf `0x8006A778`, retains its generated super-call, and
 directly presents the live guest-uploaded VRAM texture at guest VBlank. The owned-disc default run
 renders a legible Square Electronic Arts publisher splash at 29,499/691,200 non-black pixels; a
-test-only disabled-producer control retains guest execution but produces no second present. The
-honest boundary is later: after those splash loops TITLE switches to 24-bit and enters its
-intro/MDEC/FMV spine without another native presentation (RE-13). What exists:
+test-only disabled-producer control retains guest execution but produces no second splash present.
+RE-13 derives the intact TITLE libpress/MDEC output callback, completion field, slice width, and RGB24
+display dimensions. Its retained-super producer presents live guest-decoded VRAM at VBlank; a
+shipping real-disc `present_200` is coherent and 678,339/691,200 pixels are non-black. The
+producer-disabled negative still completes 4,000 DMA1 outputs and reaches the same 24-bit mode but
+has no `present_200`. What exists:
 
 - disc → executable provisioning from **your own** disc image (nothing game-derived is in this repo),
 - a process-lifetime derived `VagrantRuntime` that owns the direct-native render default, boot, and
@@ -34,14 +37,15 @@ intro/MDEC/FMV spine without another native presentation (RE-13). What exists:
   delivery (RE-10), and reproducible TITLE extraction/emission/routing (RE-11). RE-05 also measures the later overlay-owned presenters and proves their
   heap-allocated OT/packet buffers cannot be encoded by the legacy fixed-layout GameConfig fields.
   These facts are gated back to the owned images; the first direct-native TITLE sprite producer is
-  likewise measured and gated by `tools/re_title_startup.py`,
+  measured and gated by `tools/re_title_startup.py`; the live TITLE movie producer is measured and
+  gated by `tools/re_title_movie.py`,
 - the project registries (`docs/re-frontier.md`, `docs/codemap.md`, `docs/info/`, `docs/issues/`),
 - a vendored CC0 **matching decompilation** of this exact executable, `external/rood-reverse`, whose
   target images are *measured* to be byte-identical to the ones on this disc (21/21).
 
-`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-13 is the
-next frame step: measure TITLE's 24-bit intro/MDEC path through its next native presentation without
-turning the first-splash owner into a generic guest renderer.
+`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-14 is the
+next frame step: verify normal movie completion and Start-skip teardown, then root-cause the first
+missing title-menu producer without treating live-VRAM movie scanout as a generic renderer.
 
 ## Getting started
 

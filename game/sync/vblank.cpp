@@ -10,6 +10,7 @@
 
 #include "core.h"
 #include "override_registry.h"
+#include "render/title_movie.h"
 #include "render/title_startup.h"
 #include <lucent/log.h>
 
@@ -30,7 +31,11 @@ bool s_clockArmed = false;
 void vagrant_vblank_turn(Core *c) {
   const uint32_t before = c->mem_r32(kVBlankCounter);
   rec_dispatch(c, kVBlankHandler);
-  vagrant::presentTitleStartup(*c);
+  // The two TITLE products occupy consecutive guest phases. Keep one present per field even at the
+  // transition: an immediate splash sprite wins the field; otherwise a completed MDEC frame scans out.
+  if (!vagrant::presentTitleStartup(*c)) {
+    vagrant::presentTitleMovie(*c);
+  }
   lucent::debug("vagrant-vblank", "guest VBlank handler advanced counter {} -> {}", before, c->mem_r32(kVBlankCounter));
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "render/title_movie.h"
 #include "render/title_startup.h"
 
 namespace vagrant {
@@ -8,6 +9,7 @@ namespace vagrant {
 // adding another subsystem composes another member rather than growing VagrantRuntime into a god class.
 struct VagrantContext {
   TitleStartupProducer titleStartup{};
+  TitleMovieProducer titleMovie{};
 };
 
 } // namespace vagrant
