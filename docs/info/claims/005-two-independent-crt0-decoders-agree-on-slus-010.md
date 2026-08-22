@@ -4,9 +4,9 @@ kind: claim
 status: holds
 created: 2026-08-12
 tags: crt0
-depends: game/core/game_config.cpp
-reconfirmed: 2026-08-21
-verified_at: 2026-08-21 11:17:52
+depends: game/core/game_config.cpp, tools/re_crt0.py#measure
+reconfirmed: 2026-08-22 14:13:23
+verified_at: 2026-08-22 14:13:23
 ---
 
 ## Claim
@@ -48,3 +48,7 @@ RE-10 final crt0 selftest reconfirmed the interpreter measurement and independen
 ## Re-confirmed 2026-08-21
 
 Post-landing independent crt0 extraction and Vagrant re_crt0 remained in full agreement on the measured boot group.
+
+## Re-confirmed 2026-08-22 14:13:23
+
+2026-08-22: re_crt0 executable interpretation, independent SN linker record, shipped bindings, and negative controls all passed (24/24; assert gate 6/6) after the runtime migration.

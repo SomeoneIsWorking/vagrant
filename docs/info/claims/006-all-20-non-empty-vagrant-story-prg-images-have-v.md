@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: overlays,re-03
 depends: tools/re_overlay.py#measure, game/core/game_config.cpp, game/recomp_seeds.json
-reconfirmed: 2026-08-21
-verified_at: 2026-08-21 11:17:52
+reconfirmed: 2026-08-22 14:13:24
+verified_at: 2026-08-22 14:13:24
 ---
 
 ## Claim
@@ -40,3 +40,7 @@ RE-10 final tools/re_overlay.py --check-config --selftest passed all 7/7 both-an
 ## Re-confirmed 2026-08-21
 
 Post-landing re_overlay passed 7/7 and check-config 24/24 for all 20 non-empty PRG images.
+
+## Re-confirmed 2026-08-22 14:13:24
+
+2026-08-22: tools/re_overlay.py --check-config passed 24/24 and --selftest passed 7/7 after the compatibility-table refactor.

@@ -5,11 +5,11 @@
 #   psxport            the framework static library (+ psxport_smoke, its agnosticism proof). Always
 #                      configured, so `cmake --build build --target psxport_smoke` works from a bare
 #                      clone of this repo with nothing game-specific present.
-#   vagrant_seam       AN OBJECT LIBRARY over the shared game TUs (config / hooks / main / CD and
-#                      VBlank owners).
+#   vagrant_seam       AN OBJECT LIBRARY over the shared game TUs (derived runtime / bounded legacy
+#                      facts / main / CD and VBlank owners).
 #                      It COMPILES but does not link, which is exactly the check possible before a
-#                      substrate exists: it proves this port's GameConfig/GameHooks still satisfy the
-#                      pinned framework's seam — every designator binds, every hook signature matches.
+#                      substrate exists: it proves VagrantRuntime and its bounded legacy facts still
+#                      satisfy the pinned framework seam — every designator and virtual binds.
 #                      That is the gate for this repo today (`--target vagrant_seam`).
 #   vagrant_port       the game binary. Configured when the gitignored generated resident + TITLE
 #                      substrate exists.
@@ -26,6 +26,7 @@ set(GAME_SRC
   game/core/game_config.cpp
   game/core/game_hooks.cpp
   game/core/main.cpp
+  game/core/vagrant_runtime.cpp
   game/cd/ds_control.cpp
   game/sync/vblank.cpp
 )
@@ -59,6 +60,16 @@ if(BUILD_TESTING)
     NAME vagrant_cpp_quality
     COMMAND ${Python3_EXECUTABLE} ${PSXPORT_DIR}/tools/check_cpp_style.py
             --root ${CMAKE_SOURCE_DIR} --compile-commands ${CMAKE_BINARY_DIR})
+  add_executable(vagrant_runtime_test
+    tests/test_vagrant_runtime.cpp
+    game/core/game_config.cpp
+    game/core/game_hooks.cpp
+    game/core/vagrant_runtime.cpp)
+  target_include_directories(vagrant_runtime_test PRIVATE game game/core)
+  target_link_libraries(vagrant_runtime_test PRIVATE psxport)
+  set_target_properties(vagrant_runtime_test PROPERTIES
+    CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+  add_test(NAME vagrant_runtime_test COMMAND vagrant_runtime_test)
 endif()
 
 if(NOT PSXPORT_BUILD_PORT)

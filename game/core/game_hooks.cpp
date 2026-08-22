@@ -1,6 +1,4 @@
-// game_hooks.cpp — the Vagrant Story GameHooks vtable: the behaviour the PSX-generic framework calls
-// into. The table stays deliberately tiny: it composes the measured CD/VBlank owners, while their
-// implementations remain in the cohesive subsystem modules that own them.
+// game_hooks.cpp — bounded compatibility callbacks not yet migrated into VagrantRuntime.
 //
 // There are exactly two kinds of member here, and the distinction is the point (the shape is taken
 // from spider1/game/core/game_hooks.cpp, which learned it the hard way):
@@ -13,35 +11,13 @@
 //               to say so loudly and abort. A silent stub would let a half-wired path look like it
 //               worked, which is the fake-green the porting doc warns about.
 //
-// bootInit dispatches verified guest main(); registerOverrides composes the measured subsystem
-// owners. The zero guard remains a hard configuration-integrity check.
 #include "cfg.h"
 #include "core.h"
 #include "game_iface.h"
+#include "legacy_game_interface.h"
 #include <stdlib.h>
 
-void vagrant_cd_register_overrides();
-void vagrant_vblank_register_overrides();
-
-// ── boot ────────────────────────────────────────────────────────────────────────────────────────
-static void vagrant_bootInit(Core *c) {
-  if (!c->cfg->gameMain) {
-    cfg_loge("boot",
-             "GameConfig::gameMain is 0 — this port's crt0/boot RE (RE-01 in "
-             "docs/re-frontier.md) has not been done, so there is no guest main() to "
-             "dispatch. Refusing to dispatch address 0.");
-    abort();
-  }
-  cfg_logi("boot", "dispatching guest main() 0x%08X on the recompiled substrate", c->cfg->gameMain);
-  rec_dispatch(c, c->cfg->gameMain);
-}
-
 // ── neutral ─────────────────────────────────────────────────────────────────────────────────────
-static void vagrant_registerOverrides(Game *) {
-  vagrant_cd_register_overrides();
-  vagrant_vblank_register_overrides();
-}
-
 static void vagrant_renderFadeState(Core *, FadeState *out) {
   out->mode = 0; // 0 == no fade; the present path leaves pixels untouched
   out->r = out->g = out->b = 0;
@@ -100,10 +76,8 @@ static void vagrant_devWarp(Core *, int, int) {
 static const GameHooks g_vagrant_hooks = {
     .frameUpdate = vagrant_frameUpdate,
     .drawOTag = vagrant_drawOTag,
-    .bootInit = vagrant_bootInit,
     .schedFreshEntry = vagrant_schedFreshEntry,
     .hasNativeHandlerForEntry = vagrant_hasNativeHandlerForEntry,
-    .registerOverrides = vagrant_registerOverrides,
     .renderFadeState = vagrant_renderFadeState,
     .renderBbFrameReset = vagrant_renderBbFrameReset,
     .devWarp = vagrant_devWarp,
@@ -113,6 +87,4 @@ static const GameHooks g_vagrant_hooks = {
     .schedStageBody = vagrant_schedStageBody,
 };
 
-const GameHooks *vagrant_game_hooks() {
-  return &g_vagrant_hooks;
-}
+const GameHooks &vagrant::legacy::compatibilityHooks = g_vagrant_hooks;

@@ -40,6 +40,12 @@ defect found while measuring crt0 (issue #3) would give a BIOS
 call BIOS `malloc` (issue #3 has the census), so this game can neither exhibit the bug nor demonstrate
 its fix. If something here looks like it works, check `docs/codemap.md` — the honest inventory is short.
 
+The framework seam is inherited: one process-lifetime `vagrant::VagrantRuntime` owns the
+direct-native project default, measured guest-main dispatch, and CD/VBlank override composition. It derives
+`LegacyGameRuntimeAdapter` only while generic psxport algorithms still consume measured
+`GameConfig` groups and unmigrated neutral/fail-fast callbacks. `game/core/legacy_game_interface.h`
+names that debt; new behavior belongs on the derived runtime, not in `GameHooks`.
+
 `./run.sh` is the stable project launcher. With no arguments it resolves the framework and the disc,
 identity-checks and hash-provisions the resident executable and TITLE overlay, configures both CMake
 trees with Clang, builds `vagrant_port`, and launches that current target. It does not claim gameplay
@@ -54,12 +60,12 @@ What DOES build today, and is the gate for a change to the seam:
 
 ```sh
 cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-cmake --build build --target vagrant_seam vagrant_cd_contract_test -j$(nproc)
+cmake --build build --target vagrant_seam vagrant_runtime_test vagrant_cd_contract_test -j$(nproc)
 ctest --test-dir build --output-on-failure
 ```
 
-`vagrant_seam` is an OBJECT library over the shared game sources: config, hooks, process entry, and
-the `DsControlB` owner. It proves those sources still satisfy the pinned framework's seam without
+`vagrant_seam` is an OBJECT library over the shared game sources: derived runtime, bounded legacy
+facts/callbacks, process entry, and the `DsControlB` owner. It proves those sources still satisfy the pinned framework's seam without
 requiring generated code. `vagrant_cd_contract_test` compiles the owner's exact classifier and checks
 every accepted ID plus query/read/unknown refusals. When `generated/rec_sources.cmake` exists,
 `vagrant_port` is the resident+TITLE substrate gate. The overlay-input CTest proves the matching and
@@ -176,10 +182,16 @@ not let a plausible-sounding sentence in a doc elsewhere stand in for it.
 
 ## The rules that bite hardest here
 
-**Never guess a guest address or an overlay load base.** An un-RE'd `GameConfig` field stays `0` with a
+**Never guess a guest address or an overlay load base.** While the compatibility adapter exists, an un-RE'd `GameConfig` field stays `0` with a
 TODO naming the frontier step. Zero is honest and psxport fails fast on it; a plausible wrong value
 breaks boot in a way that reads as a framework bug. This repo has a *tempting* supply of addresses
 sitting in `external/rood-reverse` — that is precisely why the rule is stated twice.
+
+**`VagrantRuntime` is the title authority.** `main.cpp` constructs and installs one process-lifetime
+instance; runtime behavior moves there through virtual overrides, not new `GameHooks` callbacks.
+`GameConfig`/`GameHooks` are private compatibility tables referenced only by
+`vagrant::legacy::{measuredConfig,compatibilityHooks}`. Delete fields as psxport gains narrow typed
+fact interfaces; do not replace the bag with one virtual getter per integer.
 
 **Work the step `re_frontier.py next` names, not a downstream one.** The cardinal sin on a port is
 faking a step's output before its RE is done; it makes a broken port look finished.

@@ -1,5 +1,8 @@
-// game_config.cpp — the Vagrant Story (SLUS_010.40, USA) GameConfig: the guest-address literals the
-// PSX-generic framework reads through `c->cfg->field`.
+// game_config.cpp — measured Vagrant Story (SLUS_010.40, USA) compatibility facts.
+//
+// VagrantRuntime is the title's ownership seam. This legacy GameConfig remains only because generic
+// psxport algorithms still read `c->cfg->field`; each typed framework extraction must delete its
+// corresponding fields here rather than growing this bag.
 //
 // READ THIS BEFORE FILLING ANYTHING IN.
 //
@@ -21,6 +24,7 @@
 // fill a field, add the measurement and a shipping-value gate; a plausible citation alone is not a
 // discriminator.
 #include "game_iface.h"
+#include "legacy_game_interface.h"
 #ifdef VAGRANT_HAVE_SUBSTRATE
 #include "overlay_table.h"
 #endif
@@ -415,13 +419,4 @@ static const GameConfig g_vagrant_cfg = {
 //     (`vs_main_initHeap` 0x80043F74). So this port can demonstrate neither the bug nor the fix, and
 //     a green boot here says nothing about either.
 
-const GameConfig *vagrant_game_config() {
-  return &g_vagrant_cfg;
-}
-
-// Installs BOTH halves of the seam, because a Core's ctor snapshots them together — installing a
-// config without its hooks leaves a Core holding a half-seam.
-void vagrant_install_game_config() {
-  extern const GameHooks *vagrant_game_hooks(); // game/core/game_hooks.cpp
-  psxport_install_game(&g_vagrant_cfg, vagrant_game_hooks());
-}
+const GameConfig &vagrant::legacy::measuredConfig = g_vagrant_cfg;

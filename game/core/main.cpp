@@ -1,16 +1,17 @@
 // main.cpp — the Vagrant Story port's process entry point.
 //
-// Installs the game seam (GameConfig + GameHooks + RecompRegistry), brings up the framework's PSX
+// Installs VagrantRuntime + RecompRegistry, brings up the framework's PSX
 // hardware backends, loads the retail executable, and enters the native boot. After the install
 // nothing here names anything but framework symbols.
 //
 // The initial substrate is rooted at the PS-EXE entry by the emitter. The verified direct call graph
-// reaches GameConfig::gameMain, which this boot path dispatches after applying the measured crt0 plan.
+// reaches the measured guest-main entry, which the derived runtime dispatches after the crt0 plan.
 #include "cfg.h"
 #include "core.h"
 #include "disc.h"
 #include "fs_util.h"
 #include "game.h"
+#include "vagrant_runtime.h"
 #include <stdio.h>
 
 extern "C" {
@@ -24,8 +25,7 @@ void native_boot_run(Core *c);            // runtime/recomp/native_boot.cpp (fra
 void gte_init(void);
 int selftest_run(const char *path); // runtime/recomp/selftest.cpp (framework harness)
 
-extern void vagrant_install_game_config(); // game/core/game_config.cpp (installs cfg + hooks)
-extern void vagrant_install_recomp();      // game/core/recomp_register.cpp
+extern void vagrant_install_recomp(); // game/core/recomp_register.cpp
 
 // The retail US executable, as it is named on the disc. SYSTEM.CNF boots it directly
 // (`BOOT = cdrom:\SLUS_010.40;1` — measured 2026-08-12), so there is no SCEA boot stub LoadExec'ing a
@@ -35,9 +35,11 @@ static const char *kDefaultExe = "scratch/bin/vagrant/SLUS_010.40";
 static const char *kDiscExePath = "\\SLUS_010.40";
 
 int main(int argc, char **argv) {
-  // Must precede the first Core: Core's ctor snapshots psxport_game_config()/psxport_game_hooks().
-  vagrant_install_game_config();
+  // Process-lifetime derived owner. Installation must precede the first Core, which snapshots it.
+  static vagrant::VagrantRuntime runtime;
+  psxport_install_game(runtime);
   vagrant_install_recomp();
+  runtime.configureRenderPath();
 
   const char *path = argc > 1 ? argv[1] : kDefaultExe;
 
@@ -80,7 +82,7 @@ int main(int argc, char **argv) {
   c->r[4] = 1;
   c->r[5] = 0; // a0/a1 as the BIOS leaves them
 
-  c->hooks->registerOverrides(game); // nothing to install yet, but keep the wiring honest
+  c->runtime->registerOverrides(*game);
   native_boot_run(c);
   cfg_logi("boot", "native boot returned");
   return 0;

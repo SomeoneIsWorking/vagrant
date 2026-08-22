@@ -4,9 +4,9 @@ kind: claim
 status: holds
 created: 2026-08-12
 tags: boot,re-01
-depends: game/core/game_config.cpp,tools/re_crt0.py
-reconfirmed: 2026-08-21
-verified_at: 2026-08-21 11:17:52
+depends: game/core/game_config.cpp, tools/re_crt0.py#measure
+reconfirmed: 2026-08-22 14:13:23
+verified_at: 2026-08-22 14:13:23
 ---
 
 ## Claim
@@ -68,3 +68,7 @@ RE-10 final gate reran the full crt0 executable/config/citation/static-assert se
 ## Re-confirmed 2026-08-21
 
 Post-landing re_crt0 passed 24/24 plus the six-case compile/assert gate; the pinned runtime entered measured crt0 and guest main.
+
+## Re-confirmed 2026-08-22 14:13:23
+
+2026-08-22: tools/re_crt0.py --selftest passed 24/24 and --gate-config 6/6; all 11 boot fields plus recMainLo/Hi matched the owned executable after VagrantRuntime took boot dispatch ownership.

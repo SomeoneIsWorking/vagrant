@@ -4,9 +4,9 @@ kind: claim
 status: holds
 created: 2026-08-12
 tags: boot
-depends: game/core/game_config.cpp, tools/re_crt0.py
-reconfirmed: 2026-08-21
-verified_at: 2026-08-21 11:17:52
+depends: game/core/game_config.cpp, tools/re_crt0.py#measure
+reconfirmed: 2026-08-22 14:13:22
+verified_at: 2026-08-22 14:13:22
 ---
 
 ## Claim
@@ -48,3 +48,7 @@ RE-10 final gate reran tools/re_crt0.py --selftest clean; explicit Clang rebuild
 ## Re-confirmed 2026-08-21
 
 Post-landing re_crt0 and live default launcher revalidated the SHA-bound SLUS_010.40 identity and direct boot on psxport 9f1bb927.
+
+## Re-confirmed 2026-08-22 14:13:22
+
+2026-08-22: tools/re_crt0.py --selftest passed 24/24 plus assert gate 6/6 after the inherited-runtime migration; the direct SLUS entry and measured crt0 plan are unchanged.

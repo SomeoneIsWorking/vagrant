@@ -21,7 +21,9 @@ The honest boundary is later: 15- and 30-second headless runs reach TITLE image/
 produce no verified non-black title frame (issue #17 / RE-12). What exists:
 
 - disc → executable provisioning from **your own** disc image (nothing game-derived is in this repo),
-- the framework seam (`GameConfig` / `GameHooks`), compiling against the pinned framework,
+- a process-lifetime derived `VagrantRuntime` that owns the direct-native render default, boot, and
+  override behavior; measured
+  `GameConfig` facts and unmigrated neutral/fail-fast `GameHooks` remain bounded compatibility debt,
 - seven measured RE groups: crt0/boot (RE-01), the resident substrate (RE-02), all 20
   non-empty `.PRG` load-base mappings into three overlay slots (RE-03), and the libpad delivery buffers
   plus driver pointer table (RE-06), the boot SPU DMA callback route (RE-09), and resident VBlank
@@ -59,7 +61,7 @@ python3 tools/extract_exe.py                        # extract + identity-check S
 python3 tools/extract_overlays.py                   # extract + identity-check TITLE.PRG
 python3 tools/verify_decomp_targets.py              # does the vendored decomp target our bytes? (21/21)
 cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-cmake --build build --target vagrant_seam vagrant_cd_contract_test -j"$(nproc)"
+cmake --build build --target vagrant_seam vagrant_runtime_test vagrant_cd_contract_test -j"$(nproc)"
 ctest --test-dir build --output-on-failure
 python3 tools/re_frontier.py next                   # what to work on
 ```

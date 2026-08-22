@@ -4,7 +4,9 @@ kind: claim
 status: holds
 created: 2026-08-21
 tags: frame,re-05
-depends: tools/re_frame.py#measure, game/core/game_config.cpp#vagrant_game_config
+depends: tools/re_frame.py#measure, game/core/game_config.cpp
+reconfirmed: 2026-08-22 14:13:26
+verified_at: 2026-08-22 14:13:26
 ---
 
 ## Claim
@@ -18,3 +20,7 @@ Vagrant overlay presentation is guest-owned, and BATTLE frame buffers are dynami
 ## What would falsify it
 
 if any owned overlay no longer matches its SHA, a live reached trace shows a different submit owner/layout, or a fixed region is proven to represent all guest allocations
+
+## Re-confirmed 2026-08-22 14:13:26
+
+2026-08-22: tools/re_frame.py --check-config matched all 12 frame-policy facts and --selftest passed 4/4 after the measured table became private compatibility debt.

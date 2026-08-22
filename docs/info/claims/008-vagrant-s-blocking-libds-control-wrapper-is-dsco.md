@@ -4,9 +4,9 @@ kind: claim
 status: holds
 created: 2026-08-14
 tags: re-04,cd
-depends: game/core/game_hooks.cpp, game/cd/ds_control.cpp#ds_control_b, game/cd/ds_control_contract.h#ownedControl, cmake/vagrant_port.cmake, external/psxport
-reconfirmed: 2026-08-21 03:35:32
-verified_at: 2026-08-21 03:35:32
+depends: game/core/vagrant_runtime.cpp#VagrantRuntime::registerOverrides, game/cd/ds_control.cpp#ds_control_b, game/cd/ds_control_contract.h#ownedControl, cmake/vagrant_port.cmake
+reconfirmed: 2026-08-22 14:13:25
+verified_at: 2026-08-22 14:13:25
 ---
 
 ## Claim
@@ -56,3 +56,7 @@ Post-landing CTest 3/3 passed, including vagrant_cd_contract_test; the added VBl
 ## Re-confirmed 2026-08-21 03:35:32
 
 Post-comment landing: hook composition changed comments only; post-RE10 CTest 3/3 still passed the DsControlB shipping contract and full Clang policy.
+
+## Re-confirmed 2026-08-22 14:13:25
+
+2026-08-22: Clang rebuilt the shipping owner under VagrantRuntime; vagrant_cd_contract_test and full CTest passed, and the bounded real run reached TITLE work through DsControlB with the same boundary.

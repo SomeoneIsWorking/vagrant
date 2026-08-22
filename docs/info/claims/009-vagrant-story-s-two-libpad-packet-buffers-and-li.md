@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-20
 tags: [input, re]
 depends: tools/re_pad.py#measure, game/core/game_config.cpp
-reconfirmed: 2026-08-21
-verified_at: 2026-08-21 11:17:52
+reconfirmed: 2026-08-22 14:13:26
+verified_at: 2026-08-22 14:13:26
 ---
 
 ## Claim
@@ -36,3 +36,7 @@ RE-10 final tools/re_pad.py --check-config --selftest passed 3/3 including destr
 ## Re-confirmed 2026-08-21
 
 Post-landing re_pad passed 3/3 for both fixed buffers and the live driver pointer table.
+
+## Re-confirmed 2026-08-22 14:13:26
+
+2026-08-22: tools/re_pad.py --check-config matched all four shipped values and --selftest passed 3/3 after the compatibility-table refactor.
