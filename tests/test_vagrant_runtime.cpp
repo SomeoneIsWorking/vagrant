@@ -38,7 +38,7 @@ int main() {
   auto game = std::make_unique<Game>();
   const GameHooks *legacyHooks = runtime.legacyHooksForMigration();
   if (psxport_game_runtime() != &runtime || game->core.runtime != &runtime ||
-      runtime.legacyConfigForMigration() == nullptr || legacyHooks == nullptr) {
+      runtime.legacyConfigForMigration() == nullptr || legacyHooks == nullptr || game->core.gameCtx == nullptr) {
     std::fprintf(stderr, "VagrantRuntime did not own the installed compatibility seam\n");
     return 1;
   }

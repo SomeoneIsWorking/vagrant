@@ -27,6 +27,8 @@ set(GAME_SRC
   game/core/game_hooks.cpp
   game/core/main.cpp
   game/core/vagrant_runtime.cpp
+  game/render/title_startup.cpp
+  game/render/title_startup_recipe.cpp
   game/cd/ds_control.cpp
   game/sync/vblank.cpp
 )
@@ -64,12 +66,21 @@ if(BUILD_TESTING)
     tests/test_vagrant_runtime.cpp
     game/core/game_config.cpp
     game/core/game_hooks.cpp
-    game/core/vagrant_runtime.cpp)
+    game/core/vagrant_runtime.cpp
+    game/render/title_startup.cpp
+    game/render/title_startup_recipe.cpp)
   target_include_directories(vagrant_runtime_test PRIVATE game game/core)
   target_link_libraries(vagrant_runtime_test PRIVATE psxport)
   set_target_properties(vagrant_runtime_test PROPERTIES
     CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
   add_test(NAME vagrant_runtime_test COMMAND vagrant_runtime_test)
+  add_executable(vagrant_title_recipe_test
+    tests/test_title_startup_recipe.cpp
+    game/render/title_startup_recipe.cpp)
+  target_include_directories(vagrant_title_recipe_test PRIVATE game/render)
+  set_target_properties(vagrant_title_recipe_test PROPERTIES
+    CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+  add_test(NAME vagrant_title_recipe_test COMMAND vagrant_title_recipe_test)
 endif()
 
 if(NOT PSXPORT_BUILD_PORT)

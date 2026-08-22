@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-21
 tags: frame,re-05
 depends: tools/re_frame.py#measure, game/core/game_config.cpp
-reconfirmed: 2026-08-22 14:13:26
-verified_at: 2026-08-22 14:13:26
+reconfirmed: 2026-08-22 18:14:39
+verified_at: 2026-08-22 18:14:39
 ---
 
 ## Claim
@@ -24,3 +24,11 @@ if any owned overlay no longer matches its SHA, a live reached trace shows a dif
 ## Re-confirmed 2026-08-22 14:13:26
 
 2026-08-22: tools/re_frame.py --check-config matched all 12 frame-policy facts and --selftest passed 4/4 after the measured table became private compatibility debt.
+
+## Re-confirmed 2026-08-22 17:51:59
+
+2026-08-22 re_frame.py --check-config --selftest passed 4/4 against SHA-bound overlays after the separate immediate-sprite producer landed
+
+## Re-confirmed 2026-08-22 18:14:39
+
+2026-08-22 against psxport ad5cf802: re_frame.py --check-config --selftest passes 4/4; dynamic frame facts and zero fixed regions remain gated

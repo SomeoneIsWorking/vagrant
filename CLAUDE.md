@@ -11,7 +11,7 @@ diagnostics through `lucent`, the registries, and never editing `external/psxpor
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
-## THE STATE OF THIS PORT: TITLE overlay executes; the first native picture does not
+## THE STATE OF THIS PORT: TITLE's first publisher splash renders natively
 
 Created 2026-08-12. Seven groups are re-verified and one frame group is measured-partial: the
 **crt0/boot group** (`RE-01`, `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), all
@@ -29,11 +29,19 @@ Deterministic guest-cycle CD pacing and ReadN status `0x22` let the intact guest
 leave Busy and dispatch each final callback's queued Pause. Resident `jal 0x80042BD8` now routes into
 TITLE target `0x80071334` (`vs_title_exec`) and reaches its real GPU/image and CD work.
 
-This is not gameplay and no non-black title picture is verified. A 15-second headless capture reaches
-only the initial black framework present; 30-second runs advance inside TITLE image/intro work but do
-not complete another frame (issue #17 / RE-12). RE-05 independently measures the later overlay-owned
-presenters and dynamic OT/pool contract. XA, the other 19 non-empty overlays, direct native graphics
-production, and every other unmeasured guest-address group in
+RE-12 now owns the first direct-native picture. `tools/re_title_startup.py` derives TITLE's immediate
+sprite leaf `0x8006A778`, its static packet `0x800DED28`, and the publisher/developer owner and two
+live calls from the SHA-bound retail overlay. `VagrantRuntime` installs the retained-super override;
+a per-Core producer decodes its semantic ABI and presents the intact guest-uploaded VRAM texture at
+guest VBlank. The owned-disc default run renders the legible “Published by Square Electronic Arts
+L.L.C.” splash at 29,499/691,200 non-black pixels. A separately compiled test-only disabled-producer
+control retains the guest super-call but produces only a black initial present and no second present.
+
+This is still not the title menu or gameplay. After the publisher/developer loops, TITLE switches to
+24-bit display and enters its intro/MDEC/FMV spine; no later native picture is presented before the
+watchdog (RE-13). RE-05 independently measures the later overlay-owned presenters and dynamic OT/pool
+contract. XA, the other 19 non-empty overlays, later native graphics production, and every other
+unmeasured guest-address group in
 `game/core/game_config.cpp` stay `0` with their open steps named in `docs/re-frontier.md`. A framework
 defect found while measuring crt0 (issue #3) would give a BIOS
 `InitHeap` a zero-size heap; measured 2026-08-12, that is **latent here** — no code in this image can
@@ -49,7 +57,7 @@ names that debt; new behavior belongs on the derived runtime, not in `GameHooks`
 `./run.sh` is the stable project launcher. With no arguments it resolves the framework and the disc,
 identity-checks and hash-provisions the resident executable and TITLE overlay, configures both CMake
 trees with Clang, builds `vagrant_port`, and launches that current target. It does not claim gameplay
-or a finished picture: issue #17 records the live TITLE initialization boundary. The shell file is
+or a finished title sequence: RE-13 records the live 24-bit intro/MDEC boundary. The shell file is
 deliberately only a Python dispatch; all policy lives
 in `tools/run.py`. An explicit CHD path overrides the normal
 `PSXPORT_VAGRANT_DISC`/`.env`/drop-in resolution order. The current bootstrap target is explicitly
@@ -77,8 +85,10 @@ to a MEASURED constant in
 boot group, or `python3 tools/re_overlay.py --selftest && python3 tools/re_overlay.py --check-config`
 for overlay slots/seeds, `python3 tools/re_spu_transfer.py --check-config --selftest` for the DMA4
 callback route, `python3 tools/re_vblank.py --check-source --selftest` for resident VBlank
-delivery, or `python3 tools/re_frame.py --check-config --selftest` for the overlay-owned presentation
-contract and deliberately-zero fixed-layout fields. These diff shipped values back to the owned bytes. Compiling is not
+delivery, `python3 tools/re_frame.py --check-config --selftest` for the overlay-owned presentation
+contract and deliberately-zero fixed-layout fields, or
+`python3 tools/re_title_startup.py --check-source --selftest` for the first TITLE sprite contract.
+These diff shipped values back to the owned bytes. Compiling is not
 enough: the `static_assert`s only check the constants' internal RELATIONS, and `hi - lo == 0x46B20` holds
 just as well when both values are wrong — which is exactly how a reviewer moved `kHeapSizePtr` +4 and
 pointed `kLibcInit` at an unrelated nop with every gate green (workspace `PROTOCOL.md`, "THE SHIPPED

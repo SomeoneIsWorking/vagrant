@@ -1,10 +1,10 @@
-# Vagrant Story — a PC-native port (TITLE bootstrap stage)
+# Vagrant Story — a PC-native port (first TITLE splash stage)
 
 A PC-native port of **Vagrant Story** (PS1, USA, `SLUS_010.40`) built on the
 [psxport](https://github.com/SomeoneIsWorking/psxport) static-recompilation framework, vendored here as
 `external/psxport`.
 
-## Status: TITLE executes; no verified native picture or gameplay
+## Status: TITLE's first publisher splash renders; no title menu or gameplay
 
 Created 2026-08-12. An owner-provisioned, gitignored resident + TITLE substrate now builds and runs. It
 executes measured crt0 and guest main, completes `_initRand`, and now completes `_diskReset`'s Pause
@@ -17,8 +17,12 @@ paces each sector at the measured 2x-drive period in guest cycles and returns Re
 so the intact guest VBlank callback releases libds Busy state and each final callback's queued Pause
 dispatches normally. TITLE.PRG is SHA-verified against the exact matching decomp target, emitted at
 its measured base, and routed: resident `jal 0x80042BD8` now executes `0x80071334` (`vs_title_exec`).
-The honest boundary is later: 15- and 30-second headless runs reach TITLE image/intro GPU/CD work but
-produce no verified non-black title frame (issue #17 / RE-12). What exists:
+RE-12 now derives TITLE's immediate sprite leaf `0x8006A778`, retains its generated super-call, and
+directly presents the live guest-uploaded VRAM texture at guest VBlank. The owned-disc default run
+renders a legible Square Electronic Arts publisher splash at 29,499/691,200 non-black pixels; a
+test-only disabled-producer control retains guest execution but produces no second present. The
+honest boundary is later: after those splash loops TITLE switches to 24-bit and enters its
+intro/MDEC/FMV spine without another native presentation (RE-13). What exists:
 
 - disc → executable provisioning from **your own** disc image (nothing game-derived is in this repo),
 - a process-lifetime derived `VagrantRuntime` that owns the direct-native render default, boot, and
@@ -29,14 +33,15 @@ produce no verified non-black title frame (issue #17 / RE-12). What exists:
   plus driver pointer table (RE-06), the boot SPU DMA callback route (RE-09), and resident VBlank
   delivery (RE-10), and reproducible TITLE extraction/emission/routing (RE-11). RE-05 also measures the later overlay-owned presenters and proves their
   heap-allocated OT/packet buffers cannot be encoded by the legacy fixed-layout GameConfig fields.
-  These facts are gated back to the owned images; a non-black native presentation remains open,
+  These facts are gated back to the owned images; the first direct-native TITLE sprite producer is
+  likewise measured and gated by `tools/re_title_startup.py`,
 - the project registries (`docs/re-frontier.md`, `docs/codemap.md`, `docs/info/`, `docs/issues/`),
 - a vendored CC0 **matching decompilation** of this exact executable, `external/rood-reverse`, whose
   target images are *measured* to be byte-identical to the ones on this disc (21/21).
 
-`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-12 is the
-next frame step: classify TITLE initialization through its first real presentation and implement the
-first direct native graphics producer without a guest-packet fallback.
+`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-13 is the
+next frame step: measure TITLE's 24-bit intro/MDEC path through its next native presentation without
+turning the first-splash owner into a generic guest renderer.
 
 ## Getting started
 

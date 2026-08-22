@@ -5,6 +5,8 @@ status: holds
 created: 2026-08-22
 tags: overlay,title,runtime
 depends: tools/extract_overlays.py#provision, tools/ensure_recomp.py#generated_complete
+reconfirmed: 2026-08-22 18:14:40
+verified_at: 2026-08-22 18:14:40
 ---
 
 ## Claim
@@ -18,3 +20,7 @@ Owned TITLE/TITLE.PRG SHA-1 f74a76e6215edebf607d0c2af56481050edb139a matches its
 ## What would falsify it
 
 if the owned TITLE hash changes, the generated table/entry is absent, or a fresh headless run again misses 0x80071334
+
+## Re-confirmed 2026-08-22 18:14:40
+
+2026-08-22 against psxport ad5cf802: default launcher provisions SHA f74a76e TITLE, ensure-recomp is current, and real run executes its measured producer

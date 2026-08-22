@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: crt0
 depends: game/core/game_config.cpp, tools/re_crt0.py#measure
-reconfirmed: 2026-08-22 14:13:23
-verified_at: 2026-08-22 14:13:23
+reconfirmed: 2026-08-22 18:14:39
+verified_at: 2026-08-22 18:14:39
 ---
 
 ## Claim
@@ -52,3 +52,11 @@ Post-landing independent crt0 extraction and Vagrant re_crt0 remained in full ag
 ## Re-confirmed 2026-08-22 14:13:23
 
 2026-08-22: re_crt0 executable interpretation, independent SN linker record, shipped bindings, and negative controls all passed (24/24; assert gate 6/6) after the runtime migration.
+
+## Re-confirmed 2026-08-22 17:51:58
+
+2026-08-22 re_crt0.py independent witness/audit and full selftest passed again on owned executable
+
+## Re-confirmed 2026-08-22 18:14:39
+
+2026-08-22 against psxport ad5cf802: both crt0 evidence paths and negative selftests remain green

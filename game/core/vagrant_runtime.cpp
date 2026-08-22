@@ -5,6 +5,9 @@
 #include "config_vars.h"
 #include "core.h"
 #include "legacy_game_interface.h"
+#include "producer_db.h"
+#include "render/title_startup.h"
+#include "vagrant_context.h"
 
 #include <cstdlib>
 
@@ -15,6 +18,14 @@ namespace vagrant {
 
 VagrantRuntime::VagrantRuntime() : LegacyGameRuntimeAdapter(legacy::measuredConfig, legacy::compatibilityHooks) {}
 
+void *VagrantRuntime::createContext(Core &) {
+  return new VagrantContext();
+}
+
+void VagrantRuntime::destroyContext(void *context) {
+  delete static_cast<VagrantContext *>(context);
+}
+
 void VagrantRuntime::configureRenderPath() {
   // The project target is direct native production. Change only the default: explicit user and
   // harness selections remain higher layers on the shared CVar ladder.
@@ -24,6 +35,7 @@ void VagrantRuntime::configureRenderPath() {
 void VagrantRuntime::registerOverrides(Game &) {
   vagrant_cd_register_overrides();
   vagrant_vblank_register_overrides();
+  registerTitleStartupOverrides();
 }
 
 void VagrantRuntime::bootInit(Core &core) {
@@ -34,6 +46,7 @@ void VagrantRuntime::bootInit(Core &core) {
              "facts; refusing to dispatch address 0");
     std::abort();
   }
+  producer_db_begin(&core);
   cfg_logi("boot", "dispatching guest main() 0x%08X on the recompiled substrate", config->gameMain);
   rec_dispatch(&core, config->gameMain);
 }

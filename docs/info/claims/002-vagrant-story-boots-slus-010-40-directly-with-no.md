@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot
 depends: game/core/game_config.cpp, tools/re_crt0.py#measure
-reconfirmed: 2026-08-22 14:13:22
-verified_at: 2026-08-22 14:13:22
+reconfirmed: 2026-08-22 18:14:39
+verified_at: 2026-08-22 18:14:39
 ---
 
 ## Claim
@@ -52,3 +52,11 @@ Post-landing re_crt0 and live default launcher revalidated the SHA-bound SLUS_01
 ## Re-confirmed 2026-08-22 14:13:22
 
 2026-08-22: tools/re_crt0.py --selftest passed 24/24 plus assert gate 6/6 after the inherited-runtime migration; the direct SLUS entry and measured crt0 plan are unchanged.
+
+## Re-confirmed 2026-08-22 17:51:58
+
+2026-08-22 rechecked owned SLUS_010.40 through re_crt0.py --check-config --gate-citations --selftest; all shipped boot facts match and negative gate passes
+
+## Re-confirmed 2026-08-22 18:14:39
+
+2026-08-22 against psxport ad5cf802: re_crt0 shipped-vs-measured/citation/selftest gates pass and real default boot loads exact SLUS_010.40 identity

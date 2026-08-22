@@ -18,6 +18,8 @@ public:
     return RenderPath::Native;
   }
 
+  void *createContext(Core &core) override;
+  void destroyContext(void *context) override;
   void registerOverrides(Game &game) override;
   void bootInit(Core &core) override;
 };

@@ -5,6 +5,8 @@ status: holds
 created: 2026-08-22
 tags: launcher,overlay,title
 depends: tools/run.py#execute, tools/extract_overlays.py#provision, tests/test_launcher.py
+reconfirmed: 2026-08-22 18:14:40
+verified_at: 2026-08-22 18:14:40
 ---
 
 ## Claim
@@ -18,3 +20,7 @@ scratch/logs/title-overlay-default-launcher.log: executable and TITLE hashes mat
 ## What would falsify it
 
 if ./run.sh needs a hidden mode/argument, re-emits unchanged input, selects a non-Clang build, fails to route TITLE, or claims a non-black/gameplay outcome not established by the run
+
+## Re-confirmed 2026-08-22 18:14:40
+
+2026-08-22 against recorded/built psxport ad5cf802: zero-argument ./run.sh provisions exact resident+TITLE, builds with Clang, renders the publisher splash, then reaches the documented 24-bit boundary

@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-21
 tags: re-10,vsync,vblank,boot
 depends: tools/re_vblank.py#measure, game/sync/vblank.cpp#vagrant_start_intr_vsync, game/recomp_seeds.json#main_reentry, external/psxport
-reconfirmed: 2026-08-21
-verified_at: 2026-08-21 11:17:52
+reconfirmed: 2026-08-22 18:14:39
+verified_at: 2026-08-22 18:14:39
 ---
 
 ## Claim
@@ -44,3 +44,7 @@ Correct HookEntryInt delivery exposed the saved setjmp PC as a genuine mid-funct
 ## Re-confirmed 2026-08-21
 
 Post-landing re_vblank passed 4/4; pinned runtime restored 0x8001FAD0, kept DMA4 callbacks armed, and advanced guest VBlank 0 through 173.
+
+## Re-confirmed 2026-08-22 18:14:39
+
+2026-08-22 against psxport ad5cf802: re_vblank.py --check-source --selftest passes 4/4 and both real render legs arm guest VBlank and advance into TITLE

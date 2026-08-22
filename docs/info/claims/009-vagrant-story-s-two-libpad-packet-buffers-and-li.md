@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-20
 tags: [input, re]
 depends: tools/re_pad.py#measure, game/core/game_config.cpp
-reconfirmed: 2026-08-22 14:13:26
-verified_at: 2026-08-22 14:13:26
+reconfirmed: 2026-08-22 18:14:39
+verified_at: 2026-08-22 18:14:39
 ---
 
 ## Claim
@@ -40,3 +40,11 @@ Post-landing re_pad passed 3/3 for both fixed buffers and the live driver pointe
 ## Re-confirmed 2026-08-22 14:13:26
 
 2026-08-22: tools/re_pad.py --check-config matched all four shipped values and --selftest passed 3/3 after the compatibility-table refactor.
+
+## Re-confirmed 2026-08-22 17:51:58
+
+2026-08-22 re_pad.py --check-config --selftest passed 3/3 against owned executable
+
+## Re-confirmed 2026-08-22 18:14:39
+
+2026-08-22 against psxport ad5cf802: re_pad.py --check-config --selftest passes 3/3

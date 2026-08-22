@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: re-04,cd
 depends: game/core/vagrant_runtime.cpp#VagrantRuntime::registerOverrides, game/cd/ds_control.cpp#ds_control_b, game/cd/ds_control_contract.h#ownedControl, cmake/vagrant_port.cmake
-reconfirmed: 2026-08-22 14:13:25
-verified_at: 2026-08-22 14:13:25
+reconfirmed: 2026-08-22 18:14:39
+verified_at: 2026-08-22 18:14:39
 ---
 
 ## Claim
@@ -60,3 +60,11 @@ Post-comment landing: hook composition changed comments only; post-RE10 CTest 3/
 ## Re-confirmed 2026-08-22 14:13:25
 
 2026-08-22: Clang rebuilt the shipping owner under VagrantRuntime; vagrant_cd_contract_test and full CTest passed, and the bounded real run reached TITLE work through DsControlB with the same boundary.
+
+## Re-confirmed 2026-08-22 17:51:58
+
+2026-08-22 re_cd.py --check-config --selftest passed 3/3; vagrant_cd_contract_test and full CTest passed after VagrantRuntime override composition changed
+
+## Re-confirmed 2026-08-22 18:14:39
+
+2026-08-22 against psxport ad5cf802: re_cd 3/3, re_async_cd 3/3, CD contract CTest, Clang build, and default-disc boot all pass

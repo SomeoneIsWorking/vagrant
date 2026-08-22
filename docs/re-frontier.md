@@ -19,7 +19,7 @@ intended behaviour of the real target being reproduced.
 Statuses: ✅ re-verified · 🟡 re-partial (honest gap) · 🔬 in-progress · ⛔ hack (debt, must remove) ·
 ⬜ todo · ➖ skip-by-design · ⏸ blocked (computed).
 
-## THE STATE OF THIS PORT, 2026-08-22: TITLE executes; first native picture is next
+## THE STATE OF THIS PORT, 2026-08-22: first TITLE splash renders; 24-bit intro is next
 
 `RE-01` (crt0/boot), `RE-02` (resident seed set/substrate), and `RE-03` (all non-empty `.PRG` load
 bases) are `re-verified`. The emitter's mandatory PS-EXE entry root plus one measured Sony
@@ -37,9 +37,13 @@ The shared controller schedules every sector at the 2x-drive interval of 225,792
 reports ReadN status `0x22`; the intact guest decodes `CdlStatRead`, leaves Busy state in its VBlank
 callback, dispatches each queued Pause, and observes Pause completion status `0x02`. RE-11 now
 SHA-verifies and emits 137 TITLE functions at the measured fixed slot. Resident `jal 0x80042BD8`
-routes into `0x80071334` (`vs_title_exec`) and reaches TITLE GPU/image and CD work. RE-12 is the live
-frontier: bounded headless runs still produce only the initial black framework present, so no title
-picture or gameplay is claimed.
+routes into `0x80071334` (`vs_title_exec`) and reaches TITLE GPU/image and CD work. RE-12 now derives
+TITLE's immediate sprite leaf `0x8006A778`, retains its generated super-call, and directly presents
+the live guest-uploaded VRAM texture at guest VBlank. The owned-disc default run renders the legible
+publisher splash at 29,499/691,200 non-black pixels; the test-only disabled-producer build stays
+black and emits no second present. RE-13 is the live frontier: TITLE switches to 24-bit after the
+splash loops and reaches MDEC work without another native presentation. No title menu or gameplay is
+claimed.
 
 The resident substrate now executes the RE-01 plan through guest main. That does not mean gameplay
 boots: platform HLE and CD/overlay loading remain later frontier steps. The earlier fail-fast at the
@@ -133,12 +137,20 @@ measures it against this executable.
 - notes: Generated C and extracted PRG bytes stay gitignored. The tracked tools own reproducibility and provenance.
 
 ### RE-12 — TITLE initialization to first non-black native presentation
-- status: todo
+- status: re-verified
 - deps: RE-11
-- evidence:
-- where: TITLE overlay 0x80071334 execution spine + future game/render producer
-- gap: Headless runs of 15s and 30s capture only initial present_1.ppm (0/691200 non-black), while the live stack advances through TITLE GPU DMA and interrupt-time CD work. Classify the title-image/intro/presenter spine and implement a direct native producer; do not treat a larger watchdog budget or guest packet fallback as a graphics fix.
-- notes: Issue #17 owns the symptom and run evidence.
+- evidence: Owned SHA-bound TITLE.PRG instrument tools/re_title_startup.py uniquely derives immediate sprite leaf 0x8006A778, static packet 0x800DED28, publisher/developer owner 0x8006F54C, and its exactly two calls at 0x8006F67C/0x8006F778; --check-source gates the shipping address and retained generated super-call, while --selftest refuses a destroyed DrawPrim call, shifted shipping address, and mutated overlay identity (3/3). The VagrantRuntime-owned, per-Core producer decodes the measured leaf ABI after retaining guest writes/DrawPrim, emits the live guest-uploaded VRAM texture at intact guest VBlank, and presents directly. Real-disc no-argument ./run.sh writes scratch/screenshots/re12/positive_present_8.ppm at 29,499/691,200 non-black (4.27%), visually legible as Published by Square Electronic Arts L.L.C. A separately compiled test-only disabled-producer control retains the super-call but emits only uniformly black scratch/screenshots/re12/negative_present_1.ppm and no present_2 before the same downstream boundary.
+- where: tools/re_title_startup.py + game/render/title_startup.{h,cpp} + game/render/title_startup_recipe.{h,cpp} + game/core/vagrant_context.h + game/core/vagrant_runtime.cpp + game/sync/vblank.cpp
+- gap: NONE for TITLE publisher/developer first-picture production. This does not claim the later title menu or gameplay: after the two splash loops, TITLE switches GP1 to 24-bit and enters its intro/MDEC/FMV spine, then watchdogs without another native present; RE-13 owns that next boundary.
+- notes: Issue #17 is resolved at the exact first-picture scope. C020 records the positive/negative real-output discriminator; I016 records the executable-backed instrument. Reconfirmed after bumping the recorded framework pin to ad5cf802: scratch/screenshots/re12/positive_ad5cf802_present_8.ppm is exactly 29,499/691,200 non-black and readable, while the compile-time producer-disabled scratch/screenshots/re12/negative_ad5cf802_present_1.ppm is 0/691,200 and no second present exists; both next switch GP1 to 24-bit.
+
+### RE-13 — TITLE 24-bit intro/MDEC path to next native presentation
+- status: todo
+- deps: RE-12
+- evidence: The owned-disc RE-12 positive and disabled-producer control both transition GP1 display depth to 24-BIT (0x08000011, 320x224); the control watchdog stack reaches ov_title_gen_800721D0 -> Core::mdec_dma_pump, while the shipping run also ceases presenting after the sprite splashes.
+- where: TITLE overlay intro/MDEC/FMV spine after publisher/developer loops
+- gap: Measure the intro stream/MDEC decode and its intended presenter, then build the next direct native producer from decoded game state. Do not extend the immediate-sprite owner into a generic guest renderer or present stale splash content.
+- notes: This is the live frontier after RE-12. Later title menu and gameplay remain downstream and unclaimed.
 
 ## ownership
 

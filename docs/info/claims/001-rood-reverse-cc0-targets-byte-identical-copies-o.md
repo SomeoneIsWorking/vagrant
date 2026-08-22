@@ -5,6 +5,8 @@ status: holds
 created: 2026-08-12
 tags: references,decomp
 depends: tools/verify_decomp_targets.py
+reconfirmed: 2026-08-22 18:14:39
+verified_at: 2026-08-22 18:14:39
 ---
 
 ## Claim
@@ -18,3 +20,7 @@ tools/verify_decomp_targets.py against the retail USA disc image (resolved via $
 ## What would falsify it
 
 a different disc dump (region/revision) yielding a different SLUS_010.40 sha1, or the submodule pin moving to a commit whose splat configs state other hashes — re-run tools/verify_decomp_targets.py
+
+## Re-confirmed 2026-08-22 18:14:39
+
+2026-08-22 against psxport ad5cf802: verify_decomp_targets.py reports 21/21 owned-disc code images match and its corrupted-hash negative reports exactly 1 mismatch

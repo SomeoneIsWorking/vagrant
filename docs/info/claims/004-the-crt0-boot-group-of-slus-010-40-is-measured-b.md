@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot,re-01
 depends: game/core/game_config.cpp, tools/re_crt0.py#measure
-reconfirmed: 2026-08-22 14:13:23
-verified_at: 2026-08-22 14:13:23
+reconfirmed: 2026-08-22 18:14:39
+verified_at: 2026-08-22 18:14:39
 ---
 
 ## Claim
@@ -72,3 +72,11 @@ Post-landing re_crt0 passed 24/24 plus the six-case compile/assert gate; the pin
 ## Re-confirmed 2026-08-22 14:13:23
 
 2026-08-22: tools/re_crt0.py --selftest passed 24/24 and --gate-config 6/6; all 11 boot fields plus recMainLo/Hi matched the owned executable after VagrantRuntime took boot dispatch ownership.
+
+## Re-confirmed 2026-08-22 17:51:58
+
+2026-08-22 re_crt0.py --check-config --gate-citations --selftest passed against owned SLUS_010.40; 13 shipped fields match measured bytes and citations are byte-identical
+
+## Re-confirmed 2026-08-22 18:14:39
+
+2026-08-22 against psxport ad5cf802: re_crt0.py --check-config --gate-citations --selftest passes with all 13 shipped fields matching
