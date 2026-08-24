@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-22
 tags: render,title,mdec,re-13
 depends: game/render/title_movie.cpp#title_movie_dct_out_callback, game/render/title_movie.cpp#TitleMovieProducer::present, game/sync/vblank.cpp#vagrant_vblank_turn, tools/re_title_movie.py#measure
-reconfirmed: 2026-08-22 19:12:02
-verified_at: 2026-08-22 19:12:02
+reconfirmed: 2026-08-24
+verified_at: 2026-08-24 20:08:15
 ---
 
 ## Claim
@@ -32,3 +32,7 @@ if the callback or completion word no longer derive from the exact TITLE bytes, 
 ## Re-confirmed 2026-08-22 19:12:02
 
 Post-commit 4bd0718 positive real-disc present_200 is coherent with SHA-256 0c3a55101d1b4e07a69c4eb39084d039d73936d920e3a32e1ea577900574ed7e; producer-disabled control retains 4000 DMA1 outputs and 24-bit 320x224 but produces no same-index capture; 6/6 CTests pass.
+
+## Re-confirmed 2026-08-24
+
+Fresh shipping replay on this landed code path traversed live 24-bit movie output into the 15-bit menu; movie producer-disabled evidence and 7/7 CTest remained green

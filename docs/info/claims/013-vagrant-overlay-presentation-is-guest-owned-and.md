@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-21
 tags: frame,re-05
 depends: tools/re_frame.py#measure, game/core/game_config.cpp
-reconfirmed: 2026-08-22 18:14:39
-verified_at: 2026-08-22 18:14:39
+reconfirmed: 2026-08-24
+verified_at: 2026-08-24 20:08:15
 ---
 
 ## Claim
@@ -32,3 +32,7 @@ if any owned overlay no longer matches its SHA, a live reached trace shows a dif
 ## Re-confirmed 2026-08-22 18:14:39
 
 2026-08-22 against psxport ad5cf802: re_frame.py --check-config --selftest passes 4/4; dynamic frame facts and zero fixed regions remain gated
+
+## Re-confirmed 2026-08-24
+
+Post-landing re_crt0 and 7/7 CTest retain dynamic guest heap/frame ownership facts; legacy adapter continues the measured guest-VRAM picture policy on bc8c8897

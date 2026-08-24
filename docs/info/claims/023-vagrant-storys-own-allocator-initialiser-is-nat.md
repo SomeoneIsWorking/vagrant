@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-24
 tags: ownership,re-07,heap,override,mirror-verify
 depends: tools/re_heap.py#measure, game/core/game_heap.cpp#initHeap, game/core/game_heap.cpp#registerHeapOverride
-reconfirmed: 2026-08-24 19:41:40
-verified_at: 2026-08-24 19:41:40
+reconfirmed: 2026-08-24
+verified_at: 2026-08-24 20:08:15
 ---
 
 ## Claim
@@ -24,3 +24,7 @@ if re_heap.py --check-source ever reports a shipped constant differing from its 
 ## Re-confirmed 2026-08-24 19:41:40
 
 2026-08-24 against psxport d2266f4b: the shipping recorded-input run printed [mirror-verify] 0x80043F74 OK (pass #1), reached the same 0x800798A4 frontier, and re_heap.py --check-source --selftest passed 5/5; Clang CTest passed 7/7.
+
+## Re-confirmed 2026-08-24
+
+Post-landing re_heap re-derived sole call, body, heads and arena from real bytes with 5/5 controls; hermetic 11/11 heap contract and Clang CTest 7/7 passed; fresh live replay retained mirror-verify OK

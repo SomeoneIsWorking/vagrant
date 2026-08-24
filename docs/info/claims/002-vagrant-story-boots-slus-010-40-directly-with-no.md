@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot
 depends: game/core/game_config.cpp, tools/re_crt0.py#measure
-reconfirmed: 2026-08-22 18:14:39
-verified_at: 2026-08-22 18:14:39
+reconfirmed: 2026-08-24
+verified_at: 2026-08-24 20:08:15
 ---
 
 ## Claim
@@ -60,3 +60,7 @@ Post-landing re_crt0 and live default launcher revalidated the SHA-bound SLUS_01
 ## Re-confirmed 2026-08-22 18:14:39
 
 2026-08-22 against psxport ad5cf802: re_crt0 shipped-vs-measured/citation/selftest gates pass and real default boot loads exact SLUS_010.40 identity
+
+## Re-confirmed 2026-08-24
+
+Post-landing re_crt0 selftest matched real SLUS_010.40 identity/header, direct entry, 11 boot fields and 2 text bounds; 24/24 controls plus compile mutation gate passed

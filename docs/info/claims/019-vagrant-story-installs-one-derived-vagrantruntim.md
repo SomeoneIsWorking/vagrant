@@ -3,10 +3,10 @@ id: C019
 kind: claim
 status: holds
 created: 2026-08-22
-tags: 
+tags:
 depends: game/core/vagrant_runtime.cpp#VagrantRuntime::configureRenderPath, game/core/vagrant_runtime.cpp#VagrantRuntime::bootInit, game/core/vagrant_runtime.cpp#VagrantRuntime::registerOverrides, game/core/game_hooks.cpp, game/core/main.cpp, tests/test_vagrant_runtime.cpp
-reconfirmed: 2026-08-22 19:12:02
-verified_at: 2026-08-22 19:12:02
+reconfirmed: 2026-08-24
+verified_at: 2026-08-24 20:08:15
 ---
 
 ## Claim
@@ -48,3 +48,7 @@ or the bounded boot fails before the previously verified TITLE boundary
 ## Re-confirmed 2026-08-22 19:12:02
 
 Post-commit 4bd0718 authoritative Clang build and runtime test pass; VagrantRuntime still owns direct-native policy, lifecycle, and all measured override composition.
+
+## Re-confirmed 2026-08-24
+
+Post-landing Clang build and 7/7 CTest passed VagrantRuntime install/context/composed-product and override registration checks on bc8c8897

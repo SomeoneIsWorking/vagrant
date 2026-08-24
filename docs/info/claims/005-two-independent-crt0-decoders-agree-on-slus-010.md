@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: crt0
 depends: game/core/game_config.cpp, tools/re_crt0.py#measure
-reconfirmed: 2026-08-22 18:14:39
-verified_at: 2026-08-22 18:14:39
+reconfirmed: 2026-08-24
+verified_at: 2026-08-24 20:08:15
 ---
 
 ## Claim
@@ -60,3 +60,7 @@ Post-landing independent crt0 extraction and Vagrant re_crt0 remained in full ag
 ## Re-confirmed 2026-08-22 18:14:39
 
 2026-08-22 against psxport ad5cf802: both crt0 evidence paths and negative selftests remain green
+
+## Re-confirmed 2026-08-24
+
+Post-landing re_crt0 independent SN-link witnesses still match bss end and gp; 24/24 selftest and compile gate passed

@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-22
 tags: render,title,re-14
 depends: game/render/title_menu.cpp#title_menu_items_complete, game/render/title_menu.cpp#TitleMenuProducer::present, game/sync/vblank.cpp#vagrant_vblank_turn, tools/re_title_menu.py#measure
-reconfirmed: 2026-08-24 19:41:40
-verified_at: 2026-08-24 19:41:40
+reconfirmed: 2026-08-24
+verified_at: 2026-08-24 20:08:15
 ---
 
 ## Claim
@@ -24,3 +24,7 @@ if TITLE.PRG no longer uniquely derives 0x800705AC, the generated super-call is 
 ## Re-confirmed 2026-08-24 19:41:40
 
 2026-08-24 against psxport d2266f4b: shipping recorded-input run produced present_64 SHA256 7b93beafa44f1b9a76c511e396b9bbc179f09c004eea5725e1b3e19194198529, bit-identical to the readable prior capture, then failed honestly at 0x800798A4. Producer-disabled replay reached the same boundary with present_64 absent; the original forced-input schedule reproduced the 65536-item queue fail-fast with present_64 absent.
+
+## Re-confirmed 2026-08-24
+
+Root visually inspected fresh present_64 PNG: readable Vagrant Story/New Game/Continue/Sound frame; SHA 7b93beaf matched preserved run, producer-disabled same-index capture absent, and re_title_menu 3/3 passed

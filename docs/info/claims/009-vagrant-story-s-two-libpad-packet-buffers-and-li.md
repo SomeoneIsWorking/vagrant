@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-20
 tags: [input, re]
 depends: game/input/pad_delivery.cpp#PadDelivery::serviceField, game/input/pad_facts.h
-reconfirmed: 2026-08-24 19:41:39
-verified_at: 2026-08-24 19:41:39
+reconfirmed: 2026-08-24
+verified_at: 2026-08-24 20:08:15
 ---
 
 ## Claim
@@ -56,3 +56,7 @@ Post-landing re_pad passed 3/3 for both fixed buffers and the live driver pointe
 ## Re-confirmed 2026-08-24 19:41:39
 
 2026-08-24 against psxport d2266f4b: re_pad.py --check-config --selftest passes 6/6; shipping recorded-input run crosses 24-bit to 15-bit and reaches the first TITLE menu through the per-Core VBlank PadDelivery owner.
+
+## Re-confirmed 2026-08-24
+
+Post-landing re_pad derived unique setup and decoder from real bytes; typed facts/source gate and all 6/6 destructive controls passed

@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-14
 tags: overlays,re-03
 depends: tools/re_overlay.py#measure, game/core/game_config.cpp, game/recomp_seeds.json
-reconfirmed: 2026-08-22 18:14:39
-verified_at: 2026-08-22 18:14:39
+reconfirmed: 2026-08-24
+verified_at: 2026-08-24 20:08:15
 ---
 
 ## Claim
@@ -52,3 +52,7 @@ Post-landing re_overlay passed 7/7 and check-config 24/24 for all 20 non-empty P
 ## Re-confirmed 2026-08-22 18:14:39
 
 2026-08-22 against psxport ad5cf802: re_overlay.py --check-config --selftest passes 7/7; 20 non-empty PRG mappings remain measured
+
+## Re-confirmed 2026-08-24
+
+Post-landing re_overlay selftest passed all 7/7 placement, identity, disc-referee, and changed-shipping controls

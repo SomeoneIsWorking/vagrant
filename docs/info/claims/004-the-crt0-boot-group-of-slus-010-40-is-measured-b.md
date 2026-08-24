@@ -5,8 +5,8 @@ status: holds
 created: 2026-08-12
 tags: boot,re-01
 depends: game/core/game_config.cpp, tools/re_crt0.py#measure
-reconfirmed: 2026-08-22 18:14:39
-verified_at: 2026-08-22 18:14:39
+reconfirmed: 2026-08-24
+verified_at: 2026-08-24 20:08:15
 ---
 
 ## Claim
@@ -80,3 +80,7 @@ Post-landing re_crt0 passed 24/24 plus the six-case compile/assert gate; the pin
 ## Re-confirmed 2026-08-22 18:14:39
 
 2026-08-22 against psxport ad5cf802: re_crt0.py --check-config --gate-citations --selftest passes with all 13 shipped fields matching
+
+## Re-confirmed 2026-08-24
+
+Post-landing re_crt0 matched all 11 measured boot fields and 2 routing bounds; 24/24 selftest and 5/5 static-assert mutations passed
