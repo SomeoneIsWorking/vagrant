@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Measure Vagrant Story's libpad buffers and pointer table from SLUS_010.40.
+"""Measure Vagrant Story's libpad buffers, pointer table, and button-byte order.
 
-The result feeds GameConfig's pad seam.  The matching decomp is useful for names, but this tool finds
-the setup by its instruction shape, derives every address from the owned executable, and compares the
-shipping constants back to that measurement.
+The matching decomp is useful for names, but this tool finds the producer and consumer instruction
+shapes, derives every address from the owned executable, and compares the typed shipping facts and
+Vagrant-owned display-field delivery back to that measurement.
 """
 
 import os
@@ -14,12 +14,19 @@ import sys
 from re_crt0 import DEFAULT_EXE, FIXTURE_SHA1, Image, Refuse, s16
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FACTS_SRC = os.path.join(ROOT, "game", "input", "pad_facts.h")
 CONFIG_SRC = os.path.join(ROOT, "game", "core", "game_config.cpp")
+DELIVERY_SRC = os.path.join(ROOT, "game", "input", "pad_delivery.cpp")
+VBLANK_SRC = os.path.join(ROOT, "game", "sync", "vblank.cpp")
+CONTEXT_SRC = os.path.join(ROOT, "game", "core", "vagrant_context.h")
 
 
 def read_config():
-    with open(CONFIG_SRC) as src:
-        return src.read()
+    return "\n".join(open(path).read() for path in (FACTS_SRC, CONFIG_SRC))
+
+
+def read_delivery_sources():
+    return {path: open(path).read() for path in (DELIVERY_SRC, VBLANK_SRC, CONTEXT_SRC)}
 
 
 def words(img):
@@ -82,6 +89,43 @@ def find_setup(img):
     return matches[0], scanned
 
 
+def find_button_decoder(img):
+    """Find `~((pad[2] << 8) | pad[3])` without taking its address as input."""
+    matches = []
+    scanned = 0
+    for va, first in words(img):
+        if va + 12 >= img.hi:
+            break
+        scanned += 1
+        second, shift, invert = (img.r32(va + offset) for offset in (4, 8, 12))
+        if first >> 26 != 0x24 or (first & 0xFFFF) != 2:  # lbu byteA,2(base)
+            continue
+        if second >> 26 != 0x24 or (second & 0xFFFF) != 3:  # lbu byteB,3(base)
+            continue
+        byte_a, base = (first >> 16) & 0x1F, (first >> 21) & 0x1F
+        byte_b = (second >> 16) & 0x1F
+        if ((second >> 21) & 0x1F) != base:
+            continue
+        # sll byteA,byteA,8; nor result,byteB,byteA
+        if shift != (byte_a << 11) | (byte_a << 16) | (8 << 6):
+            continue
+        if (
+            invert >> 26 != 0
+            or (invert & 0x3F) != 0x27
+            or ((invert >> 21) & 0x1F) != byte_b
+            or ((invert >> 16) & 0x1F) != byte_a
+        ):
+            continue
+        matches.append(va)
+    if len(matches) != 1:
+        shown = ", ".join(f"0x{x:08X}" for x in matches[:8]) or "none"
+        raise Refuse(
+            f"button-byte decoder: scanned {scanned} word-aligned candidates, matched "
+            f"{len(matches)} ({shown}); cannot identify a unique high-byte-first consumer"
+        )
+    return matches[0], scanned
+
+
 def measure(img, verify_identity=True):
     if verify_identity and img.sha1() != FIXTURE_SHA1:
         raise Refuse(
@@ -90,6 +134,7 @@ def measure(img, verify_identity=True):
         )
 
     setup, scanned = find_setup(img)
+    decoder, decoder_scanned = find_button_decoder(img)
     slot0 = reg_base(img.r32(setup), img.r32(setup + 0x20), 16)
     slot_stride = s16(img.r32(setup + 0x28) & 0xFFFF)
     slot1 = (slot0 + slot_stride) & 0xFFFFFFFF
@@ -134,6 +179,8 @@ def measure(img, verify_identity=True):
         "slot_stride": slot_stride,
         "table": table,
         "table_stride": table_stride,
+        "button_decoder": decoder,
+        "decoder_scanned": decoder_scanned,
         "scanned": scanned,
     }
 
@@ -149,10 +196,10 @@ def parse_constant(text, name):
 
 def check_config(measured, text):
     fields = {
-        "kPadSlot0Buf": "slot0",
-        "kPadSlot1Buf": "slot1",
-        "kPadSlotPtrTable": "table",
-        "kPadSlotPtrStride": "table_stride",
+        "kSlot0Buffer": "slot0",
+        "kSlot1Buffer": "slot1",
+        "kDriverPointerTable": "table",
+        "kDriverPointerStride": "table_stride",
     }
     failures = []
     for constant, key in fields.items():
@@ -164,15 +211,40 @@ def check_config(measured, text):
         if not ok:
             failures.append(constant)
     for field, constant in (
-        ("padSlot0Buf", "kPadSlot0Buf"),
-        ("padSlot1Buf", "kPadSlot1Buf"),
-        ("padSlotPtrTable", "kPadSlotPtrTable"),
-        ("padSlotPtrStride", "kPadSlotPtrStride"),
+        ("padSlot0Buf", "kSlot0Buffer"),
+        ("padSlot1Buf", "kSlot1Buffer"),
+        ("padSlotPtrTable", "kDriverPointerTable"),
+        ("padSlotPtrStride", "kDriverPointerStride"),
     ):
-        if not re.search(rf"\.{field}\s*=\s*{constant}\b", text):
+        if not re.search(rf"\.{field}\s*=\s*vagrant::pad::{constant}\b", text):
             failures.append(f"{field} binding")
     if failures:
         raise Refuse("shipping mismatch: " + ", ".join(failures))
+
+
+def check_delivery_source(sources):
+    delivery = sources[DELIVERY_SRC]
+    vblank = sources[VBLANK_SRC]
+    context = sources[CONTEXT_SRC]
+    failures = []
+    if "core.game->pad.serviceFrame();" not in delivery:
+        failures.append("shared Pad service")
+    if not re.search(
+        r"mem_r8\s*\(\s*buffer\s*\+\s*2u\s*\).*mem_r8\s*\(\s*buffer\s*\+\s*3u\s*\).*"
+        r"mem_w8\s*\(\s*buffer\s*\+\s*2u\s*,\s*second\s*\).*"
+        r"mem_w8\s*\(\s*buffer\s*\+\s*3u\s*,\s*first\s*\)",
+        delivery,
+        re.S,
+    ):
+        failures.append("high-byte-first packet normalization")
+    handler = vblank.find("rec_dispatch(c, kVBlankHandler);")
+    service = vblank.find("padDelivery.serviceField(*c);")
+    if handler < 0 or service <= handler:
+        failures.append("post-handler display-field delivery")
+    if not re.search(r"\bPadDelivery\s+padDelivery\s*\{\s*\}\s*;", context):
+        failures.append("per-Core PadDelivery ownership")
+    if failures:
+        raise Refuse("shipping delivery mismatch: " + ", ".join(failures))
 
 
 def selftest(img, measured):
@@ -197,10 +269,25 @@ def selftest(img, measured):
     finally:
         img.data = original
 
+    mutable = bytearray(original)
+    off = img.off(measured["button_decoder"] + 8)
+    mutable[off : off + 4] = struct.pack("<I", 0)
+    img.data = bytes(mutable)
+    try:
+        measure(img, verify_identity=False)
+        raise AssertionError("destroyed button-byte decoder was accepted")
+    except Refuse as e:
+        if "button-byte decoder" not in str(e) or "matched 0" not in str(e):
+            raise AssertionError(f"decoder negative lacked denominator: {e}")
+        print(f"  [ ok ] destroyed decoder refused: {e}")
+        checks += 1
+    finally:
+        img.data = original
+
     text = read_config()
     changed = text.replace(
-        f"kPadSlot0Buf = 0x{measured['slot0']:08X}",
-        f"kPadSlot0Buf = 0x{measured['slot0'] + 4:08X}",
+        f"kSlot0Buffer = 0x{measured['slot0']:08X}",
+        f"kSlot0Buffer = 0x{measured['slot0'] + 4:08X}",
         1,
     )
     if changed == text:
@@ -209,11 +296,25 @@ def selftest(img, measured):
         check_config(measured, changed)
         raise AssertionError("+4 shipping slot was accepted")
     except Refuse as e:
-        if "kPadSlot0Buf" not in str(e):
-            raise AssertionError(f"shipping negative did not name kPadSlot0Buf: {e}")
+        if "kSlot0Buffer" not in str(e):
+            raise AssertionError(f"shipping negative did not name kSlot0Buffer: {e}")
         print(f"  [ ok ] +4 shipping slot refused: {e}")
         checks += 1
-    print(f"re_pad selftest: {checks}/3 PASS")
+
+    sources = read_delivery_sources()
+    check_delivery_source(sources)
+    checks += 1
+    sabotaged = dict(sources)
+    sabotaged[DELIVERY_SRC] = sabotaged[DELIVERY_SRC].replace("buffer + 3u, first", "buffer + 4u, first", 1)
+    try:
+        check_delivery_source(sabotaged)
+        raise AssertionError("shifted shipping byte normalization was accepted")
+    except Refuse as e:
+        if "normalization" not in str(e):
+            raise AssertionError(f"delivery negative did not name normalization: {e}")
+        print(f"  [ ok ] shifted normalization refused: {e}")
+        checks += 1
+    print(f"re_pad selftest: {checks}/6 PASS")
 
 
 def main(argv):
@@ -243,10 +344,16 @@ def main(argv):
             f"  driver pointer table 0x{m['table']:08X}, stride {m['table_stride']} bytes"
         )
         print(
-            "  boundary: this identifies input delivery only; no frame loop is claimed"
+            f"  button decoder 0x{m['button_decoder']:08X}: byte[2] << 8, then byte[3] "
+            f"({m['decoder_scanned']} candidates scanned)"
+        )
+        print(
+            "  boundary: the measured VBlank host turn services and normalizes these packets; "
+            "later menu behavior is not claimed"
         )
         if do_check:
             check_config(m, read_config())
+            check_delivery_source(read_delivery_sources())
         if do_selftest:
             selftest(img, m)
         return 0

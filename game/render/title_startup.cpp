@@ -122,7 +122,7 @@ bool TitleStartupProducer::present(Core &core) {
   const std::size_t produced = pending_.size();
   pending_.clear();
   queue.flush(&core);
-  core.game->fps60.present_vk(&core);
+  core.game->presentation.commit(&core);
   lucent::debug("vagrant-title", "presented {} native TITLE sprite(s)", produced);
   return true;
 }

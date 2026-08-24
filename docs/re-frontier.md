@@ -19,7 +19,7 @@ intended behaviour of the real target being reproduced.
 Statuses: ✅ re-verified · 🟡 re-partial (honest gap) · 🔬 in-progress · ⛔ hack (debt, must remove) ·
 ⬜ todo · ➖ skip-by-design · ⏸ blocked (computed).
 
-## THE STATE OF THIS PORT, 2026-08-22: live 24-bit TITLE intro frames render; completion is next
+## THE STATE OF THIS PORT, 2026-08-22: Start skips the live intro into a readable TITLE menu
 
 `RE-01` (crt0/boot), `RE-02` (resident seed set/substrate), and `RE-03` (all non-empty `.PRG` load
 bases) are `re-verified`. The emitter's mandatory PS-EXE entry root plus one measured Sony
@@ -44,8 +44,14 @@ publisher splash at 29,499/691,200 non-black pixels; the test-only disabled-prod
 black and emits no second splash present. RE-13 derives TITLE's MDEC completion callback and RGB24
 scanout contract; the retained-super semantic producer presents coherent live guest-decoded intro
 frames. A producer-disabled real-disc build still completes 4,000 DMA1 outputs and reaches the same
-24-bit mode but emits no same-index `present_200`. RE-14 now owns full movie completion, Start-skip,
-XA/audio teardown, and the first title-menu picture. No title menu or gameplay is claimed.
+24-bit mode but emits no same-index `present_200`. RE-14 derives Vagrant's high-byte-first pad
+consumer, services the shared host Pad once per intact guest VBlank, and proves Start exits the movie.
+The shared deterministic HSync counter carries `_initTitleScreen` through its real `VSync(1) < 248`
+wait. TITLE then changes to 15-bit 512x224 and its retained `_drawTitleMenuItems` super builds a
+readable Vagrant Story/New Game/Continue/Sound screen. Disabling only that completed-pass producer
+leaves the same transition intact but reproduces the 65,536-item queue fail-fast with the matching
+present absent. Normal movie completion, XA/STR teardown, later menu interaction, and gameplay are
+not claimed; the next reached code boundary is missing TITLE function `0x800798A4`.
 
 The resident substrate now executes the RE-01 plan through guest main. That does not mean gameplay
 boots: platform HLE and CD/overlay loading remain later frontier steps. The earlier fail-fast at the
@@ -119,14 +125,17 @@ measures it against this executable.
   at +34, and calls `PadInitDirect 0x8002DCC4` with those two pointers. The callee preserves a0/a1
   in s1/s2, materialises driver state `0x8003FCC0`, and stores them at +0x30/+0x120, independently
   deriving pointer table `0x8003FCF0` with stride 240. `--check-config` compares all four shipping
-  constants and field bindings to the bytes; `--selftest` is 3/3 and proves both a destroyed call
-  shape (0 matches over 83,948 candidates) and a +4 shipped-buffer edit are rejected.
-- where: `tools/re_pad.py` -> `game/core/game_config.cpp` (`padSlot0Buf`, `padSlot1Buf`,
-  `padSlotPtrTable`, `padSlotPtrStride`)
-- gap: The addresses are complete, but the current resident boot has no owned frame loop calling
-  `Pad::serviceFrame`; this step supplies the delivery destination, not live interactive gameplay.
-- notes: `padDriverFn` stays zero deliberately: psxport does not read that legacy field. The runtime
-  writes through the pointer table and falls back to the two fixed buffers. The matching decomp's
+  constants and field bindings to the bytes. It also uniquely derives the high-byte-first consumer
+  at `0x800431B0`; `--selftest` is 6/6 and rejects destroyed setup/decoder shapes, a +4 shipped
+  buffer, and shifted byte normalization.
+- where: `tools/re_pad.py` -> `game/input/pad_facts.h` + `game/input/pad_delivery.{h,cpp}` +
+  `game/sync/vblank.cpp`; compatibility bindings remain in `game/core/game_config.cpp`
+- gap: NONE for delivering host/replay input at the measured display-field turn. This does not claim
+  later menu interaction or gameplay input semantics.
+- notes: The per-Core owner calls shared `Pad::serviceFrame` after the intact guest VBlank handler,
+  then adapts only the measured byte order. `padDriverFn` stays zero deliberately: psxport does not
+  read that legacy field. The runtime writes through the pointer table and falls back to the two
+  fixed buffers. The matching decomp's
   `vs_main_padBuffer` name and `char[2][34]` type corroborate the byte-derived result but are not an
   input to it.
 
@@ -151,26 +160,34 @@ measures it against this executable.
 - deps: RE-12
 - evidence: SHA-bound tools/re_title_movie.py derives MovieData init 0x8006F0A0, callback 0x8006F174, MovieData 0x800DEDA8/frameComplete 0x800DEDDC, DecDCTout 0x80071F70, 24-halfword slices, and the 480-halfword x 224 RGB24 display owner 0x8006FA54; 3/3 negative mutations pass. Against pinned psxport 57a17a14, the no-argument owned-disc shipping present_200 is a coherent intro frame at 678339/691200 nonblack (SHA256 0c3a55101d1b4e07a69c4eb39084d039d73936d920e3a32e1ea577900574ed7e), while the producer-disabled build completes 4000 DMA1 outputs, reaches the same 24-bit mode, and has present_200 absent.
 - where: tools/re_title_movie.py; game/render/title_movie.cpp; VagrantRuntime-owned per-Core TitleMovieProducer
-- gap: The first live intro frames render. Full movie completion, input skip, XA/audio, and the transition into TITLE's menu presenter remain unverified (RE-14).
+- gap: NONE for live intro-frame presentation. RE-14 resolves Start skip and the transition to the first menu picture. Normal movie completion and XA/STR teardown remain outside this step.
 - notes: The callback's generated body remains linked and super-called; guest libpress owns STR/VLC/MDEC and VRAM uploads. Native code only observes the measured completion word and invokes the shared live-VRAM RGB24 scanout at guest VBlank.
 
-### RE-14 — TITLE intro completion and transition to the menu presenter
-- status: todo
+### RE-14 — TITLE Start-skip transition to the menu presenter
+- status: re-verified
 - deps: RE-13
-- evidence: RE-13 proves live guest-decoded RGB24 frames through present_200; no bounded run yet proves normal movie end/Start skip, teardown, or the first title-menu DrawOTag frame.
-- where: TITLE state spine after 0x8006FA54 _playIntroMovie returns; measured TITLE presenter 0x80071A68
-- gap: Run the intro to normal completion and exercise Start skip, verify cleanup/XA behavior, then root-cause the earliest missing title-menu producer without reusing the movie scanout as a generic renderer.
-- notes: Do not relabel the first rendered movie frame as a completed title sequence. RE-13 is only the path to the next native presentation.
+- evidence: Against pinned psxport d2266f4b, tools/re_pad.py uniquely derives the guest high-byte-first button decoder at 0x800431B0 and gates per-Core VBlank delivery/normalization (6/6). Forced active-low Start exits _playIntroMovie after 14 live MDEC frames. The shared deterministic VSync(1)/root-counter1 implementation lets intact _initTitleScreen pass its 248-HSync wait and switch from 24-bit 320x224 to 15-bit 512x224. SHA-bound tools/re_title_menu.py scans 138572 candidates, uniquely derives the two-pass owner 0x8007093C and completed-items leaf 0x800705AC, gates the retained super-call, and passes 3/3 destructive controls. Shipping present_64 is a readable Vagrant Story/New Game/Continue/Sound menu at 241809/691200 nonblack (SHA256 7b93beaf...); disabling only the semantic menu producer retains guest execution and the mode switch but reaches the 65536-item queue fail-fast with present_64 absent.
+- where: game/input/pad_facts.h + game/input/pad_delivery.{h,cpp} + game/render/title_menu.{h,cpp} + game/core/vagrant_context.h + game/core/vagrant_runtime.cpp + game/sync/vblank.cpp + tools/re_pad.py + tools/re_title_menu.py
+- gap: NONE for the Start-skip transition to the first title-menu picture. Normal movie completion and XA/STR teardown are not claimed. The next reached boundary is missing TITLE function 0x800798A4 from resident caller 0x80042C14 after repeated readable menu presents; later menu interaction, stream teardown, and gameplay remain open.
+- notes: The input adapter calls the shared Pad service exactly once per guest field, then applies the retail decoder byte order; no input state is fabricated. The menu override retains the generated _drawTitleMenuItems body and only owns the measured completed-pass fence; guest DrawPrim creates every pixel. Startup/movie/menu all use the neutral FramePresenter, never the removed temporal fps60 product.
+
+### RE-15 — classify TITLE transfer target 0x800798A4
+- status: todo
+- deps: RE-14
+- evidence: Both the 2026-08-24 shipping recorded-input run and the menu-producer-disabled control cross the 24-bit-to-15-bit transition and then fail fast at `0x800798A4` from resident return address `0x80042C14` (`c->pc=0x80010AA4`). The miss report finds no stored RAM word equal to the target, and the active fixed slot is the SHA-bound TITLE overlay. This proves the boundary is execution/discovery, not another missing presentation fence.
+- where: retail TITLE.PRG control flow around 0x800798A4 + resident caller 0x80042C14; `tools/ensure_recomp.py` and `game/recomp_seeds.json` only after classification
+- gap: Determine from the retail TITLE bytes whether 0x800798A4 is a real function entry, computed branch target, or coroutine resume. Add a recompiler seed or discovery rule only after that binary fact is measured; do not guess an entry merely to clear the miss.
+- notes: Normal movie completion and XA/STR teardown remain a separate unverified path because RE-14 reaches this boundary through a forced Start skip.
 
 ## ownership
 
 ### RE-07 — native ownership seeded from the matching decomp
-- status: todo
+- status: re-verified
 - deps: RE-01, RE-02
-- evidence:
-- where: game/ (no native body exists yet)
-- gap: The resident substrate now provides the `gen` comparison leg. The first native body still needs a measured reached target and a byte/SBS gate; nothing may be imported merely because the reference names it — an imported body with no live gate is a hack with a citation.
-- notes: rood-reverse is ~55-63% matched overall (its own decomp.dev badges; not measured here — and the psxport port's axis is SBS RAM parity, not object identity, so the two percentages are not comparable). Widescreen source lead only: BATTLE/BATTLE.PRG's matching reference resets `SetGeomOffset(160,112)` every frame, initializes the battle view through `func_800760CC(0x140,0xF0,projectionDistance,...)`, and changes projection via `vs_battle_setProjectionDistance`. `projectionDistance` also changes during camera transitions. A future wide implementation must target that world-camera path, not globally replace `SetGeomOffset`/`SetGeomScreen`: menu, title, and other overlay calls have their own 2D/UI intent. This has no shipping address or runtime confirmation until RE-02/RE-07 exist.
+- evidence: MEASURED 2026-08-24 by `tools/re_heap.py` on the owned SLUS_010.40 (sha1-gated): the image's unique arena-argument call site `0x80042B2C` (`lui a0,0x8010/ori 0xC000/lui a1,0xF/jal X/ori a1,0x2000`, found among 83,964 scanned word-aligned candidates, exactly one match) targets `vs_main_initHeap 0x80043F74`; the callee's own store sequence names free-list heads `heapA 0x800501A8` and `heapB 0x800501B8`; rood-reverse's independent labels (CC0) agree on all three. The FIRST decomp-seeded native body is `game/core/game_heap.cpp` (`vagrant::heap::initHeap`, from rood-reverse main.c `vs_main_initHeap`, CC0), installed through psxport's override registry as `{0x80043F74, initHeap, gen_func_80043F74}` via `shard_set_override`. LIVE GATES, all against pinned psxport d2266f4b on the real disc run: (1) REACHED — `[mirror-verify] 0x80043F74 OK (pass #1)` prints ONLY inside the override dispatch path after running BOTH legs (an uninstalled override runs substrate directly and can print nothing), so the OK line is simultaneously install-proof, ran-proof, and byte-match; (2) BYTE/SBS — mirror-verify compares every touched RAM byte + scratchpad + v0/v1/s0-s7/t8/sp/fp/ra/hi/lo between the native leg and the pure-substrate leg on live guest state; (3) DISCRIMINATOR RAN BOTH WAYS — a deliberately sabotaged body (`blockSz = value>>4` instead of `value>>4 - 1`) turned the same gate RED naming the exact bytes (`MISMATCH ram 0x8010C008: native=00 substrate=FF`) and aborted, so a hollow gen-vs-gen pass cannot produce the green line. The hermetic `vagrant_game_heap_test` pins the body's 11-word contract on a real Core without a disc. Instrument negatives: destroyed call-site shape, destroyed capacity shift, duplicated caller, and a +4 shipping constant are each refused with denominators (`re_heap.py --selftest`: 5/5 PASS).
+- where: game/core/game_heap.{h,cpp} (facts + native body + registry wiring in VagrantRuntime::registerOverrides) + tools/re_heap.py (instrument and shipped-vs-measured gate) + tests/test_game_heap.cpp (hermetic contract)
+- gap: NONE for the first body's ownership claim. Ownership covers this ONE initialiser; `vs_main_allocHeap`/`freeHeap` and every other decomp-backed function stay on the substrate until their own measured step. The ovhit atexit hit-count dump cannot fire in this window because both of its end states abort (menu-boundary fail-fast with input, intro-movie wait-stall without); the mirror-verify line carries the reach proof instead.
+- notes: rood-reverse is ~55-63% matched overall (its own decomp.dev badges; not measured here — and the psxport port's axis is SBS RAM parity, not object identity, so the two percentages are not comparable). The consumption pattern proven here — measure from our bytes, lift the CC0 body readable, install {addr, native, gen}, prove reached+byte-exact, sabotage-discriminate — is the template every later body reuses. Widescreen source lead only: BATTLE/BATTLE.PRG's matching reference resets `SetGeomOffset(160,112)` every frame, initializes the battle view through `func_800760CC(0x140,0xF0,projectionDistance,...)`, and changes projection via `vs_battle_setProjectionDistance`. `projectionDistance` also changes during camera transitions. A future wide implementation must target that world-camera path, not globally replace `SetGeomOffset`/`SetGeomScreen`: menu, title, and other overlay calls have their own 2D/UI intent. This has no shipping address or runtime confirmation until BATTLE is emitted and reached.
 
 ## platform
 

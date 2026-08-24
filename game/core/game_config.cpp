@@ -24,6 +24,7 @@
 // fill a field, add the measurement and a shipping-value gate; a plausible citation alone is not a
 // discriminator.
 #include "game_iface.h"
+#include "input/pad_facts.h"
 #include "legacy_game_interface.h"
 #ifdef VAGRANT_HAVE_SUBSTRATE
 #include "overlay_table.h"
@@ -225,15 +226,6 @@ static_assert(kGp == kBssZeroLo - 4u,
               "load/stores in code (measured — 4 candidate encodings in the whole image, all 4 inside "
               "byte-ramp DATA tables), so nothing but that instruction pair can confirm gp");
 
-// RE-06, MEASURED by tools/re_pad.py from the unique _sysInit -> PadInitDirect
-// call sequence and PadInitDirect's own stores into its per-port driver
-// records.
-static constexpr uint32_t kPadSlot0Buf = 0x8005DFF0u;
-static constexpr uint32_t kPadSlot1Buf = 0x8005E012u;
-static constexpr uint32_t kPadSlotPtrTable = 0x8003FCF0u;
-static constexpr uint32_t kPadSlotPtrStride = 240u;
-static_assert(kPadSlot1Buf - kPadSlot0Buf == 34u);
-
 // RE-09, MEASURED by tools/re_spu_transfer.py from libapi's low-level DMACallback owner. The owner
 // indexes this eight-word table by channel*4; Sony libspu's adapter fixes the channel to DMA4. The
 // framework already completes the real DMA4 transfer and reads this exact table at its deferred
@@ -359,11 +351,11 @@ static const GameConfig g_vagrant_cfg = {
     // shipped constants and field bindings back to the measurement.
     // padDriverFn remains zero because psxport never reads that legacy field;
     // Pad::serviceFrame writes through the table/fixed buffers.
-    .padSlot0Buf = kPadSlot0Buf,
-    .padSlot1Buf = kPadSlot1Buf,
+    .padSlot0Buf = vagrant::pad::kSlot0Buffer,
+    .padSlot1Buf = vagrant::pad::kSlot1Buffer,
     .padDriverFn = 0,
-    .padSlotPtrTable = kPadSlotPtrTable,
-    .padSlotPtrStride = kPadSlotPtrStride,
+    .padSlotPtrTable = vagrant::pad::kDriverPointerTable,
+    .padSlotPtrStride = vagrant::pad::kDriverPointerStride,
 
     // --- platform HLE (the hardware-sync primitives) ------------------------------- RE-04/08 --
     .hle = {},

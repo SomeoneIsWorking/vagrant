@@ -54,6 +54,11 @@ int main() {
     std::fprintf(stderr, "VagrantContext did not retain TITLE movie producer state\n");
     return 1;
   }
+  context->titleMenu.frameCompleted();
+  if (!context->titleMenu.frameReady()) {
+    std::fprintf(stderr, "VagrantContext did not retain TITLE menu producer state\n");
+    return 1;
+  }
 
   runtime.registerOverrides(*game);
   if (g_cdRegistrations != 1 || g_vblankRegistrations != 1) {

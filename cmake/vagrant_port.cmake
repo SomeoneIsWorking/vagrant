@@ -24,9 +24,12 @@ include(${PSXPORT_DIR}/cmake/psxport.cmake)
 # recomp_register.cpp is excluded because it is the one TU that names generated symbols.
 set(GAME_SRC
   game/core/game_config.cpp
+  game/core/game_heap.cpp
   game/core/game_hooks.cpp
   game/core/main.cpp
   game/core/vagrant_runtime.cpp
+  game/input/pad_delivery.cpp
+  game/render/title_menu.cpp
   game/render/title_movie.cpp
   game/render/title_startup.cpp
   game/render/title_startup_recipe.cpp
@@ -66,8 +69,11 @@ if(BUILD_TESTING)
   add_executable(vagrant_runtime_test
     tests/test_vagrant_runtime.cpp
     game/core/game_config.cpp
+    game/core/game_heap.cpp
     game/core/game_hooks.cpp
     game/core/vagrant_runtime.cpp
+    game/input/pad_delivery.cpp
+    game/render/title_menu.cpp
     game/render/title_movie.cpp
     game/render/title_startup.cpp
     game/render/title_startup_recipe.cpp)
@@ -76,6 +82,14 @@ if(BUILD_TESTING)
   set_target_properties(vagrant_runtime_test PROPERTIES
     CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
   add_test(NAME vagrant_runtime_test COMMAND vagrant_runtime_test)
+  add_executable(vagrant_game_heap_test
+    tests/test_game_heap.cpp
+    game/core/game_heap.cpp)
+  target_include_directories(vagrant_game_heap_test PRIVATE game game/core)
+  target_link_libraries(vagrant_game_heap_test PRIVATE psxport)
+  set_target_properties(vagrant_game_heap_test PROPERTIES
+    CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+  add_test(NAME vagrant_game_heap_test COMMAND vagrant_game_heap_test)
   add_executable(vagrant_title_recipe_test
     tests/test_title_startup_recipe.cpp
     game/render/title_startup_recipe.cpp)

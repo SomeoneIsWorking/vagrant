@@ -156,8 +156,8 @@ def configure_and_build(psxport, cc, cxx):
 
 def launch(psxport):
     say(
-        "launching the current resident + TITLE-overlay bootstrap headlessly; later overlays and "
-        "gameplay remain fail-fast boundaries…"
+        "launching the current resident + TITLE startup/movie/menu frontier headlessly; later "
+        "TITLE functions, overlays, and gameplay remain fail-fast boundaries…"
     )
     os.environ.setdefault("PSXPORT_ASSET_DIR", str(psxport))
     os.environ["PSXPORT_VK_HEADLESS"] = "1"
@@ -187,7 +187,7 @@ def execute(
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(
-        description="Provision, build, and launch the current Vagrant Story TITLE-overlay bootstrap."
+        description="Provision, build, and launch the current Vagrant Story TITLE frontier."
     )
     parser.add_argument(
         "disc",

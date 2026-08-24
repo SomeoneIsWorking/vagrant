@@ -1,10 +1,10 @@
-# Vagrant Story — a PC-native port (TITLE 24-bit intro stage)
+# Vagrant Story — a PC-native port (TITLE menu stage)
 
 A PC-native port of **Vagrant Story** (PS1, USA, `SLUS_010.40`) built on the
-[psxport](https://github.com/SomeoneIsWorking/psxport) static-recompilation framework, vendored here as
-`external/psxport`.
+[psxport](https://github.com/SomeoneIsWorking/psxport) static-recompilation framework, resolved at
+`external/psxport` by `tools/psxport_sync.py`.
 
-## Status: TITLE's publisher splashes and first 24-bit intro frames render; no title menu or gameplay
+## Status: a forced Start skip reaches and renders the first TITLE menu; no gameplay
 
 Created 2026-08-12. An owner-provisioned, gitignored resident + TITLE substrate now builds and runs. It
 executes measured crt0 and guest main, completes `_initRand`, and now completes `_diskReset`'s Pause
@@ -25,7 +25,16 @@ RE-13 derives the intact TITLE libpress/MDEC output callback, completion field, 
 display dimensions. Its retained-super producer presents live guest-decoded VRAM at VBlank; a
 shipping real-disc `present_200` is coherent and 678,339/691,200 pixels are non-black. The
 producer-disabled negative still completes 4,000 DMA1 outputs and reaches the same 24-bit mode but
-has no `present_200`. What exists:
+has no `present_200`. RE-14 measures Vagrant's high-byte-first pad consumer and TITLE's two-pass menu
+owner. The derived runtime services the shared pad once per intact guest VBlank, applies only the
+measured packet-byte adaptation, and retains the generated `_drawTitleMenuItems` body. A recorded
+Start press exits the intro, the intact title code switches to 15-bit 512x224, and the neutral
+presenter displays the readable Vagrant Story/New Game/Continue/Sound menu. Disabling only the menu
+producer retains the transition but reproduces the 65,536-item queue fail-fast with the matching
+present absent. Normal movie completion, XA/STR teardown, later menu interaction, and gameplay remain
+open. RE-07 also establishes the first matching-decomp ownership slice: native
+`vs_main_initHeap` is measured from the retail executable and mirror-verifies byte-exact against its
+retained generated body on the live boot path. What exists:
 
 - disc → executable provisioning from **your own** disc image (nothing game-derived is in this repo),
 - a process-lifetime derived `VagrantRuntime` that owns the direct-native render default, boot, and
@@ -38,39 +47,35 @@ has no `present_200`. What exists:
   heap-allocated OT/packet buffers cannot be encoded by the legacy fixed-layout GameConfig fields.
   These facts are gated back to the owned images; the first direct-native TITLE sprite producer is
   measured and gated by `tools/re_title_startup.py`; the live TITLE movie producer is measured and
-  gated by `tools/re_title_movie.py`,
+  gated by `tools/re_title_movie.py`; the pad-delivery and menu-pass owners are gated by
+  `tools/re_pad.py` and `tools/re_title_menu.py`; the first native heap body is gated by
+  `tools/re_heap.py` and the live mirror verifier,
 - the project registries (`docs/re-frontier.md`, `docs/codemap.md`, `docs/info/`, `docs/issues/`),
 - a vendored CC0 **matching decompilation** of this exact executable, `external/rood-reverse`, whose
   target images are *measured* to be byte-identical to the ones on this disc (21/21).
 
-`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-14 is the
-next frame step: verify normal movie completion and Start-skip teardown, then root-cause the first
-missing title-menu producer without treating live-VRAM movie scanout as a generic renderer.
+`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. The next
+reached code boundary is missing TITLE function `0x800798A4`. Normal movie completion and XA/STR
+teardown remain independently unverified; a forced skip is not evidence for either.
 
 ## Getting started
 
-**Do NOT use `git clone --recurse-submodules` or `git submodule update --init --recursive` on this
-tree.** Both ABORT partway: `external/psxport/vendor/beetle-psx` nests a URL-less
-`deps/lightning/gnulib`, and a recursive operation dies on it *after* cloning beetle and *before*
-reaching `vendor/lucent` — leaving lucent's worktree empty with every file staged-deleted, and cmake
-then failing on a missing `CMakeLists.txt`. Measured 2026-08-11; see
-`external/psxport/docs/workspace/KNOWN-DEFECT-sync-submodules.md`. Init the vendors ONE AT A TIME,
-non-recursively, exactly as `psxport/scripts/bootstrap-workspace.sh` does:
+**Do NOT use `git clone --recurse-submodules` or `git submodule update --init --recursive`.** The
+framework is no longer a game-repo submodule, and beetle-psx still contains a URL-less nested gitlink
+that makes recursive initialization fail. Resolve the framework through its one authoritative tool;
+it links the shared workspace checkout when present or creates a private clone at `psxport.pin` and
+initializes only the required vendors:
 
 ```sh
 git clone <this repo> && cd vagrant
-git submodule update --init external/psxport external/rood-reverse
-for sm in vendor/beetle-psx vendor/lucent; do                    # one at a time, NEVER --recursive
-  git -C external/psxport submodule update --init "$sm"
-  git -C "external/psxport/$sm" reset --hard -q HEAD             # repairs a half-checkout
-done
-git -C external/psxport/vendor/beetle-psx submodule update --init deps/libchdr   # CHD disc access
+python3 tools/psxport_sync.py --auto
+git submodule update --init external/rood-reverse
 cp .env.example .env && $EDITOR .env                # point it at your own disc image (.env is gitignored)
 python3 tools/extract_exe.py                        # extract + identity-check SLUS_010.40
 python3 tools/extract_overlays.py                   # extract + identity-check TITLE.PRG
 python3 tools/verify_decomp_targets.py              # does the vendored decomp target our bytes? (21/21)
 cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-cmake --build build --target vagrant_seam vagrant_runtime_test vagrant_cd_contract_test -j"$(nproc)"
+cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
 python3 tools/re_frontier.py next                   # what to work on
 ```
@@ -83,10 +88,10 @@ scratch trees are excluded.
 `./run.sh` is the default project launcher. With no arguments it uses the disc configured through
 `PSXPORT_VAGRANT_DISC`, `.env`, or a root-level CHD; an explicit CHD path is also accepted. It
 identity-checks the executable and TITLE overlay, only re-emits when their hashed inputs changed,
-builds with Clang, and launches `vagrant_port`. Today that current target is still the honest
-headless TITLE-bootstrap boundary described above, not gameplay. The launcher will grow a window
-when the port owns a real frame loop; until then, headless execution keeps the watchdog on the measured
-guest boundary rather than host surface setup. The normal one-command verification is:
+builds with Clang, and launches `vagrant_port`. Today that current target is the honest headless TITLE
+menu frontier described above, not gameplay. The launcher will grow a window after later title/game
+execution is owned; until then, headless execution keeps the watchdog on the measured guest boundary
+rather than host-surface setup. The normal one-command verification is:
 
 ```sh
 ctest --test-dir build --output-on-failure

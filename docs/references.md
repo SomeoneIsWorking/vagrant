@@ -77,9 +77,11 @@ supply of exactly those bodies** — its own CI already proves each one assemble
 
 No other title in this workspace has that, which is why this port is worth standing up: it is the
 cheapest available test of whether psxport's ownership pipeline can consume a decomp wholesale rather
-than one hand-RE'd function at a time. That test is `RE-07`, and it is blocked on there being a
-substrate to match against (RE-01/RE-02) — importing a body before then would be a hack with a
-citation attached.
+than one hand-RE'd function at a time. `RE-07` now proves the first consumption slice: the measured
+`vs_main_initHeap` body is installed as a retained-super override and mirror-verifies byte-exact on
+the live boot path. The result proves the pipeline for one body, not wholesale ownership of the
+decomp; allocator operations and every later candidate still require their own measured reach and
+mirror gate.
 
 ### Keeping the pin honest
 

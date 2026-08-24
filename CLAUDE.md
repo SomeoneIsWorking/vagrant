@@ -11,7 +11,7 @@ diagnostics through `lucent`, the registries, and never editing `external/psxpor
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
-## THE STATE OF THIS PORT: TITLE's first 24-bit intro frames render natively
+## THE STATE OF THIS PORT: a forced Start skip reaches the first readable TITLE menu
 
 Created 2026-08-12. Seven groups are re-verified and one frame group is measured-partial: the
 **crt0/boot group** (`RE-01`, `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), all
@@ -45,10 +45,23 @@ The shipping real-disc run produces coherent animated intro frames, including `p
 678,339/691,200 non-black pixels. A producer-disabled build still completes 4,000 DMA1 outputs and
 reaches the same 24-bit mode but emits no `present_200`.
 
-This is still not the title menu or gameplay. Full intro completion, Start-skip, XA/audio teardown,
-and the transition into the measured TITLE menu presenter remain RE-14. RE-05 independently measures
-the later overlay-owned presenters and dynamic OT/pool contract. XA, the other 19 non-empty overlays,
-later native graphics production, and every other
+RE-14 measures the high-byte-first pad consumer and TITLE's two-pass menu owner. A per-Core input
+product services the shared host/replay pad once per intact guest VBlank and applies only the measured
+packet-byte adaptation. A recorded Start press exits the intro; intact title code crosses its
+`VSync(1)` wait, switches to 15-bit 512x224, and builds a readable Vagrant
+Story/New Game/Continue/Sound screen. `TitleMenuProducer` retains the generated
+`_drawTitleMenuItems` body and owns only the completed-pass fence. Disabling only that producer keeps
+the guest transition but reproduces the 65,536-item queue fail-fast with the matching present absent.
+Normal movie completion, XA/STR teardown, later menu interaction, and gameplay remain unverified.
+
+RE-07 owns the first decomp-seeded native body: `tools/re_heap.py` derives `vs_main_initHeap`
+`0x80043F74` and its two free-list heads from the retail executable, and the readable CC0-derived body
+is paired with the retained generated function through the override registry. The live mirror gate
+proves it installed, ran, and byte-matched; a deliberate capacity sabotage turns that same gate red.
+Allocator operations and every other decomp body remain on the substrate until separately measured.
+
+RE-05 independently measures the later overlay-owned presenters and dynamic OT/pool contract. XA,
+the other 19 non-empty overlays, later native graphics production, and every other
 unmeasured guest-address group in
 `game/core/game_config.cpp` stay `0` with their open steps named in `docs/re-frontier.md`. A framework
 defect found while measuring crt0 (issue #3) would give a BIOS
@@ -62,11 +75,16 @@ direct-native project default, measured guest-main dispatch, and CD/VBlank overr
 `GameConfig` groups and unmigrated neutral/fail-fast callbacks. `game/core/legacy_game_interface.h`
 names that debt; new behavior belongs on the derived runtime, not in `GameHooks`.
 
+Host ownership follows Dusklight's current boundary rather than its platform details: the thin entry
+point delegates to a composed runtime, while input conversion, render-pass ownership, and game-heap
+semantics remain separate owners. Here `VagrantRuntime` composes per-Core `PadDelivery` and TITLE
+producers through `VagrantContext`; it does not absorb their implementations or grow `GameConfig`.
+
 `./run.sh` is the stable project launcher. With no arguments it resolves the framework and the disc,
 identity-checks and hash-provisions the resident executable and TITLE overlay, configures both CMake
 trees with Clang, builds `vagrant_port`, and launches that current target. It does not claim gameplay
-or a finished title sequence: RE-13 records live 24-bit intro/MDEC frames, while RE-14 owns movie
-completion and the menu transition. The shell file is
+or a finished title sequence: RE-13 records live 24-bit intro/MDEC frames, while RE-14 owns only the
+measured Start-skip transition to the first menu picture. The shell file is
 deliberately only a Python dispatch; all policy lives
 in `tools/run.py`. An explicit CHD path overrides the normal
 `PSXPORT_VAGRANT_DISC`/`.env`/drop-in resolution order. The current bootstrap target is explicitly
@@ -77,7 +95,7 @@ What DOES build today, and is the gate for a change to the seam:
 
 ```sh
 cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-cmake --build build --target vagrant_seam vagrant_runtime_test vagrant_cd_contract_test -j$(nproc)
+cmake --build build -j$(nproc)
 ctest --test-dir build --output-on-failure
 ```
 
@@ -96,8 +114,11 @@ for overlay slots/seeds, `python3 tools/re_spu_transfer.py --check-config --self
 callback route, `python3 tools/re_vblank.py --check-source --selftest` for resident VBlank
 delivery, `python3 tools/re_frame.py --check-config --selftest` for the overlay-owned presentation
 contract and deliberately-zero fixed-layout fields, or
-`python3 tools/re_title_startup.py --check-source --selftest` for the first TITLE sprite contract, or
-`python3 tools/re_title_movie.py --check-source --selftest` for the TITLE RGB24 movie contract.
+`python3 tools/re_title_startup.py --check-source --selftest` for the first TITLE sprite contract,
+`python3 tools/re_title_movie.py --check-source --selftest` for the TITLE RGB24 movie contract,
+`python3 tools/re_title_menu.py --check-source --selftest` for the completed menu-pass owner,
+`python3 tools/re_pad.py --check-config --selftest` for display-field delivery and byte order, or
+`python3 tools/re_heap.py --check-source --selftest` for the native allocator initialiser.
 These diff shipped values back to the owned bytes. Compiling is not
 enough: the `static_assert`s only check the constants' internal RELATIONS, and `hi - lo == 0x46B20` holds
 just as well when both values are wrong — which is exactly how a reviewer moved `kHeapSizePtr` +4 and
@@ -144,9 +165,9 @@ Three rules for using it, and they are the whole reason this section exists:
 
 Why it matters structurally: psxport's override registry wants `(addr, native, gen)` triples whose
 native body byte-matches the substrate body, and a matching decomp is a **pre-verified supply of exactly
-that**. Testing whether that supply can be consumed wholesale is the point of this port (`RE-07`), and
-it is blocked until there is a substrate to match against. Importing a body before then is a hack with a
-citation attached. Full detail: `docs/references.md`.
+that**. RE-07 now proves that pipeline for one measured, reached body (`vs_main_initHeap`); it does not
+grant blanket ownership of the rest. Importing another body without its own reach and mirror gate
+would still be a hack with a citation attached. Full detail: `docs/references.md`.
 
 ## Vagrant-Story-specific facts (measured 2026-08-12 — the whole list, nothing inferred)
 
@@ -195,9 +216,10 @@ citation attached. Full detail: `docs/references.md`.
   `C_011`), libetc (`VSYNC`, `INTR`, `INTR_DMA`), libgpu, libspu, libpad (`PADENTRY`), libds, libc.
   That says which SHAPES to look for; it says nothing about where they are in this image.
 
-Everything else about this game — the loader contract beyond its three static slot words, the frame
-loop, OT/packet-pool dance, scene model, and platform HLE windows — is **unknown**. The libpad buffer
-destinations are measured; no live frame owner services them yet. Do
+Everything else about this game — the loader contract beyond its three static slot words, the later
+menu/game frame loop, OT/packet-pool dance, scene model, and platform HLE windows — is **unknown**.
+The libpad destinations, packet byte order, and VBlank delivery owner are measured through the first
+menu picture; later interaction semantics are not. Do
 not let a plausible-sounding sentence in a doc elsewhere stand in for it.
 
 ## The rules that bite hardest here

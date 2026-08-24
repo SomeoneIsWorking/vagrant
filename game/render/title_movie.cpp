@@ -75,7 +75,7 @@ bool TitleMovieProducer::present(Core &core) {
   RenderQueue &queue = core.game->activeRq();
   queue.reset();
   queue.flush(&core);
-  core.game->fps60.present_vk(&core);
+  core.game->presentation.commit(&core);
   lucent::debug("vagrant-title-movie", "presented completed guest-decoded TITLE movie frame");
   return true;
 }

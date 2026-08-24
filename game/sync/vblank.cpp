@@ -10,8 +10,10 @@
 
 #include "core.h"
 #include "override_registry.h"
+#include "render/title_menu.h"
 #include "render/title_movie.h"
 #include "render/title_startup.h"
+#include "vagrant_context.h"
 #include <lucent/log.h>
 
 extern void gen_func_8001FF94(Core *);
@@ -31,9 +33,14 @@ bool s_clockArmed = false;
 void vagrant_vblank_turn(Core *c) {
   const uint32_t before = c->mem_r32(kVBlankCounter);
   rec_dispatch(c, kVBlankHandler);
+  // RE-06 measured the two buffers consumed by Vagrant Story's intact libpad state decoder. The
+  // resident program never returns to psxport's generic native frame loop, so this owned display
+  // field is also the only faithful point at which host input can replace the console's VBlank SIO
+  // transfer before guest code resumes and reads those buffers.
+  static_cast<vagrant::VagrantContext *>(c->gameCtx)->padDelivery.serviceField(*c);
   // The two TITLE products occupy consecutive guest phases. Keep one present per field even at the
   // transition: an immediate splash sprite wins the field; otherwise a completed MDEC frame scans out.
-  if (!vagrant::presentTitleStartup(*c)) {
+  if (!vagrant::presentTitleStartup(*c) && !vagrant::presentTitleMenu(*c)) {
     vagrant::presentTitleMovie(*c);
   }
   lucent::debug("vagrant-vblank", "guest VBlank handler advanced counter {} -> {}", before, c->mem_r32(kVBlankCounter));
