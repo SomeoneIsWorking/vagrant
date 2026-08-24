@@ -47,9 +47,8 @@ target_compile_options(vagrant_seam PRIVATE -g)
 # This test compiles the exact command classifier used by the shipping owner. It needs neither the
 # provisioned executable nor generated code, so a bare clone can prove every accepted control ID and
 # the refusal side of the ownership boundary.
-include(CTest)
 if(BUILD_TESTING)
-  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  include(CTest)
 
   add_executable(vagrant_cd_contract_test tests/test_ds_control_contract.cpp)
   set_target_properties(vagrant_cd_contract_test PROPERTIES

@@ -34,6 +34,18 @@ class Overlay:
 
 OVERLAYS = (
     Overlay(
+        stem="BATTLE",
+        disc_path="BATTLE/BATTLE.PRG",
+        reference_config=ROOT
+        / "external/rood-reverse/config/BATTLE/BATTLE.PRG/splat.yaml",
+    ),
+    Overlay(
+        stem="INITBTL",
+        disc_path="BATTLE/INITBTL.PRG",
+        reference_config=ROOT
+        / "external/rood-reverse/config/BATTLE/INITBTL.PRG/splat.yaml",
+    ),
+    Overlay(
         stem="TITLE",
         disc_path="TITLE/TITLE.PRG",
         reference_config=ROOT

@@ -1,12 +1,13 @@
 ---
 id: C018
 kind: claim
-status: holds
+status: falsified
 created: 2026-08-22
 tags: launcher,overlay,title
 depends: tools/run.py#execute, tools/extract_overlays.py#provision, tests/test_launcher.py
 reconfirmed: 2026-08-22 18:14:40
 verified_at: 2026-08-22 18:14:40
+falsified_on: 2026-08-24
 ---
 
 ## Claim
@@ -24,3 +25,9 @@ if ./run.sh needs a hidden mode/argument, re-emits unchanged input, selects a no
 ## Re-confirmed 2026-08-22 18:14:40
 
 2026-08-22 against recorded/built psxport ad5cf802: zero-argument ./run.sh provisions exact resident+TITLE, builds with Clang, renders the publisher splash, then reaches the documented 24-bit boundary
+
+## FALSIFIED 2026-08-24
+
+The player launcher intentionally stopped enforcing Clang identity: the fresh-clone contract now accepts any configured compiler that demonstrates the required C11/C++20 capabilities, so C018's non-Clang falsifier and Clang-only product claim no longer describe the shipping launcher.
+
+> Anything that cited this claim as proof must be re-checked. Grep the repo for it.

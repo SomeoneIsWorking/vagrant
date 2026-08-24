@@ -22,4 +22,6 @@ Against psxport d2266f4b and the owned SLUS_010.40 disc, shipping `scratch/logs/
 
 ## Next boundary
 
-The shipping run next fails honestly at missing TITLE function `0x800798A4` from caller `0x80042C14`; no later menu interaction or stream teardown is claimed.
+The shipping run next fails at `0x800798A4` from caller `0x80042C14`. RE-15 later proved this is
+BATTLE's real entry after the guest loads BATTLE+INITBTL, not a TITLE function; issue #21 owns that
+separate overlay-inventory boundary. No later menu interaction or stream teardown is claimed here.

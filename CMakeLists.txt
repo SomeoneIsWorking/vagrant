@@ -58,6 +58,8 @@ message(STATUS "psxport commit: ${PSXPORT_RESOLVED_SHA}")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+option(BUILD_TESTING "Build the Vagrant Story verification targets" ON)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 find_package(ZLIB REQUIRED)
 find_package(zstd CONFIG QUIET)

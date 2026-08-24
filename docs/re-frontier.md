@@ -19,11 +19,11 @@ intended behaviour of the real target being reproduced.
 Statuses: ✅ re-verified · 🟡 re-partial (honest gap) · 🔬 in-progress · ⛔ hack (debt, must remove) ·
 ⬜ todo · ➖ skip-by-design · ⏸ blocked (computed).
 
-## THE STATE OF THIS PORT, 2026-08-22: Start skips the live intro into a readable TITLE menu
+## THE STATE OF THIS PORT, 2026-08-25: Start skips the live intro and enters BATTLE initialization
 
 `RE-01` (crt0/boot), `RE-02` (resident seed set/substrate), and `RE-03` (all non-empty `.PRG` load
 bases) are `re-verified`. The emitter's mandatory PS-EXE entry root plus one measured Sony
-`HookEntryInt` return PC plus TITLE's resident references expand to 799 resident functions. `main` remains
+`HookEntryInt` return PC plus reached-overlay resident references expand to 882 resident functions. `main` remains
 empty; `main_reentry` contains only `0x8001FAD0`. The built port executes the measured
 crt0 plan, handles InitHeap, enters guest main at `0x80042C38`, and, against pinned psxport
 `3418a79b`, completes `_initRand`. RE-04 now owns blocking `DsControlB` at `0x80025BE4`; a bounded run completes
@@ -51,7 +51,9 @@ wait. TITLE then changes to 15-bit 512x224 and its retained `_drawTitleMenuItems
 readable Vagrant Story/New Game/Continue/Sound screen. Disabling only that completed-pass producer
 leaves the same transition intact but reproduces the 65,536-item queue fail-fast with the matching
 present absent. Normal movie completion, XA/STR teardown, later menu interaction, and gameplay are
-not claimed; the next reached code boundary is missing TITLE function `0x800798A4`.
+not claimed. RE-15 proves the former `0x800798A4` miss is BATTLE's real entry after the guest loads
+BATTLE+INITBTL. One bounded run executes both BATTLE `0x800798A4` and INITBTL `0x800FA35C`, then
+exposes the next emitter boundary at BATTLE `0x800E6EAC`.
 
 The resident substrate now executes the RE-01 plan through guest main. That does not mean gameplay
 boots: platform HLE and CD/overlay loading remain later frontier steps. The earlier fail-fast at the
@@ -84,7 +86,7 @@ measures it against this executable.
 - deps: RE-01
 - evidence: The framework emitter was run on the owned, SHA-verified SLUS_010.40 with this game's seed file and no overlay directory. Its root contract is `{exe.entry} | explicit main seeds | explicit main_reentry seeds | pointer/table discoveries`; the measured PS-EXE entry is `0x8001F544`. Natural `main` seeds remain empty. Correct HookEntryInt delivery exposed a genuine mid-function miss at `0x8001FAD0`: `tools/re_vblank.py` derives Sony libetc owner `0x8001FA68`, its `setjmp` call at `0x8001FAC8`, buffer `0x80031084`, saved return PC `0x8001FAD0`, and HookEntryInt call at `0x8001FAF0`. The missing-seed negative `scratch/logs/re05-reentry.log` fails exactly there. With that one `main_reentry`, the emitter reports `261 seeds -> 744 recompiled after jal discovery` and generates both `gen_func_8001FAD0` and its dispatcher case; `scratch/logs/re05-final-irq-dma.log` executes it without a recompilation miss. This falsifies C007's older empty-both-lists claim. The earlier `recMainLo/Hi=0` failure remains a separately proven routing-range defect, removed by configuring the PS-EXE physical text range `[0x00010000,0x00062000)` rather than adding a seed.
 - where: game/recomp_seeds.json (empty natural main list plus one measured main_reentry) + tools/re_vblank.py (saved-PC instrument/gate) + game/core/game_config.cpp (physical main routing range) + game/core/recomp_register.cpp (generated registry) + generated/ (gitignored emitter output)
-- gap: The resident substrate now contains 799 functions because TITLE contributes 85 resident references; RE-11 owns the separate 137-function TITLE module. Future resident misses may extend explicit seeds only with image provenance and runtime rationale.
+- gap: The resident substrate now contains 882 functions because the reached TITLE/BATTLE/INITBTL images contribute 209 resident references; RE-11 owns the separate TITLE module and RE-15 owns BATTLE/INITBTL provisioning. Future resident misses may extend explicit seeds only with image provenance and runtime rationale.
 - notes: Reproduce from a provisioned executable with `mkdir -p generated && PSXPORT_SHARDS=8 python3 "${PSXPORT_DIR:-external/psxport}/tools/recomp/emit.py" scratch/bin/vagrant/SLUS_010.40 generated/recompiled.c --seeds game/recomp_seeds.json`, then configure/build normally. Generated code remains gitignored and must never be edited.
 
 ## overlays
@@ -94,7 +96,7 @@ measures it against this executable.
 - deps:
 - evidence: MEASURED 2026-08-14 by `tools/re_overlay.py` on the owned disc: 22 code-image directory entries = boot executable + 21 `.PRG`; `MENU/MENUA.PRG` is exactly 0 bytes and therefore has no code/base; all 20 non-empty `.PRG` images are verified. M2 independently derives placement from each image's own absolute `jal` targets × non-leaf function-entry offsets: BATTLE/TITLE/ENDING = `0x80068800`; INITBTL/SCREFF2/MAINMENU = `0x800F9800`; MENU0-5,7-9,B-F = `0x80102800`. Margins are printed per image (minimum accepted: MENU1 and SCREFF2, 2.00x; maximum: TITLE, 12.71x), with zero undecided. M3 parses each rood-reverse PRG config, first requires OUR extracted image's SHA-1 to equal that config's SHA-1, then compares M2's answer with its independent `vram`: 20 checked, 20 identity matches, 20 address agreements, 0 missing/mismatch/extra. Resident executable M1 independently finds all three values in four contiguous words at `0x80010000..0x8001000C`, though only 1/14 candidate call sites yields a disc descriptor; the other 13 are reported as unresolved rather than used to name files. `--selftest`: 7/7 PASS, 0 SKIP — PS-EXE-header truth, shifted-image answer moves by -4, destroyed entries refuse, one-byte image mutation fails SHA before address, +4 reference-vram mutation fails address after SHA, bad LBA rejected/good accepted, and +4 shipping slot plus +4 BATTLE seed are both named by `--check-config`. `--check-config`: 24/24, comparing the three shipped `GameConfig` slots plus all 20 explicit seed mappings back to this measurement.
 - where: tools/re_overlay.py (instrument and shipping gate) + game/recomp_seeds.json (20 explicit overlay_bases) + game/core/game_config.cpp (3 overlaySlots)
-- gap: All 20 bases are complete. RE-11 emits and live-routes TITLE at 0x80068800; the other 19 non-empty modules retain measured bases but are not emitted yet. A slot target must never be added as a resident seed.
+- gap: All 20 bases are complete. RE-11 emits and live-routes TITLE; RE-15 emits and enters BATTLE plus INITBTL. The other 17 non-empty modules retain measured bases but are not emitted yet. A slot target must never be added as a resident seed.
 - notes: Three slots serve 20 non-empty modules; the twenty-first `.PRG`, MENUA, is 0 bytes and correctly absent from the seed map. M1's 13 unresolved candidate sites remain explicit coverage limits and are not inputs to the per-file verdict.
 
 ## cd
@@ -144,7 +146,7 @@ measures it against this executable.
 - deps: RE-03, RE-10
 - evidence: TITLE/TITLE.PRG from the owned disc is 554568 bytes and SHA-1 f74a76e6215edebf607d0c2af56481050edb139a, matching rood-reverse's exact target; tools/extract_overlays.py verifies this on every provision. emit.py registers one fixed module at measured [0x80068800,0x800EFE48), and tools/ensure_recomp.py refuses generated output missing TITLE/ov_title_func_80071334. Live headless scratch/logs/title-overlay-first-run.log routes resident jal 0x80042BD8 through ov_title_func_80071334 and into TITLE GPU work; the former recomp-MISS is absent. tests/test_overlay_inputs.py proves matching, hash-mismatch, unowned-input, and missing-entry answers.
 - where: tools/extract_overlays.py + tools/ensure_recomp.py + game/core/recomp_register.cpp
-- gap: Only TITLE is emitted. The live visual boundary is RE-12; the remaining 19 non-empty overlays still have measured bases but no emitted modules.
+- gap: TITLE's provisioning and routing are complete. RE-15 separately provisions and enters BATTLE plus INITBTL; the remaining 17 non-empty overlays still have measured bases but no emitted modules.
 - notes: Generated C and extracted PRG bytes stay gitignored. The tracked tools own reproducibility and provenance.
 
 ### RE-12 — TITLE initialization to first non-black native presentation
@@ -168,15 +170,15 @@ measures it against this executable.
 - deps: RE-13
 - evidence: Against pinned psxport d2266f4b, tools/re_pad.py uniquely derives the guest high-byte-first button decoder at 0x800431B0 and gates per-Core VBlank delivery/normalization (6/6). Forced active-low Start exits _playIntroMovie after 14 live MDEC frames. The shared deterministic VSync(1)/root-counter1 implementation lets intact _initTitleScreen pass its 248-HSync wait and switch from 24-bit 320x224 to 15-bit 512x224. SHA-bound tools/re_title_menu.py scans 138572 candidates, uniquely derives the two-pass owner 0x8007093C and completed-items leaf 0x800705AC, gates the retained super-call, and passes 3/3 destructive controls. Shipping present_64 is a readable Vagrant Story/New Game/Continue/Sound menu at 241809/691200 nonblack (SHA256 7b93beaf...); disabling only the semantic menu producer retains guest execution and the mode switch but reaches the 65536-item queue fail-fast with present_64 absent.
 - where: game/input/pad_facts.h + game/input/pad_delivery.{h,cpp} + game/render/title_menu.{h,cpp} + game/core/vagrant_context.h + game/core/vagrant_runtime.cpp + game/sync/vblank.cpp + tools/re_pad.py + tools/re_title_menu.py
-- gap: NONE for the Start-skip transition to the first title-menu picture. Normal movie completion and XA/STR teardown are not claimed. The next reached boundary is missing TITLE function 0x800798A4 from resident caller 0x80042C14 after repeated readable menu presents; later menu interaction, stream teardown, and gameplay remain open.
+- gap: NONE for the Start-skip transition to the first title-menu picture. Normal movie completion and XA/STR teardown are not claimed. RE-15 owns the corrected BATTLE entry classification and its still-pending runtime proof; later menu interaction, stream teardown, and gameplay remain open.
 - notes: The input adapter calls the shared Pad service exactly once per guest field, then applies the retail decoder byte order; no input state is fabricated. The menu override retains the generated _drawTitleMenuItems body and only owns the measured completed-pass fence; guest DrawPrim creates every pixel. Startup/movie/menu all use the neutral FramePresenter, never the removed temporal fps60 product.
 
-### RE-15 — classify TITLE transfer target 0x800798A4
-- status: todo
+### RE-15 — provision and enter the first BATTLE overlays
+- status: re-verified
 - deps: RE-14
-- evidence: Both the 2026-08-24 shipping recorded-input run and the menu-producer-disabled control cross the 24-bit-to-15-bit transition and then fail fast at `0x800798A4` from resident return address `0x80042C14` (`c->pc=0x80010AA4`). The miss report finds no stored RAM word equal to the target, and the active fixed slot is the SHA-bound TITLE overlay. This proves the boundary is execution/discovery, not another missing presentation fence.
-- where: retail TITLE.PRG control flow around 0x800798A4 + resident caller 0x80042C14; `tools/ensure_recomp.py` and `game/recomp_seeds.json` only after classification
-- gap: Determine from the retail TITLE bytes whether 0x800798A4 is a real function entry, computed branch target, or coroutine resume. Add a recompiler seed or discovery rule only after that binary fact is measured; do not guess an entry merely to clear the miss.
+- evidence: Both 2026-08-24 recorded-input controls crossed the title transition and failed at `0x800798A4` from resident `jal` return `0x80042C14`. Static classification on 2026-08-25 corrected the image owner: resident `vs_main_execTitle` loads BATTLE.PRG to `0x80068800` and INITBTL.PRG to `0x800F9800` immediately before its direct `jal 0x800798A4`. Owned-disc BATTLE SHA-1 `d53aaccc...` matches the exact decomp target and its offset `0x110A4` is a normal stack-frame entry; the same offset in TITLE is invalid BLEZ data (`0x190E2594`, nonzero `rt`). BATTLE directly calls INITBTL `0x800FA35C` from `0x800798E4`. Provisioning all three reached images against psxport `aa0b2067` emits 1,974 BATTLE functions including `ov_battle_func_800798A4`, 12 INITBTL functions including `ov_initbtl_func_800FA35C`, and the existing 137-function TITLE module; the exact Clang product build and 7/7 CTests pass. The single authorized bounded Start replay, PID 199806, removes the old miss; host write-watch backtraces contain `ov_battle_func_800798A4`, `ov_battle_gen_800798A4`, and `ov_initbtl_gen_800FA35C`, proving actual execution of both modules. The next miss is BATTLE `0x800E6EAC`, called from INITBTL with return address `0x800FA4A8` while BATTLE is resident.
+- where: `tools/extract_overlays.py` + `tools/ensure_recomp.py` + `tests/test_overlay_inputs.py` + retail resident/BATTLE/INITBTL bytes; no new seed
+- gap: Entry into the first BATTLE/INITBTL pair is verified. Issue #22 owns the next framework defect: cross-overlay target `0x800E6EAC` is emitted only as a predecessor's local label, not as the separate callable entry INITBTL requires. Normal movie completion remains separate.
 - notes: Normal movie completion and XA/STR teardown remain a separate unverified path because RE-14 reaches this boundary through a forced Start skip.
 
 ## ownership

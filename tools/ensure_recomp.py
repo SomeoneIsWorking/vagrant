@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keep Vagrant Story's generated resident + TITLE substrate aligned with its inputs."""
+"""Keep Vagrant Story's generated resident and reached overlays aligned with their inputs."""
 
 import hashlib
 import os
@@ -11,7 +11,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 EXE = ROOT / "scratch/bin/vagrant/SLUS_010.40"
 OVERLAY_DIR = ROOT / "scratch/bin/overlays"
-OVERLAYS = (OVERLAY_DIR / "TITLE.BIN",)
+OVERLAYS = tuple(
+    OVERLAY_DIR / name for name in ("BATTLE.BIN", "INITBTL.BIN", "TITLE.BIN")
+)
 SEEDS = ROOT / "game/recomp_seeds.json"
 GENERATED = ROOT / "generated"
 HASH_FILE = GENERATED / ".recomp.hash"
@@ -58,17 +60,28 @@ def generated_complete():
     if not manifest.is_file():
         return False
     listed = re.findall(r"^\s*(\S+\.c)\s*$", manifest.read_text(), re.MULTILINE)
-    required = {"overlay_table.c", "ov_title_disp.c"}
+    required = {
+        "overlay_table.c",
+        "ov_battle_disp.c",
+        "ov_initbtl_disp.c",
+        "ov_title_disp.c",
+    }
     if not required.issubset(listed) or not all(
         (GENERATED / name).is_file() for name in listed
     ):
         return False
     table = (GENERATED / "overlay_table.c").read_text()
-    dispatch = (GENERATED / "ov_title_disp.c").read_text()
+    battle_dispatch = (GENERATED / "ov_battle_disp.c").read_text()
+    initbtl_dispatch = (GENERATED / "ov_initbtl_disp.c").read_text()
+    title_dispatch = (GENERATED / "ov_title_disp.c").read_text()
     return (
-        '"TITLE", ov_title_dispatch, ov_title_func_index' in table
-        and "const int g_rec_overlay_count = 1;" in table
-        and "ov_title_func_80071334" in dispatch
+        '"BATTLE", ov_battle_dispatch, ov_battle_func_index' in table
+        and '"INITBTL", ov_initbtl_dispatch, ov_initbtl_func_index' in table
+        and '"TITLE", ov_title_dispatch, ov_title_func_index' in table
+        and "const int g_rec_overlay_count = 3;" in table
+        and "ov_battle_func_800798A4" in battle_dispatch
+        and "ov_initbtl_func_800FA35C" in initbtl_dispatch
+        and "ov_title_func_80071334" in title_dispatch
     )
 
 
@@ -93,7 +106,7 @@ def ensure(psxport_dir):
         return
 
     reason = "forced" if force else "inputs or generated output changed"
-    say(f"{reason} — emitting resident + TITLE substrate (version {version})")
+    say(f"{reason} — emitting resident + reached-overlay substrate (version {version})")
     GENERATED.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env.setdefault("PSXPORT_SHARDS", "8")
@@ -109,7 +122,7 @@ def ensure(psxport_dir):
     ]
     result = subprocess.run(command, cwd=ROOT, env=env, check=False)
     if result.returncode:
-        raise RecompError("resident + TITLE substrate emission failed")
+        raise RecompError("resident + reached-overlay substrate emission failed")
     if not generated_complete():
         raise RecompError("emitter returned success but generated/ is incomplete")
     actual_stamp = VERSION_FILE.read_text().strip() if VERSION_FILE.is_file() else ""

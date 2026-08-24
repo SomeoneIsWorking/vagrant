@@ -6,14 +6,13 @@ in this repo goes through it rather than through a second implementation, so "wh
 ONE answer.
 
 WHICH framework checkout it is built from is the same decision CMake makes: $PSXPORT_DIR, defaulting
-to external/psxport, so a bare clone works standalone. Its verified-Clang CMake build lives under
-this repo's gitignored scratch/build/psxport; $PSXPORT_DISCDUMP overrides with a prebuilt binary.
+to external/psxport, so a bare clone works standalone. Its CMake build lives under this repo's
+gitignored scratch/build/psxport; $PSXPORT_DISCDUMP overrides with a prebuilt binary.
 
 Nothing here caches a file list: a stale listing is a silent trap, and the reads are cheap.
 """
+
 import os
-import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -34,7 +33,10 @@ def find(build_if_missing=True):
     override = os.environ.get("PSXPORT_DISCDUMP")
     if override:
         if not os.access(override, os.X_OK):
-            print(f"[discdump] $PSXPORT_DISCDUMP={override} is not executable", file=sys.stderr)
+            print(
+                f"[discdump] $PSXPORT_DISCDUMP={override} is not executable",
+                file=sys.stderr,
+            )
             raise SystemExit(2)
         return os.path.abspath(override)
 
@@ -59,51 +61,43 @@ def find(build_if_missing=True):
     return build(Path(px), build_dir)
 
 
-def _require_clang(compiler, variable):
-    if not shutil.which(compiler):
-        raise SystemExit(f"[discdump] {variable}={compiler} was not found")
-    probe = subprocess.run(
-        [compiler, "--version"], capture_output=True, text=True, check=False
-    )
-    if probe.returncode or "clang" not in (probe.stdout + probe.stderr).lower():
-        raise SystemExit(f"[discdump] {variable}={compiler} is not Clang")
+def configure_command(psxport, build_dir, cc, cxx, python):
+    """Return the test-free player configure for the authoritative disc reader."""
+    return [
+        "cmake",
+        "-S",
+        str(psxport),
+        "-B",
+        str(build_dir),
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DBUILD_TESTING=OFF",
+        "-DPSXPORT_BUILD_TESTS=OFF",
+        f"-DCMAKE_C_COMPILER={cc}",
+        f"-DCMAKE_CXX_COMPILER={cxx}",
+        f"-DPython3_EXECUTABLE={python}",
+    ]
 
 
-def build(psxport=None, build_dir=None, cc=None, cxx=None):
-    """Incrementally build the authoritative disc reader with a verified Clang toolchain."""
+def build(psxport=None, build_dir=None, cc=None, cxx=None, python=None):
+    """Incrementally build the authoritative disc reader with the selected toolchain."""
     psxport = Path(psxport or psxport_dir()).resolve()
-    build_dir = Path(build_dir or os.environ.get("PSXPORT_DISCDUMP_BUILD", DEFAULT_BUILD))
-    cc = cc or os.environ.get("CC", "clang")
-    cxx = cxx or os.environ.get("CXX", "clang++")
-    _require_clang(cc, "CC")
-    _require_clang(cxx, "CXX")
+    build_dir = Path(
+        build_dir or os.environ.get("PSXPORT_DISCDUMP_BUILD", DEFAULT_BUILD)
+    )
+    cc = cc or os.environ.get("CC", "cc")
+    cxx = cxx or os.environ.get("CXX", "c++")
+    python = python or sys.executable
 
     print(f"[discdump] building it from {psxport} (incremental)…", file=sys.stderr)
     jobs = str(os.cpu_count() or 4)
     for cmd in (
-        [
-            "cmake",
-            "-S",
-            str(psxport),
-            "-B",
-            str(build_dir),
-            "-DCMAKE_BUILD_TYPE=Release",
-            f"-DCMAKE_C_COMPILER={cc}",
-            f"-DCMAKE_CXX_COMPILER={cxx}",
-        ],
+        configure_command(psxport, build_dir, cc, cxx, python),
         ["cmake", "--build", str(build_dir), "-j", jobs, "--target", "discdump"],
     ):
         r = subprocess.run(cmd, stdout=subprocess.DEVNULL, check=False)
         if r.returncode != 0:
             print(f"[discdump] FAILED: {' '.join(cmd)}", file=sys.stderr)
             raise SystemExit(2)
-    compiler_files = sorted((build_dir / "CMakeFiles").glob("*/CMakeCXXCompiler.cmake"))
-    if not compiler_files or not re.search(
-        r'^set\(CMAKE_CXX_COMPILER_ID "Clang"\)$',
-        compiler_files[-1].read_text(),
-        re.MULTILINE,
-    ):
-        raise SystemExit("[discdump] configured build is not using Clang")
     for name in ("discdump", "discdump.exe"):
         candidate = build_dir / "tools" / name
         if os.access(candidate, os.X_OK):
@@ -114,9 +108,14 @@ def build(psxport=None, build_dir=None, cc=None, cxx=None):
 def listing(disc, dd=None):
     """Every file on the disc, as a list of (path, lba, size). Raises SystemExit(2) on a bad read."""
     dd = dd or find()
-    out = subprocess.run([dd, "list", disc], capture_output=True, text=True, check=False)
+    out = subprocess.run(
+        [dd, "list", disc], capture_output=True, text=True, check=False
+    )
     if out.returncode != 0:
-        print(f"[discdump] list failed on {disc}:\n{out.stdout}{out.stderr}", file=sys.stderr)
+        print(
+            f"[discdump] list failed on {disc}:\n{out.stdout}{out.stderr}",
+            file=sys.stderr,
+        )
         raise SystemExit(2)
     # `discdump list` prints a bare "DIR/" header line and then each file with its FULL path already
     # prefixed ("BATTLE/BATTLE.PRG   LBA 1100   577828 bytes"). Prepending the header directory again
@@ -126,14 +125,21 @@ def listing(disc, dd=None):
     files = []
     for line in out.stdout.splitlines():
         s = line.strip()
-        if not s or s.startswith(("disc:", "root dir")) or (s.endswith("/") and " " not in s):
+        if (
+            not s
+            or s.startswith(("disc:", "root dir"))
+            or (s.endswith("/") and " " not in s)
+        ):
             continue
         parts = s.split()
         if len(parts) >= 5 and parts[1] == "LBA":
             files.append((parts[0], int(parts[2]), int(parts[3])))
     if not files:
-        print(f"[discdump] list produced ZERO files for {disc} — refusing to report an empty disc "
-              "as a successful read", file=sys.stderr)
+        print(
+            f"[discdump] list produced ZERO files for {disc} — refusing to report an empty disc "
+            "as a successful read",
+            file=sys.stderr,
+        )
         raise SystemExit(2)
     return files
 
@@ -144,10 +150,16 @@ def get(disc, path_on_disc, outdir, dd=None):
     dd = dd or find()
     os.makedirs(outdir, exist_ok=True)
     out = subprocess.run(
-        [dd, "get", path_on_disc, disc, outdir], capture_output=True, text=True, check=False
+        [dd, "get", path_on_disc, disc, outdir],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     dest = os.path.join(outdir, os.path.basename(path_on_disc))
     if out.returncode != 0 or not os.path.isfile(dest):
-        print(f"[discdump] get {path_on_disc} failed:\n{out.stdout}{out.stderr}", file=sys.stderr)
+        print(
+            f"[discdump] get {path_on_disc} failed:\n{out.stdout}{out.stderr}",
+            file=sys.stderr,
+        )
         return None
     return dest

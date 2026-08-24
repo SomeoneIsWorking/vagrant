@@ -1,12 +1,12 @@
-# Vagrant Story — a PC-native port (TITLE menu stage)
+# Vagrant Story — a PC-native port (BATTLE initialization stage)
 
 A PC-native port of **Vagrant Story** (PS1, USA, `SLUS_010.40`) built on the
 [psxport](https://github.com/SomeoneIsWorking/psxport) static-recompilation framework, resolved at
 `external/psxport` by `tools/psxport_sync.py`.
 
-## Status: a forced Start skip reaches and renders the first TITLE menu; no gameplay
+## Status: a forced Start skip reaches BATTLE initialization; no gameplay
 
-Created 2026-08-12. An owner-provisioned, gitignored resident + TITLE substrate now builds and runs. It
+Created 2026-08-12. An owner-provisioned, gitignored resident + reached-overlay substrate now builds and runs. It
 executes measured crt0 and guest main, completes `_initRand`, and now completes `_diskReset`'s Pause
 and Setmode through blocking libds control ownership. It also completes `StartSound`'s DMA4 transfers
 through the measured libapi callback table. The resident VBlank route is now measured too: the host
@@ -31,8 +31,12 @@ measured packet-byte adaptation, and retains the generated `_drawTitleMenuItems`
 Start press exits the intro, the intact title code switches to 15-bit 512x224, and the neutral
 presenter displays the readable Vagrant Story/New Game/Continue/Sound menu. Disabling only the menu
 producer retains the transition but reproduces the 65,536-item queue fail-fast with the matching
-present absent. Normal movie completion, XA/STR teardown, later menu interaction, and gameplay remain
-open. RE-07 also establishes the first matching-decomp ownership slice: native
+present absent. RE-15 corrects the former `0x800798A4` miss to BATTLE's real entry, provisions both
+BATTLE and INITBTL, and proves a bounded Start replay executes BATTLE `0x800798A4` and INITBTL
+`0x800FA35C`. The next boundary is BATTLE `0x800E6EAC`: INITBTL calls it directly, but the emitter
+keeps it only as a preceding BATTLE body's local label instead of a separately callable entry.
+Normal movie completion, XA/STR teardown, later menu interaction, and gameplay remain open. RE-07
+also establishes the first matching-decomp ownership slice: native
 `vs_main_initHeap` is measured from the retail executable and mirror-verifies byte-exact against its
 retained generated body on the live boot path. What exists:
 
@@ -54,9 +58,11 @@ retained generated body on the live boot path. What exists:
 - a vendored CC0 **matching decompilation** of this exact executable, `external/rood-reverse`, whose
   target images are *measured* to be byte-identical to the ones on this disc (21/21).
 
-`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. The next
-reached code boundary is missing TITLE function `0x800798A4`. Normal movie completion and XA/STR
-teardown remain independently unverified; a forced skip is not evidence for either.
+`docs/codemap.md` is the honest inventory; `docs/re-frontier.md` is the ordered RE chain. RE-15
+proves the former `0x800798A4` miss is BATTLE's real entry after the guest replaces TITLE, and a
+bounded run enters both reached BATTLE+INITBTL images. Issue #22 owns the next cross-overlay callable
+entry defect at `0x800E6EAC`. Normal movie completion and XA/STR teardown remain independently
+unverified; a forced skip is not evidence for either.
 
 ## Getting started
 
@@ -64,16 +70,19 @@ teardown remain independently unverified; a forced skip is not evidence for eith
 framework is no longer a game-repo submodule, and beetle-psx still contains a URL-less nested gitlink
 that makes recursive initialization fail. Resolve the framework through its one authoritative tool;
 it links the shared workspace checkout when present or creates a private clone at `psxport.pin` and
-initializes only the required vendors:
+initializes only the required vendors. The player path is:
 
 ```sh
 git clone <this repo> && cd vagrant
-python3 tools/psxport_sync.py --auto
-git submodule update --init external/rood-reverse
 cp .env.example .env && $EDITOR .env                # point it at your own disc image (.env is gitignored)
-python3 tools/extract_exe.py                        # extract + identity-check SLUS_010.40
-python3 tools/extract_overlays.py                   # extract + identity-check TITLE.PRG
-python3 tools/verify_decomp_targets.py              # does the vendored decomp target our bytes? (21/21)
+./run.sh
+```
+
+`run.sh` resolves the framework, initializes the exact-executable reference, provisions the disc
+inputs, generates the recompilation substrate, builds, and launches the current product. For
+maintainer verification after that provisioning:
+
+```sh
 cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
@@ -87,11 +96,16 @@ scratch trees are excluded.
 
 `./run.sh` is the default project launcher. With no arguments it uses the disc configured through
 `PSXPORT_VAGRANT_DISC`, `.env`, or a root-level CHD; an explicit CHD path is also accepted. It
-identity-checks the executable and TITLE overlay, only re-emits when their hashed inputs changed,
-builds with Clang, and launches `vagrant_port`. Today that current target is the honest headless TITLE
-menu frontier described above, not gameplay. The launcher will grow a window after later title/game
+identity-checks the executable plus reached TITLE, BATTLE, and INITBTL overlays, only re-emits when their hashed inputs changed,
+builds with the available `CC`/`CXX` (defaulting to `cc`/`c++`), and launches `vagrant_port`. Compiler
+acceptance is based on compiling a minimal C11/C++20 input, not a compiler-brand allow/deny list.
+Today that current target is the honest headless BATTLE-initialization frontier described above, not gameplay.
+The launcher will grow a window after later title/game
 execution is owned; until then, headless execution keeps the watchdog on the measured guest boundary
-rather than host-surface setup. The normal one-command verification is:
+rather than host-surface setup. `run.sh` is a slim shim over `uv run --frozen`; the locked interpreter
+is propagated through provisioning, generation, and both test-free CMake builds. Use
+`./run.sh --prepare-only` for a non-launching provisioning/build check. The normal maintainer
+verification remains:
 
 ```sh
 ctest --test-dir build --output-on-failure
@@ -99,7 +113,10 @@ ctest --test-dir build --output-on-failure
 
 ## Requirements
 
-cmake ≥ 3.21, pkg-config, SDL3, zlib, zstd, python3, Clang/clang-format/clang-tidy.
+Player launcher: `uv`, CMake ≥ 3.21, Git, pkg-config, glslc, a C11/C++20 compiler, SDL3,
+SDL3_image, FreeType, zlib, and zstd. Missing packaged dependencies are reported with an exact install
+command for the detected supported platform. Maintainer verification additionally requires Clang,
+clang-format, and clang-tidy.
 
 ## Legal
 

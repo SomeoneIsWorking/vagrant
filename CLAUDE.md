@@ -11,7 +11,7 @@ diagnostics through `lucent`, the registries, and never editing `external/psxpor
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
-## THE STATE OF THIS PORT: a forced Start skip reaches the first readable TITLE menu
+## THE STATE OF THIS PORT: a forced Start skip reaches BATTLE initialization
 
 Created 2026-08-12. Seven groups are re-verified and one frame group is measured-partial: the
 **crt0/boot group** (`RE-01`, `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), all
@@ -20,8 +20,8 @@ delivery buffers and their pointer table (`RE-06`, `tools/re_pad.py`), the boot 
 route (`RE-09`, `tools/re_spu_transfer.py`), resident VBlank delivery (`RE-10`,
 `tools/re_vblank.py`), and the overlay-owned presenter/dynamic-buffer contract (`RE-05`,
 `tools/re_frame.py`), plus SHA-bound TITLE extraction/emission/routing (`RE-11`,
-`tools/extract_overlays.py`). The gitignored substrate emits 799 resident functions plus 137 TITLE
-functions, builds `vagrant_port`, executes crt0 and guest main, and
+`tools/extract_overlays.py`). The gitignored substrate emits 882 resident functions plus 137 TITLE,
+1,974 BATTLE, and 12 INITBTL functions, builds `vagrant_port`, executes crt0 and guest main, and
 completes `_initRand`. RE-04 owns blocking `DsControlB` (`0x80025BE4`); the run completes
 `_diskReset` Pause and Setmode, dispatches DMA4 completion, advances through the measured guest
 VBlank handler, and completes four asynchronous WAVE reads plus the 271-sector TITLE.PRG read.
@@ -54,6 +54,12 @@ Story/New Game/Continue/Sound screen. `TitleMenuProducer` retains the generated
 the guest transition but reproduces the 65,536-item queue fail-fast with the matching present absent.
 Normal movie completion, XA/STR teardown, later menu interaction, and gameplay remain unverified.
 
+RE-15 corrects the old `0x800798A4` classification: after TITLE returns, resident code loads BATTLE
+and INITBTL, then calls BATTLE's `vs_battle_exec`. The one bounded replay run executes generated
+BATTLE `0x800798A4` and INITBTL `0x800FA35C`; its next concrete boundary is BATTLE `0x800E6EAC`,
+which INITBTL calls directly but the emitter currently retains only as a preceding BATTLE body's local
+label. Issue #22 owns that generic cross-overlay entry-demotion defect; do not add a Vagrant-only seed.
+
 RE-07 owns the first decomp-seeded native body: `tools/re_heap.py` derives `vs_main_initHeap`
 `0x80043F74` and its two free-list heads from the retail executable, and the readable CC0-derived body
 is paired with the retained generated function through the override registry. The live mirror gate
@@ -61,7 +67,7 @@ proves it installed, ran, and byte-matched; a deliberate capacity sabotage turns
 Allocator operations and every other decomp body remain on the substrate until separately measured.
 
 RE-05 independently measures the later overlay-owned presenters and dynamic OT/pool contract. XA,
-the other 19 non-empty overlays, later native graphics production, and every other
+the other 17 non-empty overlays, later native graphics production, and every other
 unmeasured guest-address group in
 `game/core/game_config.cpp` stay `0` with their open steps named in `docs/re-frontier.md`. A framework
 defect found while measuring crt0 (issue #3) would give a BIOS
@@ -81,12 +87,19 @@ semantics remain separate owners. Here `VagrantRuntime` composes per-Core `PadDe
 producers through `VagrantContext`; it does not absorb their implementations or grow `GameConfig`.
 
 `./run.sh` is the stable project launcher. With no arguments it resolves the framework and the disc,
-identity-checks and hash-provisions the resident executable and TITLE overlay, configures both CMake
-trees with Clang, builds `vagrant_port`, and launches that current target. It does not claim gameplay
-or a finished title sequence: RE-13 records live 24-bit intro/MDEC frames, while RE-14 owns only the
-measured Start-skip transition to the first menu picture. The shell file is
+identity-checks and hash-provisions the resident executable plus reached TITLE, BATTLE, and INITBTL overlays, configures both CMake
+trees with the user's `CC`/`CXX` (or the host `cc`/`c++`), builds `vagrant_port`, and launches that
+current target. Compiler acceptance is capability-based and has no compiler identity allow/deny
+policy. It does not claim gameplay
+or a finished title sequence: RE-13 records live 24-bit intro/MDEC frames, RE-14 owns only the
+measured Start-skip transition to the first menu picture, and RE-15 owns entry into the first
+BATTLE/INITBTL pair. The shell file is
 deliberately only a Python dispatch; all policy lives
-in `tools/run.py`. An explicit CHD path overrides the normal
+in `tools/run.py`, entered through the frozen `uv.lock` environment and propagated to every Python
+subprocess and CMake configure. The isolated player build trees configure with testing disabled; the
+launcher never invokes CTest or builds a test target. `--prepare-only` exercises provisioning and the
+product build without starting the game. Missing native tools/libraries are refused with the exact
+Homebrew, APT, DNF, winget, or vcpkg command for the detected platform. An explicit CHD path overrides the normal
 `PSXPORT_VAGRANT_DISC`/`.env`/drop-in resolution order. The current bootstrap target is explicitly
 headless: it has no frame loop or gameplay window yet, and entering the window presentation path would
 make the watchdog diagnose host-surface setup instead of the measured guest boundary.

@@ -977,8 +977,9 @@ def selftest(disc, out=print):
         f"{fails if fails else ''}")
     out("  Not covered by this selftest, stated explicitly: nothing here observes a RUNNING loader, "
         "so a base that is correct statically but rewritten at run time would pass every check "
-        "above. The resident + TITLE substrate now routes TITLE.PRG's first direct call, "
-        "but this instrument does not observe or validate runtime rewriting (RE-04/RE-05).")
+        "above. The resident + reached-overlay substrate statically contains TITLE, BATTLE, and "
+        "INITBTL, but this instrument does not observe or validate runtime rewriting "
+        "(RE-04/RE-05/RE-15).")
     return 1 if fails else 0
 
 
