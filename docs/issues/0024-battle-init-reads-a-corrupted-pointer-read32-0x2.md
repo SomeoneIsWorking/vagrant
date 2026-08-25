@@ -10,9 +10,13 @@ updated: 2026-08-25
 
 ## Update 2026-08-26
 
-After issue #25's fix (psxport f9b5db8f) an UNATTENDED run now reaches this exact boundary by
-itself: same read32 @0x2414003B, ra 0x8008A058, last-fn ov_battle_gen_80089DC0 (io_read fail-fast,
-scratch/logs/i25-fix10.log). The boundary is reproducible without any pad replay.
+After issue #25's fix (psxport f9b5db8f) a truly HEADLESS run reaches this boundary by itself
+(scratch/logs/i25-cdc-trace.log, .log fix10/unattended: all 'headless sink', zero input channels
+active): same read32 @0x2414003B, ra 0x8008A058, last-fn ov_battle_gen_80089DC0. Trace shows the
+automatic post-intro flow: movie sectors end -> CdlPause -> Setmode 0xA0 (data mode) -> file loads
+at LBA ~7254 -> ov_battle dispatch -> abort. Whether this is the attract DEMO or another automatic
+title transition is NOT yet determined — do not cite the WINDOWED smoke runs for this claim: one of
+them had the operator playing (input-driven reachability proves nothing about the unattended path).
 
 ---
 
