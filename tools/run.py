@@ -376,13 +376,23 @@ def configure_and_build(psxport: Path, cc: str, cxx: str) -> None:
 
 
 def launch(psxport: Path) -> None:
-    say(
-        "launching the current resident + TITLE/BATTLE startup frontier headlessly; BATTLE "
-        "later BATTLE initialization and gameplay remain fail-fast boundaries…"
-    )
     environment = os.environ.copy()
     environment.setdefault("PSXPORT_ASSET_DIR", str(psxport))
-    environment["PSXPORT_VK_HEADLESS"] = "1"
+    # A PLAY LAUNCH MUST OPEN THE GAME WINDOW AND NEVER SELF-DESTRUCT. PSXPORT_WATCHDOG=0
+    # disables the frame-progress abort: it is a diagnostic for agent-driven headless runs,
+    # not something a player's session should die by (the intro movie stalls on unimplemented
+    # XA/STR streaming and would otherwise be killed mid-black-screen). Set PSXPORT_HEADLESS=1
+    # to get the old agent-style headless launch back.
+    environment.setdefault("PSXPORT_WATCHDOG", "0")
+    if os.environ.get("PSXPORT_HEADLESS", "") not in ("", "0"):
+        say(
+            "launching headless (PSXPORT_HEADLESS=1); BATTLE later initialization and gameplay "
+            "remain fail-fast boundaries…"
+        )
+        environment["PSXPORT_VK_HEADLESS"] = "1"
+    else:
+        say("launching the game window; press Start (Enter) during the intro to reach the menu…")
+        environment["PSXPORT_VK_WINDOW"] = "1"
     os.execve(PORT, [str(PORT)], environment)
 
 

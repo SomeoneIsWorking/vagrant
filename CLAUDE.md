@@ -104,9 +104,13 @@ subprocess and CMake configure. The isolated player build trees configure with t
 launcher never invokes CTest or builds a test target. `--prepare-only` exercises provisioning and the
 product build without starting the game. Missing native tools/libraries are refused with the exact
 Homebrew, APT, DNF, winget, or vcpkg command for the detected platform. An explicit CHD path overrides the normal
-`PSXPORT_VAGRANT_DISC`/`.env`/drop-in resolution order. The current bootstrap target is explicitly
-headless: it has no frame loop or gameplay window yet, and entering the window presentation path would
-make the watchdog diagnose host-surface setup instead of the measured guest boundary.
+`PSXPORT_VAGRANT_DISC`/`.env`/drop-in resolution order. `./run.sh` opens the GAME WINDOW by default
+(2026-08-25: a play launch must never be headless nor self-destruct — PSXPORT_WATCHDOG=0 is forced,
+since the intro movie stalls on unimplemented XA/STR streaming and a diagnostic abort killed the
+session mid-play). Set `PSXPORT_HEADLESS=1` for the agent-style headless launch. What a player sees:
+publisher splash → intro movie (freezes partway on the streaming frontier — press Start/Enter to
+skip to the menu) → title menu; New Game enters BATTLE initialization, which still fail-fasts
+(issue #23).
 
 What DOES build today, and is the gate for a change to the seam:
 
