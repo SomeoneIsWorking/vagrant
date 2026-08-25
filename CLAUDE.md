@@ -105,12 +105,12 @@ launcher never invokes CTest or builds a test target. `--prepare-only` exercises
 product build without starting the game. Missing native tools/libraries are refused with the exact
 Homebrew, APT, DNF, winget, or vcpkg command for the detected platform. An explicit CHD path overrides the normal
 `PSXPORT_VAGRANT_DISC`/`.env`/drop-in resolution order. `./run.sh` opens the GAME WINDOW by default
-(2026-08-25: a play launch must never be headless nor self-destruct — PSXPORT_WATCHDOG=0 is forced,
-since the intro movie stalls on unimplemented XA/STR streaming and a diagnostic abort killed the
-session mid-play). Set `PSXPORT_HEADLESS=1` for the agent-style headless launch. What a player sees:
-publisher splash → intro movie (freezes partway on the streaming frontier — press Start/Enter to
-skip to the menu) → title menu; New Game enters BATTLE initialization, which still fail-fasts
-(issue #23).
+(2026-08-25: a play launch must never hang silently — the frame watchdog runs at 15s and the guest
+spin detector is always armed, so a freeze aborts NAMING the stuck region instead of wedging an
+unclosable window). Set `PSXPORT_HEADLESS=1` for the agent-style headless launch. What a player
+sees: publisher splash → intro movie (freezes partway on the streaming frontier, issue #25 — press
+Start/Enter to skip to the menu) → title menu; New Game enters BATTLE initialization, which still
+fail-fasts (issue #24).
 
 What DOES build today, and is the gate for a change to the seam:
 

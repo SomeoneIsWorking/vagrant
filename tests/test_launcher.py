@@ -121,7 +121,10 @@ class LauncherTest(unittest.TestCase):
             )
         self.assertEqual(events, ["refused"])
 
-    def test_launch_pins_the_current_bootstrap_to_headless(self):
+    def test_launch_opens_the_window_and_never_self_destructs(self):
+        # A play launch opens the game window and disables the frame-progress abort: the
+        # watchdog is an agent-run diagnostic (2026-08-25) — the intro movie stalls on the
+        # unimplemented XA/STR streaming frontier and a 3-second abort killed real sessions.
         psxport = ROOT / "external/psxport"
         with (
             mock.patch.dict(launcher.os.environ, {}, clear=True),
@@ -129,9 +132,24 @@ class LauncherTest(unittest.TestCase):
         ):
             launcher.launch(psxport)
         environment = execve.call_args.args[2]
-        self.assertEqual(environment["PSXPORT_VK_HEADLESS"], "1")
+        self.assertEqual(environment["PSXPORT_VK_WINDOW"], "1")
+        self.assertNotIn("PSXPORT_VK_HEADLESS", environment)
+        self.assertEqual(environment["PSXPORT_WATCHDOG"], "15")
         self.assertEqual(environment["PSXPORT_ASSET_DIR"], str(psxport))
         execve.assert_called_once_with(launcher.PORT, [str(launcher.PORT)], environment)
+
+    def test_headless_escape_hatch_restores_agent_launch(self):
+        psxport = ROOT / "external/psxport"
+        with (
+            mock.patch.dict(launcher.os.environ,
+                            {"PSXPORT_HEADLESS": "1"}, clear=True),
+            mock.patch.object(launcher.os, "execve") as execve,
+        ):
+            launcher.launch(psxport)
+        environment = execve.call_args.args[2]
+        self.assertEqual(environment["PSXPORT_VK_HEADLESS"], "1")
+        self.assertNotIn("PSXPORT_VK_WINDOW", environment)
+        self.assertEqual(environment["PSXPORT_WATCHDOG"], "15")
 
     def test_compilers_are_accepted_by_capability_without_identity_policy(self):
         host = FakeHost()

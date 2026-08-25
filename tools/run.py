@@ -378,12 +378,15 @@ def configure_and_build(psxport: Path, cc: str, cxx: str) -> None:
 def launch(psxport: Path) -> None:
     environment = os.environ.copy()
     environment.setdefault("PSXPORT_ASSET_DIR", str(psxport))
-    # A PLAY LAUNCH MUST OPEN THE GAME WINDOW AND NEVER SELF-DESTRUCT. PSXPORT_WATCHDOG=0
-    # disables the frame-progress abort: it is a diagnostic for agent-driven headless runs,
-    # not something a player's session should die by (the intro movie stalls on unimplemented
-    # XA/STR streaming and would otherwise be killed mid-black-screen). Set PSXPORT_HEADLESS=1
-    # to get the old agent-style headless launch back.
-    environment.setdefault("PSXPORT_WATCHDOG", "0")
+    # A PLAY LAUNCH NEVER HANGS SILENTLY. Two layers do the crashing so the player never gets an
+    # unclosable frozen window:
+    #   * frame-progress watchdog (15s): a stoppage in presented frames is fail-fast by design and
+    #     names the stuck guest call chain;
+    #   * guest spin detector (always on): burns-instruction-without-yielding spins abort naming
+    #     the region ([spin] FATAL ...).
+    # Set PSXPORT_HEADLESS=1 for the agent-style headless launch; PSXPORT_WATCHDOG=0 disables the
+    # first layer only.
+    environment.setdefault("PSXPORT_WATCHDOG", "15")
     if os.environ.get("PSXPORT_HEADLESS", "") not in ("", "0"):
         say(
             "launching headless (PSXPORT_HEADLESS=1); BATTLE later initialization and gameplay "
