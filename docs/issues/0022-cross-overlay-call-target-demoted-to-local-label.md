@@ -1,7 +1,7 @@
 ---
 id: 22
 title: Cross-overlay call target demoted to a local label
-status: investigating
+status: resolved
 symptom: After BATTLE and INITBTL begin executing, INITBTL's direct call to BATTLE 0x800E6EAC fails even though BATTLE contains that callable entry
 tags: runtime,overlay,recompiler,battle,re-15
 created: 2026-08-25
@@ -39,3 +39,6 @@ only when BATTLE dispatch contains `ov_battle_func_800E6EAC` and the predecessor
 `L_800E6EAC`; the next separately authorized bounded run must remove this miss and advance to a later
 concrete guest boundary. Adding this one address to Vagrant's seed file would hide the generic defect
 and is not a resolution.
+
+### Resolution (2026-08-25)
+Fixed generically in psxport 0339b459 (cross_overlay_call_targets: disjoint-range + callable-entry proofs, same-slot siblings rejected) plus the case-label/pointer-sink emitter work in 073d7a62. Runtime falsifier met: bounded Start replay scratch/logs/re15-battle-entry-0339b459-jtfix.log no longer reports recomp-MISS 0x800E6EAC and advances deep into BATTLE (next boundary is issue #23). Static gates: BATTLE dispatch contains ov_battle_func_800E6EAC while the predecessor body reaches the same address as a callable entry; INITBTL's direct rec_dispatch(c, 0x800E6EACu) routes to it.

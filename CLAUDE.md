@@ -56,9 +56,13 @@ Normal movie completion, XA/STR teardown, later menu interaction, and gameplay r
 
 RE-15 corrects the old `0x800798A4` classification: after TITLE returns, resident code loads BATTLE
 and INITBTL, then calls BATTLE's `vs_battle_exec`. The one bounded replay run executes generated
-BATTLE `0x800798A4` and INITBTL `0x800FA35C`; its next concrete boundary is BATTLE `0x800E6EAC`,
-which INITBTL calls directly but the emitter currently retains only as a preceding BATTLE body's local
-label. Issue #22 owns that generic cross-overlay entry-demotion defect; do not add a Vagrant-only seed.
+BATTLE `0x800798A4` and INITBTL `0x800FA35C`. The emitter defects behind its next boundaries are
+FIXED upstream: issue #22 (cross-overlay entry demotion) closed by psxport `0339b459`, and the
+resident-side chain — mask-stride dispatch recovery, iterative case-label pruning, and the
+dispatch-base-vs-function-pointer classification — by psxport `073d7a62`; against that substrate the
+replay runs past both former fail-fasts deep into BATTLE initialization. The live boundary is issue
+#23 (a computed dispatch whose base register is carried across `jr ra` fragments, BATTLE
+`0x800B182C`).
 
 RE-07 owns the first decomp-seeded native body: `tools/re_heap.py` derives `vs_main_initHeap`
 `0x80043F74` and its two free-list heads from the retail executable, and the readable CC0-derived body

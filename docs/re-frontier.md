@@ -52,8 +52,12 @@ readable Vagrant Story/New Game/Continue/Sound screen. Disabling only that compl
 leaves the same transition intact but reproduces the 65,536-item queue fail-fast with the matching
 present absent. Normal movie completion, XA/STR teardown, later menu interaction, and gameplay are
 not claimed. RE-15 proves the former `0x800798A4` miss is BATTLE's real entry after the guest loads
-BATTLE+INITBTL. One bounded run executes both BATTLE `0x800798A4` and INITBTL `0x800FA35C`, then
-exposes the next emitter boundary at BATTLE `0x800E6EAC`.
+BATTLE+INITBTL. One bounded run executes both BATTLE `0x800798A4` and INITBTL `0x800FA35C`. The two
+emitter defects behind the next boundaries are since FIXED upstream (issues #22 and its resident-side
+companions, psxport `0339b459` + `073d7a62`): cross-overlay call targets are seeded as destination
+entries, mask-stride dispatches recover statically, case-label entries merge into their runs, and the
+GTE macro chain emits static switches over shared labels. The live boundary is issue #23
+(`0x800B182C`, a dispatch base carried across `jr ra` fragments).
 
 The resident substrate now executes the RE-01 plan through guest main. That does not mean gameplay
 boots: platform HLE and CD/overlay loading remain later frontier steps. The earlier fail-fast at the
@@ -178,7 +182,14 @@ measures it against this executable.
 - deps: RE-14
 - evidence: Both 2026-08-24 recorded-input controls crossed the title transition and failed at `0x800798A4` from resident `jal` return `0x80042C14`. Static classification on 2026-08-25 corrected the image owner: resident `vs_main_execTitle` loads BATTLE.PRG to `0x80068800` and INITBTL.PRG to `0x800F9800` immediately before its direct `jal 0x800798A4`. Owned-disc BATTLE SHA-1 `d53aaccc...` matches the exact decomp target and its offset `0x110A4` is a normal stack-frame entry; the same offset in TITLE is invalid BLEZ data (`0x190E2594`, nonzero `rt`). BATTLE directly calls INITBTL `0x800FA35C` from `0x800798E4`. Provisioning all three reached images against psxport `aa0b2067` emits 1,974 BATTLE functions including `ov_battle_func_800798A4`, 12 INITBTL functions including `ov_initbtl_func_800FA35C`, and the existing 137-function TITLE module; the exact Clang product build and 7/7 CTests pass. The single authorized bounded Start replay, PID 199806, removes the old miss; host write-watch backtraces contain `ov_battle_func_800798A4`, `ov_battle_gen_800798A4`, and `ov_initbtl_gen_800FA35C`, proving actual execution of both modules. The next miss is BATTLE `0x800E6EAC`, called from INITBTL with return address `0x800FA4A8` while BATTLE is resident.
 - where: `tools/extract_overlays.py` + `tools/ensure_recomp.py` + `tests/test_overlay_inputs.py` + retail resident/BATTLE/INITBTL bytes; no new seed
-- gap: Entry into the first BATTLE/INITBTL pair is verified. Issue #22 owns the next framework defect: cross-overlay target `0x800E6EAC` is emitted only as a predecessor's local label, not as the separate callable entry INITBTL requires. Normal movie completion remains separate.
+- gap: Entry into the first BATTLE/INITBTL pair is verified, and the framework defects that blocked
+  deeper execution are FIXED upstream: issue #22 (cross-overlay call target demoted to a local
+  label) closed by psxport `0339b459`, and the resident-side chain (mask-stride dispatch recovery,
+  iterative case-label pruning, dispatch-base-vs-function-pointer classification) by psxport
+  `073d7a62`. Against that substrate the bounded Start replay runs past both former fail-fasts and
+  reaches deep BATTLE initialization; the live boundary is now issue #23 — computed dispatches
+  whose base register flows in from a preceding `jr ra` fragment (`recomp-MISS 0x800B182C`,
+  scratch/logs/re15-battle-entry-0339b459-jtfix.log). Normal movie completion remains separate.
 - notes: Normal movie completion and XA/STR teardown remain a separate unverified path because RE-14 reaches this boundary through a forced Start skip.
 
 ## ownership
