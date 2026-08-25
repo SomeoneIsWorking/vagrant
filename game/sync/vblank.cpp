@@ -9,6 +9,7 @@
 #include "vblank.h"
 
 #include "core.h"
+#include "game.h"
 #include "override_registry.h"
 #include "render/title_menu.h"
 #include "render/title_movie.h"
@@ -38,6 +39,11 @@ void vagrant_vblank_turn(Core *c) {
   // field is also the only faithful point at which host input can replace the console's VBlank SIO
   // transfer before guest code resumes and reads those buffers.
   static_cast<vagrant::VagrantContext *>(c->gameCtx)->padDelivery.serviceField(*c);
+  // The resident program likewise never reaches a framework per-field tick, so the SPU mixer has
+  // exactly one driver: this display field. Advancing it here is what makes CD-XA pulls happen
+  // (CDC_GetCDAudioSample lives inside spu_update) — without it the XA ring fills and drops while
+  // rd never moves, and every SPU-produced sound (movie audio, BGM, voices) stays silent.
+  c->game->spu_audio.frame();
   // The two TITLE products occupy consecutive guest phases. Keep one present per field even at the
   // transition: an immediate splash sprite wins the field; otherwise a completed MDEC frame scans out.
   if (!vagrant::presentTitleStartup(*c) && !vagrant::presentTitleMenu(*c)) {

@@ -8,6 +8,14 @@ created: 2026-08-25
 updated: 2026-08-25
 ---
 
+## Update 2026-08-26
+
+After issue #25's fix (psxport f9b5db8f) an UNATTENDED run now reaches this exact boundary by
+itself: same read32 @0x2414003B, ra 0x8008A058, last-fn ov_battle_gen_80089DC0 (io_read fail-fast,
+scratch/logs/i25-fix10.log). The boundary is reproducible without any pad replay.
+
+---
+
 ## Symptom
 
 psxport cab5d077 substrate. Evidence: scratch/logs/re15-flow5.log (guest register dump incl. v0=0x2413FFFF immediately before the wild read).
