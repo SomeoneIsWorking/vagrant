@@ -1,11 +1,11 @@
 ---
 id: 24
 title: BATTLE init reads a corrupted pointer (read32 @0x2414003B, last-fn 0x800417C8, ra 0x8008A058)
-status: open
+status: resolved
 symptom: After cross-fragment dispatch completion, the bounded Start replay passes all former fail-fasts and dies with [mem:error] FATAL: UNMAPPED RAM read32 @ 0x2414003B (phys 0x0414003B); v0=0x2413FFFF just before the fault; caller context is BATTLE initialization via ov_battle_gen_80089DC0
 tags: battle,re-15,memory-corruption,next-boundary
 created: 2026-08-25
-updated: 2026-08-25
+updated: 2026-08-26
 ---
 
 ## Update 2026-08-26
@@ -31,3 +31,25 @@ This is the NEW concrete boundary after cross-fragment completion landed. Either
 ## Falsifier
 
 A replay that passes this read (or proves the pointer value correct against real-hardware expectations) advances BATTLE init to its next boundary.
+
+## Resolution (2026-08-26, psxport 54af32cb)
+
+The pointer was never corrupted in memory — a CALLEE-SAVED REGISTER was. Root cause chain,
+all measured:
+
+1. BATTLE func_80089DC0 sets $s0=0x800F0000 then calls func_80089114 -> ... -> func_800E6F9C.
+2. func_800E6F9C ends in GCC's shared-epilogue tail idiom (lui $ra,0x800d; bgez $zero,0x800DC638;
+   ori $ra,$ra,0xb888 — verified against the SHA-bound retail image with tools/disasm.py). The
+   callee returns to the epilogue block at 0x800DB888, which restores $s0-$s5/$ra/$sp for BOTH
+   frames. The emitter's call+return translation skipped that epilogue entirely.
+3. Back in func_80089DC0, `lw $t0,0x19FC($s0)` therefore read garbage (gdb at the three call
+   returns showed $s0 already broken after the FIRST callee), and the follow-up
+   `lw +0x3C` dereferenced 0x2413FFFF -> fault at 0x2414003B.
+
+Fix: emit.py ra_branch_continuations() — per-site, static, conservative; call then dispatch to $ra.
+11 sites substrate-wide (1 resident + 10 BATTLE). RECOMP_VERSION 2026-08-26.14.
+
+Falsifier MET: unattended run passes this read and continues; 240s headless / 150s windowed with
+zero faults (scratch/logs/i24-fix2.log, i24-windowed.log). One follow-on defect found and fixed on
+the way: the presenter capture grew unbounded past the title products because nothing committed it
+(vagrant-side commit in vagrant_vblank_turn).

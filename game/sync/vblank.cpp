@@ -46,8 +46,13 @@ void vagrant_vblank_turn(Core *c) {
   c->game->spu_audio.frame();
   // The two TITLE products occupy consecutive guest phases. Keep one present per field even at the
   // transition: an immediate splash sprite wins the field; otherwise a completed MDEC frame scans out.
+  // PAST them (BATTLE and later native producers) nothing else commits the presenter, so the prim
+  // capture would grow unbounded until FramePresenter::capture aborts at RQ_MAX — commit here to
+  // present the field's batch and reset the capture, exactly like the title paths do.
   if (!vagrant::presentTitleStartup(*c) && !vagrant::presentTitleMenu(*c)) {
-    vagrant::presentTitleMovie(*c);
+    if (!vagrant::presentTitleMovie(*c)) {
+      c->game->presentation.commit(c);
+    }
   }
   lucent::debug("vagrant-vblank", "guest VBlank handler advanced counter {} -> {}", before, c->mem_r32(kVBlankCounter));
 }
