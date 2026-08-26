@@ -22,6 +22,7 @@ DEFAULT_TITLE = os.path.join(ROOT, "scratch", "raw", "prg", "TITLE.PRG")
 DEFAULT_BATTLE = os.path.join(ROOT, "scratch", "raw", "prg", "BATTLE.PRG")
 DEFAULT_INITBTL = os.path.join(ROOT, "scratch", "raw", "prg", "INITBTL.PRG")
 CONFIG = os.path.join(ROOT, "game", "core", "game_config.cpp")
+BATTLE_SOURCE = os.path.join(ROOT, "game", "render", "battle_frame.cpp")
 
 TITLE_SHA1 = "f74a76e6215edebf607d0c2af56481050edb139a"
 BATTLE_SHA1 = "d53aaccc3b3a2fc057d05e0dcea92f7182bc72a9"
@@ -40,6 +41,10 @@ PUT_DRAW_ENV = 0x80028CB4
 PUT_DISP_ENV = 0x80028E80
 GAMETIME_UPDATE = 0x8004261C
 ALLOC_HEAP = 0x80043EC4
+SET_GEOM_SCREEN = 0x80041534
+SET_GEOM_OFFSET = 0x80041540
+SET_DEF_DRAW_ENV = 0x8002B374
+SET_DEF_DISP_ENV = 0x8002B434
 
 
 class Overlay:
@@ -135,6 +140,9 @@ def measure(title, battle, initbtl, verify_identity=True):
             0x10: 0x8C62E210,
             0x38: 0x2C420001,
             0x40: 0xAC62E210,
+            0x44: 0x240400A0,
+            0x48: jal_word(SET_GEOM_OFFSET),
+            0x4C: 0x24050070,
             0x50: jal_word(DRAW_SYNC),
             0x60: jal_word(GAMETIME_UPDATE),
             0x164: jal_word(PUT_DISP_ENV),
@@ -154,6 +162,65 @@ def measure(title, battle, initbtl, verify_identity=True):
     if battle_frame_buf != title_frame_buf:
         raise Refuse(
             "TITLE and BATTLE presenters do not share one resident parity word"
+        )
+
+    # BATTLE establishes the 320x224 world viewport in one initializer. Its presenter then restores
+    # the matching 160,112 GTE center every field, so a widescreen owner must replace this game-owned
+    # projection boundary rather than globally changing the SDK calls used by 2D overlays too.
+    battle_view_init, battle_view_init_scanned = unique_shape(
+        battle,
+        "BATTLE viewport initializer",
+        {
+            0x00: 0x27BDFFC0,
+            0x1C: 0x24B3FFF0,
+            0x58: jal_word(SET_GEOM_OFFSET),
+            0x60: jal_word(SET_GEOM_SCREEN),
+            0x68: 0x3C108006,
+            0x6C: 0x2610E0D0,
+            0x80: jal_word(SET_DEF_DRAW_ENV),
+            0x84: 0xAFB30010,
+            0xA0: jal_word(SET_DEF_DISP_ENV),
+            0xA4: 0xAFB30010,
+        },
+    )
+
+    battle_view_call, battle_view_call_scanned = unique_shape(
+        battle,
+        "BATTLE 320x240 viewport call",
+        {
+            0x00: 0x24040140,
+            0x04: 0x240500F0,
+            0x08: 0x3C028006,
+            0x0C: 0x8C46E248,
+            0x10: 0x00003821,
+            0x14: 0xAFA00010,
+            0x18: jal_word(battle_view_init),
+            0x1C: 0xAFA00014,
+        },
+    )
+    projection_global = address_from_lui_memory(
+        battle, battle_view_call + 0x08, battle_view_call + 0x0C, 2
+    )
+
+    projection_setter, projection_setter_scanned = unique_shape(
+        battle,
+        "BATTLE projection-distance setter",
+        {
+            0x00: 0x27BDFFE8,
+            0x04: 0x3C028006,
+            0x08: 0xAFBF0010,
+            0x0C: jal_word(SET_GEOM_SCREEN),
+            0x14: 0x8FBF0010,
+            0x1C: 0x03E00008,
+            0x20: 0x27BD0018,
+        },
+    )
+    setter_projection_global = address_from_lui_memory(
+        battle, projection_setter + 0x04, projection_setter + 0x10, 2
+    )
+    if setter_projection_global != projection_global:
+        raise Refuse(
+            "BATTLE viewport call and projection setter do not share one projection-distance word"
         )
 
     # INITBTL constructs the two OT allocations. The two results are stored at [array+0] and
@@ -240,6 +307,10 @@ def measure(title, battle, initbtl, verify_identity=True):
         "title_present": title_present,
         "battle_present": battle_present,
         "battle_submit": battle_submit,
+        "battle_view_init": battle_view_init,
+        "battle_view_call": battle_view_call,
+        "projection_setter": projection_setter,
+        "projection_global": projection_global,
         "ot_alloc": ot_alloc,
         "pool_alloc": pool_alloc,
         "frame_buf": title_frame_buf,
@@ -254,6 +325,9 @@ def measure(title, battle, initbtl, verify_identity=True):
         "ot_alloc_scanned": ot_alloc_scanned,
         "pool_alloc_scanned": pool_alloc_scanned,
         "battle_submit_scanned": battle_submit_scanned,
+        "battle_view_init_scanned": battle_view_init_scanned,
+        "battle_view_call_scanned": battle_view_call_scanned,
+        "projection_setter_scanned": projection_setter_scanned,
     }
 
 
@@ -298,7 +372,31 @@ def check_config(text):
         raise Refuse("shipping frame contract mismatch: " + ", ".join(failures))
 
 
-def selftest(title, battle, initbtl, measured):
+def check_battle_source(measured, text):
+    match = re.search(
+        r"\bkBattleFramePresenter\s*=\s*(0x[0-9A-Fa-f]+)u?", text
+    )
+    if not match:
+        raise Refuse(f"{BATTLE_SOURCE}: kBattleFramePresenter is absent")
+    shipped = int(match.group(1), 0)
+    if shipped != measured["battle_present"]:
+        raise Refuse(
+            f"{BATTLE_SOURCE}: kBattleFramePresenter=0x{shipped:08X}, "
+            f"measured 0x{measured['battle_present']:08X}"
+        )
+    generated = f"ov_battle_gen_{measured['battle_present']:08X}"
+    if text.count(generated) < 2:
+        raise Refuse(
+            f"{BATTLE_SOURCE}: measured generated super body {generated} "
+            "is not retained and installed"
+        )
+    print(
+        f"  [ ok ] BATTLE shipping completion/super: "
+        f"0x{shipped:08X} / {generated}"
+    )
+
+
+def selftest(title, battle, initbtl, measured, battle_source):
     print("== re_frame selftest ==")
     checks = 0
     with open(CONFIG, encoding="utf-8") as source:
@@ -338,6 +436,21 @@ def selftest(title, battle, initbtl, measured):
     finally:
         battle.data = original
 
+    mutable = bytearray(original)
+    off = battle.off(measured["battle_view_call"])
+    mutable[off : off + 4] = struct.pack("<I", 0)
+    battle.data = bytes(mutable)
+    try:
+        measure(title, battle, initbtl, verify_identity=False)
+        raise AssertionError("BATTLE viewport call with destroyed width was accepted")
+    except Refuse as error:
+        if "scanned" not in str(error) or "matched 0" not in str(error):
+            raise AssertionError(f"viewport negative lacked denominator: {error}")
+        print(f"  [ ok ] destroyed BATTLE viewport width refused: {error}")
+        checks += 1
+    finally:
+        battle.data = original
+
     changed = config.replace(".otRegionBase = 0", ".otRegionBase = 4", 1)
     if changed == config:
         raise AssertionError("shipping mutation anchor did not fire")
@@ -349,17 +462,35 @@ def selftest(title, battle, initbtl, measured):
             raise AssertionError(f"shipping negative did not name field: {error}")
         print(f"  [ ok ] counterfeit fixed OT base refused: {error}")
         checks += 1
-    print(f"re_frame selftest: {checks}/4 PASS")
+
+    shifted = battle_source.replace(
+        f"0x{measured['battle_present']:08X}u",
+        f"0x{measured['battle_present'] + 4:08X}u",
+        1,
+    )
+    try:
+        check_battle_source(measured, shifted)
+        raise AssertionError("shifted BATTLE shipping completion was accepted")
+    except Refuse as error:
+        print(f"  [ ok ] shifted BATTLE shipping completion refused: {error}")
+        checks += 1
+    print(f"re_frame selftest: {checks}/6 PASS")
 
 
 def main(argv):
     args = list(argv)
     do_check = "--check-config" in args
+    do_check_source = "--check-source" in args
     do_selftest = "--selftest" in args
-    args = [arg for arg in args if arg not in ("--check-config", "--selftest")]
+    args = [
+        arg
+        for arg in args
+        if arg not in ("--check-config", "--check-source", "--selftest")
+    ]
     if len(args) not in (0, 3):
         print(
-            "usage: re_frame.py [--check-config] [--selftest] [TITLE.PRG BATTLE.PRG INITBTL.PRG]",
+            "usage: re_frame.py [--check-config] [--check-source] [--selftest] "
+            "[TITLE.PRG BATTLE.PRG INITBTL.PRG]",
             file=sys.stderr,
         )
         return 2
@@ -386,14 +517,27 @@ def main(argv):
             f"0x{measured['pool_ptr_array']:08X}, 2 x 0x{measured['pool_size']:X}"
         )
         print(
+            f"  BATTLE viewport init 0x{measured['battle_view_init']:08X}, call sequence at "
+            f"0x{measured['battle_view_call']:08X} with 320x240 input / 320x224 draw area; "
+            "presenter restores OFX/OFY 160,112 each field"
+        )
+        print(
+            f"  projection distance 0x{measured['projection_global']:08X}; setter "
+            f"0x{measured['projection_setter']:08X} stores it and calls SetGeomScreen"
+        )
+        print(
             "  boundary: OT/pool bases are guest-heap results, not fixed regions; keep the legacy "
             "native-loop GameConfig fields zero"
         )
         if do_check:
             with open(CONFIG, encoding="utf-8") as source:
                 check_config(source.read())
+        with open(BATTLE_SOURCE, encoding="utf-8") as source:
+            battle_source = source.read()
+        if do_check_source:
+            check_battle_source(measured, battle_source)
         if do_selftest:
-            selftest(title, battle, initbtl, measured)
+            selftest(title, battle, initbtl, measured, battle_source)
         return 0
     except (AssertionError, OSError, Refuse) as error:
         print(f"re_frame REFUSED: {error}", file=sys.stderr)

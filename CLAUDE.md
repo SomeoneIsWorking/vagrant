@@ -11,9 +11,16 @@ diagnostics through `lucent`, the registries, and never editing `external/psxpor
 `external/psxport/docs/workspace/WORKSPACE.md`; the multi-agent protocol is `…/PROTOCOL.md`; the
 methodology is `…/docs/porting-a-new-psx-game.md`.
 
-## THE STATE OF THIS PORT: a forced Start skip reaches BATTLE initialization
+## Current-state authority
 
-Created 2026-08-12. Seven groups are re-verified and one frame group is measured-partial: the
+`docs/project-state.md` is the authoritative capability inventory and current focus;
+`docs/project-goals.md` owns durable product intent; `docs/issues/` owns atomic work;
+`docs/codemap.md` owns placement only; and `docs/re-frontier.md` owns the ordered binary-evidence
+dependency chain. The evidence summary below explains the active RE boundary but does not replace
+those registries.
+
+Created 2026-08-12. Seven foundational groups are re-verified; RE-05, RE-16, and RE-17 are
+measured-partial frame/transition groups. The verified groups are the
 **crt0/boot group** (`RE-01`, `tools/re_crt0.py`), the resident recompiled substrate (`RE-02`), all
 20 non-empty `.PRG` overlay mappings into three slots (`RE-03`, `tools/re_overlay.py`), libpad
 delivery buffers and their pointer table (`RE-06`, `tools/re_pad.py`), the boot SPU DMA callback
@@ -52,7 +59,10 @@ packet-byte adaptation. A recorded Start press exits the intro; intact title cod
 Story/New Game/Continue/Sound screen. `TitleMenuProducer` retains the generated
 `_drawTitleMenuItems` body and owns only the completed-pass fence. Disabling only that producer keeps
 the guest transition but reproduces the 65,536-item queue fail-fast with the matching present absent.
-Normal movie completion, XA/STR teardown, later menu interaction, and gameplay remain unverified.
+Natural movie completion reaches the common title/menu path. Issue #26's saved black captures were
+misclassified: their replay had already pressed Cross and their display/primitive signature is the
+later 320x224 BATTLE/loading phase. A correctly-provenanced natural menu screenshot, XA/STR teardown
+ownership, later menu interaction, and gameplay remain unverified.
 
 RE-15 corrects the old `0x800798A4` classification: after TITLE returns, resident code loads BATTLE
 and INITBTL, then calls BATTLE's `vs_battle_exec`. The one bounded replay run executes generated
@@ -60,9 +70,24 @@ BATTLE `0x800798A4` and INITBTL `0x800FA35C`. The emitter defects behind its nex
 FIXED upstream: issue #22 (cross-overlay entry demotion) closed by psxport `0339b459`, and the
 resident-side chain — mask-stride dispatch recovery, iterative case-label pruning, and the
 dispatch-base-vs-function-pointer classification — by psxport `073d7a62`; against that substrate the
-replay runs past both former fail-fasts deep into BATTLE initialization. The live boundary is issue
-#23 (a computed dispatch whose base register is carried across `jr ra` fragments, BATTLE
-`0x800B182C`).
+replay runs past both former fail-fasts deep into BATTLE initialization. Issue #24 then isolated a
+skipped GCC shared epilogue that corrupted callee-saved `$s0`; psxport `54af32cb` fixes the emitter
+cause, and unattended execution continues for 240 seconds without a fault.
+
+RE-16 classifies the natural movie-end transition without changing runtime code.
+`tools/re_title_natural.py` proves from the SHA-bound retail TITLE.PRG that natural return `0` and
+Start/right return `1` converge at `0x8006FC0C`; the sole caller ignores `v0` and enters the same
+title-screen/menu initialization. That rules out a return-selected caller or fade path. The natural
+replay is idle through frame 5,899 and records full TITLE batches before its first Cross press, then
+switches to small BATTLE batches. No correctly-provenanced natural-end menu picture exists yet.
+
+RE-17 establishes the nearest BATTLE render prerequisite. SHA-bound `tools/re_frame.py` measures the
+sole presenter `0x8007629C`, dynamic-OT submit owner `0x8008A3A0`, viewport initializer
+`0x800760CC`, 320x240 input/320x224 draw convention, per-field GTE center `(160,112)`, projection
+word `0x8005E248`, and setter `0x8007CCF0`. `BattleFrameProducer` retained-super-calls that presenter
+and publishes its completed field to guest VBlank. This is product-link and focused-test verified,
+not live-reach or pixel verified; it is a field fence over guest primitives, not the semantic native
+world producer required for widescreen and interpolation (issue #27, `docs/battle-rendering.md`).
 
 RE-07 owns the first decomp-seeded native body: `tools/re_heap.py` derives `vs_main_initHeap`
 `0x80043F74` and its two free-list heads from the retail executable, and the readable CC0-derived body
@@ -70,14 +95,16 @@ is paired with the retained generated function through the override registry. Th
 proves it installed, ran, and byte-matched; a deliberate capacity sabotage turns that same gate red.
 Allocator operations and every other decomp body remain on the substrate until separately measured.
 
-RE-05 independently measures the later overlay-owned presenters and dynamic OT/pool contract. XA,
-the other 17 non-empty overlays, later native graphics production, and every other
+RE-05 independently measures the later overlay-owned presenters and dynamic OT/pool contract. RE-17
+now gives BATTLE's presenter an explicit per-Core completed-field owner. XA, the other 17 non-empty
+overlays, semantic native graphics production, and every other
 unmeasured guest-address group in
 `game/core/game_config.cpp` stay `0` with their open steps named in `docs/re-frontier.md`. A framework
 defect found while measuring crt0 (issue #3) would give a BIOS
 `InitHeap` a zero-size heap; measured 2026-08-12, that is **latent here** — no code in this image can
 call BIOS `malloc` (issue #3 has the census), so this game can neither exhibit the bug nor demonstrate
-its fix. If something here looks like it works, check `docs/codemap.md` — the honest inventory is short.
+its fix. If something here looks like it works, check `docs/project-state.md`; file presence in the
+codemap is never capability evidence.
 
 The framework seam is inherited: one process-lifetime `vagrant::VagrantRuntime` owns the
 direct-native project default, measured guest-main dispatch, and CD/VBlank override composition. It derives
@@ -87,17 +114,19 @@ names that debt; new behavior belongs on the derived runtime, not in `GameHooks`
 
 Host ownership follows Dusklight's current boundary rather than its platform details: the thin entry
 point delegates to a composed runtime, while input conversion, render-pass ownership, and game-heap
-semantics remain separate owners. Here `VagrantRuntime` composes per-Core `PadDelivery` and TITLE
-producers through `VagrantContext`; it does not absorb their implementations or grow `GameConfig`.
+semantics remain separate owners. Here `VagrantRuntime` composes per-Core `PadDelivery`, TITLE
+producers, and the BATTLE field producer through `VagrantContext`; it does not absorb their
+implementations or grow `GameConfig`.
 
 `./run.sh` is the stable project launcher. With no arguments it resolves the framework and the disc,
 identity-checks and hash-provisions the resident executable plus reached TITLE, BATTLE, and INITBTL overlays, configures both CMake
 trees with the user's `CC`/`CXX` (or the host `cc`/`c++`), builds `vagrant_port`, and launches that
 current target. Compiler acceptance is capability-based and has no compiler identity allow/deny
 policy. It does not claim gameplay
-or a finished title sequence: RE-13 records live 24-bit intro/MDEC frames, RE-14 owns only the
-measured Start-skip transition to the first menu picture, and RE-15 owns entry into the first
-BATTLE/INITBTL pair. The shell file is
+or a finished title sequence: RE-13 records live 24-bit intro/MDEC frames, RE-14 owns the measured
+Start-skip transition to the first menu picture, RE-15 owns BATTLE/INITBTL entry, RE-16 owns the
+still-partial natural movie-end transition, and RE-17 owns the statically verified BATTLE field
+fence. The shell file is
 deliberately only a Python dispatch; all policy lives
 in `tools/run.py`, entered through the frozen `uv.lock` environment and propagated to every Python
 subprocess and CMake configure. The isolated player build trees configure with testing disabled; the
@@ -107,10 +136,11 @@ Homebrew, APT, DNF, winget, or vcpkg command for the detected platform. An expli
 `PSXPORT_VAGRANT_DISC`/`.env`/drop-in resolution order. `./run.sh` opens the GAME WINDOW by default
 (2026-08-25: a play launch must never hang silently — the frame watchdog runs at 15s and the guest
 spin detector is always armed, so a freeze aborts NAMING the stuck region instead of wedging an
-unclosable window). Set `PSXPORT_HEADLESS=1` for the agent-style headless launch. What a player
-sees: publisher splash → intro movie (freezes partway on the streaming frontier, issue #25 — press
-Start/Enter to skip to the menu) → title menu; New Game enters BATTLE initialization, which still
-fail-fasts (issue #24).
+unclosable window). Set `PSXPORT_HEADLESS=1` for the agent-style headless launch. Pressing Start/Enter
+during the movie takes the verified readable-menu path; New Game enters BATTLE initialization, which
+continues past issue #24's resolved shared-epilogue corruption. Natural completion reaches the common
+TITLE path, but its saved black captures were later BATTLE/loading fields and must not be cited as a
+black menu. BATTLE's first honest native world picture remains issue #27.
 
 What DOES build today, and is the gate for a change to the seam:
 
@@ -133,7 +163,7 @@ to a MEASURED constant in
 boot group, or `python3 tools/re_overlay.py --selftest && python3 tools/re_overlay.py --check-config`
 for overlay slots/seeds, `python3 tools/re_spu_transfer.py --check-config --selftest` for the DMA4
 callback route, `python3 tools/re_vblank.py --check-source --selftest` for resident VBlank
-delivery, `python3 tools/re_frame.py --check-config --selftest` for the overlay-owned presentation
+delivery, `python3 tools/re_frame.py --check-config --check-source --selftest` for the overlay-owned presentation
 contract and deliberately-zero fixed-layout fields, or
 `python3 tools/re_title_startup.py --check-source --selftest` for the first TITLE sprite contract,
 `python3 tools/re_title_movie.py --check-source --selftest` for the TITLE RGB24 movie contract,
@@ -155,7 +185,8 @@ python3 tools/info.py brief <words>          # what's already proven — and doe
 python3 tools/catalog.py search <symptom>    # has this been hit (or ruled out) before?
 ```
 
-Believe these over your instinct about what is known. End the task by writing back what you proved,
+Also read `docs/project-state.md` for capability coverage/current focus and `docs/codemap.md` for
+placement. Believe these over your instinct about what is known. End the task by writing back what you proved,
 what you disproved, and any tool you caught lying. `tools/re_frontier.py` is a SHIM onto the shared
 engine in `external/psxport/tools/port/`; do not grow a local copy of it.
 

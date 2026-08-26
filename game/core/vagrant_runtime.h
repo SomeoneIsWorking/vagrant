@@ -14,8 +14,16 @@ public:
 
   void configureRenderPath();
 
+  static constexpr RenderCapabilities renderProfile() {
+    return RenderCapabilities::interpolatedNative();
+  }
+
   static constexpr RenderPath defaultRenderPath() {
-    return RenderPath::Native;
+    return renderProfile().defaultPath;
+  }
+
+  RenderCapabilities renderCapabilities() const override {
+    return renderProfile();
   }
 
   void *createContext(Core &core) override;

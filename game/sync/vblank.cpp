@@ -11,6 +11,7 @@
 #include "core.h"
 #include "game.h"
 #include "override_registry.h"
+#include "render/battle_frame.h"
 #include "render/title_menu.h"
 #include "render/title_movie.h"
 #include "render/title_startup.h"
@@ -46,11 +47,10 @@ void vagrant_vblank_turn(Core *c) {
   c->game->spu_audio.frame();
   // The two TITLE products occupy consecutive guest phases. Keep one present per field even at the
   // transition: an immediate splash sprite wins the field; otherwise a completed MDEC frame scans out.
-  // PAST them (BATTLE and later native producers) nothing else commits the presenter, so the prim
-  // capture would grow unbounded until FramePresenter::capture aborts at RQ_MAX — commit here to
-  // present the field's batch and reset the capture, exactly like the title paths do.
+  // BATTLE has its own retail-measured completed-presenter fence. The final commit remains an honest
+  // fallback for overlays whose frame owner has not yet been measured; it is not BATTLE's owner.
   if (!vagrant::presentTitleStartup(*c) && !vagrant::presentTitleMenu(*c)) {
-    if (!vagrant::presentTitleMovie(*c)) {
+    if (!vagrant::presentBattleFrame(*c) && !vagrant::presentTitleMovie(*c)) {
       c->game->presentation.commit(c);
     }
   }

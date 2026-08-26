@@ -31,6 +31,10 @@ external/rood-reverse/disks/
 external/rood-reverse/.venv/
 *.log
 
+# Per-checkout player video preferences. The framework F1 overlay writes this file on every change;
+# it is runtime state, not a shipping input (path can be overridden with PSXPORT_SETTINGS).
+/psxport_settings.ini
+
 # Python bytecode — never committed. Compiled .pyc embed ABSOLUTE SOURCE PATHS, i.e. a machine-path
 # leak that a TEXT-only audit cannot see, because they are binary.
 __pycache__/

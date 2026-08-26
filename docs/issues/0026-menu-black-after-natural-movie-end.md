@@ -1,54 +1,43 @@
 ---
 id: 26
 title: Menu renders black when the intro movie ends NATURALLY (skip path renders fine)
-status: open
-symptom: With the intro allowed to play to its natural end, the title menu's logic runs and presents (2200 "presented completed TITLE menu" fields) but every captured frame is black in BOTH sinks; with Start-skip the same menu renders perfectly on the SAME substrate
-tags: menu,render,user-facing,next-boundary
+status: resolved
+symptom: Saved captures were initially classified as black TITLE-menu frames after natural movie completion
+tags: menu,render,misclassification,re-16
+state_items: S005
 created: 2026-08-26
 updated: 2026-08-26
 ---
 
-## Evidence matrix (all on psxport 54af32cb, RECOMP 2026-08-26.14, unless noted)
+## Resolution
 
-| generated | fallback commit | movie | menu picture |
-|---|---|---|---|
-| cab5d077-emitted | OFF | skip | RENDERS (bisect-cab2, scratch/screenshots/cell2_4000.png era) |
-| cab5d077-emitted | ON | skip | RENDERS (cell2_4000.png) |
-| 54af32cb-emitted | ON | skip | RENDERS (headskip_4000.png) |
-| 54af32cb-emitted | ON/OFF | natural | BLACK (pad5/pad6/idle-shots, windowed win-shot.log) |
+The saved black captures do not establish a black natural-end menu. They occur after the recorded
+input has left the idle natural path and after the renderer has changed from TITLE to BATTLE:
 
-The emitter (54af32cb) and the vagrant fallback commit are BOTH innocent: the generated-code
-diff cab5→HEAD is exactly the 11 BATTLE tail sites (resident/TITLE byte-identical,
-scratch/generated-cab5 vs scratch/generated-head14), and cab5-generated renders the menu with
-the fallback either way. The decisive variable is SKIP vs NATURAL movie end.
+- `scratch/vs-natural.pad` is idle through frame 5,899, then presses active-low Cross at
+  5,900–5,911, 6,400–6,411, 6,900–6,911, and 7,400–7,411.
+- `scratch/logs/rqhist.log` names that replay and records the 792–1,683-primitive TITLE batches before
+  they switch to repeated 24-primitive batches.
+- `scratch/logs/prims_f6600.csv`, previously called a menu frame, contains the small BATTLE/loading
+  batch: black full-screen polygons, item sprites using BATTLE CLUT/page coordinates, and white
+  semitransparent quads. It is not the 1,400-plus-sprite TITLE menu batch.
+- The stored no-input `vs-idle.pad` black captures likewise use the later 320x224 BATTLE display,
+  not TITLE's 512x224 display.
+- Images at 4,000/4,300/6,600 that visibly show the menu came from `vs-skip.pad`/`vs-drive.pad`;
+  `vs-drive.pad` presses Start at frame 1,800. They are valid skip controls, not natural controls.
 
-## Measured at the black menu (natural end)
+The original issue combined a real natural-return question with a later BATTLE picture. The retail
+control-flow result remains valid: `tools/re_title_natural.py` proves natural return `0` and
+Start/right return `1` converge at `0x8006FC0C`, and the sole caller ignores `v0` before the common
+title-screen/menu initialization chain. But no correctly-provenanced natural-end menu screenshot has
+yet been captured, so this resolution does not claim one.
 
-* Menu LOGIC is alive: menu presents fire every completed pass; X input reaches New Game
-  (pad2: zone-load Setloc [57 25 56] fired).
-* RenderQueue has real content per field (rqhist: n=24 — 6 bg opaque + 17 hud + 1 semi).
-* Prim CSV at f6600 (scratch/logs/prims_f6600.csv): 32 full-screen op=0x30 rgb=0 flat tris
-  (opaque black) + 60 textured item quads (page 768,0; CLUTs 832/864,223) + 4 white semi quads.
-* VRAM is FINE: PSXPORT_VRAMDUMP=6600 shows the logo, artwork, fonts, "NOW LOADING.." text;
-  both CLUTs are populated gradient ramps (scratch/vram6600_view.png).
-* The composite is black anyway, in headless AND windowed.
+The actual visible frontier is tracked as issue #27: the replay reaches BATTLE/loading, whose native
+world producer and live picture are not yet verified.
 
-## Candidate causes (unranked)
+### Earlier dead end
 
-1. The natural-end teardown leaves a full-screen opaque black layer (the movie fade-out?)
-  permanently composited OVER the menu — on hardware the same layer is removed or semi.
-2. The menu's own fade-in from black never advances when the movie ended naturally (its clock
-  may be the movie player's, which was skipped/aborted differently).
-3. Tonight's wall-locked CDC clock changed the natural-end timing path (only natural completion
-  became POSSIBLE tonight — the movie froze pre-#25-fix, so this path was NEVER exercised
-  before 2026-08-26; it may have been broken for a long time).
-
-## Workaround (ships today)
-
-Press Start during the intro (the authentic player behaviour anyway): the skip path renders the
-menu correctly on the current substrate, and New Game/Continue work from there.
-
-## Required resolution
-
-A natural-end run's menu frame must match the skip run's menu frame byte-for-byte at the same
-menu-state. Falsifier: PSXPORT_PAD_SHOT_AT on a natural-end replay shows the menu.
+The earlier theory that natural return selects a distinct caller/menu/fade branch remains ruled out.
+SHA-bound `tools/re_title_natural.py` measures natural `v0=0` and Start/right `v0=1` converging at
+epilogue `0x8006FC0C`; the sole caller `0x800713DC` ignores `v0` and enters the same
+`initTitleScreen`/`SetDispMask(1)`/`initMenu` chain (C028, I020, RE-16).

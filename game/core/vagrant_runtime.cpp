@@ -7,6 +7,7 @@
 #include "core/game_heap.h"
 #include "legacy_game_interface.h"
 #include "producer_db.h"
+#include "render/battle_frame.h"
 #include "render/title_menu.h"
 #include "render/title_movie.h"
 #include "render/title_startup.h"
@@ -42,6 +43,7 @@ void VagrantRuntime::registerOverrides(Game &) {
   registerTitleStartupOverrides();
   registerTitleMovieOverrides();
   registerTitleMenuOverrides();
+  registerBattleFrameOverrides();
 }
 
 void VagrantRuntime::bootInit(Core &core) {

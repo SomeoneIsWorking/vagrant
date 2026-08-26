@@ -29,6 +29,7 @@ set(GAME_SRC
   game/core/main.cpp
   game/core/vagrant_runtime.cpp
   game/input/pad_delivery.cpp
+  game/render/battle_frame.cpp
   game/render/title_menu.cpp
   game/render/title_movie.cpp
   game/render/title_startup.cpp
@@ -72,6 +73,7 @@ if(BUILD_TESTING)
     game/core/game_hooks.cpp
     game/core/vagrant_runtime.cpp
     game/input/pad_delivery.cpp
+    game/render/battle_frame.cpp
     game/render/title_menu.cpp
     game/render/title_movie.cpp
     game/render/title_startup.cpp

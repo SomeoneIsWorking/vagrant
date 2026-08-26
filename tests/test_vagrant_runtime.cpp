@@ -27,8 +27,17 @@ int main() {
   static_assert(std::is_base_of_v<GameRuntime, vagrant::VagrantRuntime>);
   static_assert(std::is_base_of_v<LegacyGameRuntimeAdapter, vagrant::VagrantRuntime>);
   static_assert(vagrant::VagrantRuntime::defaultRenderPath() == RenderPath::Native);
+  static_assert(vagrant::VagrantRuntime::renderProfile().nativeRenderPath);
+  static_assert(vagrant::VagrantRuntime::renderProfile().temporalInterpolation);
+  static_assert(vagrant::VagrantRuntime::renderProfile().playerPathCount() == 2);
 
   vagrant::VagrantRuntime runtime;
+  const RenderCapabilities capabilities = runtime.renderCapabilities();
+  if (capabilities.defaultPath != RenderPath::Native || !capabilities.supports(RenderPath::Native) ||
+      !capabilities.temporalInterpolation || capabilities.playerPathCount() != 2) {
+    std::fprintf(stderr, "VagrantRuntime did not declare its native+widescreen+interpolation profile\n");
+    return 1;
+  }
   psx::config::cv_render_path.set(psx::config::Layer::Default, "gte");
   runtime.configureRenderPath();
   if (psx::config::render_path() != RenderPath::Native) {
@@ -49,6 +58,11 @@ int main() {
   }
 
   auto *context = static_cast<vagrant::VagrantContext *>(game->core.gameCtx);
+  context->battleFrame.frameCompleted();
+  if (!context->battleFrame.frameReady()) {
+    std::fprintf(stderr, "VagrantContext did not retain BATTLE frame producer state\n");
+    return 1;
+  }
   context->titleMovie.frameCompleted();
   if (!context->titleMovie.frameReady()) {
     std::fprintf(stderr, "VagrantContext did not retain TITLE movie producer state\n");

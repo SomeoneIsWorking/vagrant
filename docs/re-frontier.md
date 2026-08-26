@@ -1,9 +1,10 @@
 # RE Frontier — the ordered RE dependency chain toward a faithful port
 
 Tracked by `tools/re_frontier.py` (a shim onto `external/psxport/tools/port/re_frontier.py` — consult
-it FIRST; update it in the SAME commit that changes a step). This is the fine-grained companion to
-`docs/codemap.md`: the codemap says *what subsystem exists*, this says *which ordered RE step is real
-reverse-engineering vs a hack that jumped ahead*.
+it FIRST; update it in the SAME commit that changes a step). This is the ordered binary-evidence
+dependency chain: it says which RE step is grounded versus a hack that jumped ahead. General
+capability coverage/current focus belongs to `docs/project-state.md`; subsystem placement belongs to
+`docs/codemap.md`.
 
 **Hard rule (no hacks / no fallbacks):** a `⛔ hack` status is DEBT, never an acceptable resting
 state. It marks a shortcut standing in for absent RE and MUST be removed as its real mechanism lands.
@@ -19,7 +20,7 @@ intended behaviour of the real target being reproduced.
 Statuses: ✅ re-verified · 🟡 re-partial (honest gap) · 🔬 in-progress · ⛔ hack (debt, must remove) ·
 ⬜ todo · ➖ skip-by-design · ⏸ blocked (computed).
 
-## THE STATE OF THIS PORT, 2026-08-25: Start skips the live intro and enters BATTLE initialization
+## Current RE boundary, 2026-08-26
 
 `RE-01` (crt0/boot), `RE-02` (resident seed set/substrate), and `RE-03` (all non-empty `.PRG` load
 bases) are `re-verified`. The emitter's mandatory PS-EXE entry root plus one measured Sony
@@ -50,14 +51,23 @@ The shared deterministic HSync counter carries `_initTitleScreen` through its re
 wait. TITLE then changes to 15-bit 512x224 and its retained `_drawTitleMenuItems` super builds a
 readable Vagrant Story/New Game/Continue/Sound screen. Disabling only that completed-pass producer
 leaves the same transition intact but reproduces the 65,536-item queue fail-fast with the matching
-present absent. Normal movie completion, XA/STR teardown, later menu interaction, and gameplay are
-not claimed. RE-15 proves the former `0x800798A4` miss is BATTLE's real entry after the guest loads
+present absent. RE-15 proves the former `0x800798A4` miss is BATTLE's real entry after the guest loads
 BATTLE+INITBTL. One bounded run executes both BATTLE `0x800798A4` and INITBTL `0x800FA35C`. The two
 emitter defects behind the next boundaries are since FIXED upstream (issues #22 and its resident-side
 companions, psxport `0339b459` + `073d7a62`): cross-overlay call targets are seeded as destination
 entries, mask-stride dispatches recover statically, case-label entries merge into their runs, and the
-GTE macro chain emits static switches over shared labels. The live boundary is issue #23
-(`0x800B182C`, a dispatch base carried across `jr ra` fragments).
+GTE macro chain emits static switches over shared labels. Issue #24 then identified the next fault as
+a skipped shared epilogue that corrupted `$s0`; psxport `54af32cb` fixes that root cause, and
+unattended runs continue through BATTLE initialization for 240 seconds without a fault. RE-16 now
+classifies the natural movie-end transition from the retail TITLE bytes: natural return `0` and input
+return `1` converge at one epilogue, and the sole caller ignores the value before the same title/menu
+initialization. Issue #26 is resolved as a provenance error: its replay presses Cross before the
+stored black captures, which have BATTLE's 320x224 display and small loading-batch signature rather
+than TITLE's menu batch. RE-17 owns BATTLE presenter `0x8007629C` as an explicit completed-field
+fence and maps its viewport/projection boundary. A serialized exact-pin run reached that fence 9,073
+times, but all four exact-index 320x224 captures were byte-identical black frames while a separate
+diagnostic composition still showed the title menu. The one-commit-per-call relation and semantic
+native world producer remain issue #27. Gameplay is not claimed.
 
 The resident substrate now executes the RE-01 plan through guest main. That does not mean gameplay
 boots: platform HLE and CD/overlay loading remain later frontier steps. The earlier fail-fast at the
@@ -186,11 +196,27 @@ measures it against this executable.
   deeper execution are FIXED upstream: issue #22 (cross-overlay call target demoted to a local
   label) closed by psxport `0339b459`, and the resident-side chain (mask-stride dispatch recovery,
   iterative case-label pruning, dispatch-base-vs-function-pointer classification) by psxport
-  `073d7a62`. Against that substrate the bounded Start replay runs past both former fail-fasts and
-  reaches deep BATTLE initialization; the live boundary is now issue #23 — computed dispatches
-  whose base register flows in from a preceding `jr ra` fragment (`recomp-MISS 0x800B182C`,
-  scratch/logs/re15-battle-entry-0339b459-jtfix.log). Normal movie completion remains separate.
-- notes: Normal movie completion and XA/STR teardown remain a separate unverified path because RE-14 reaches this boundary through a forced Start skip.
+  `073d7a62`. Issue #24's later wild read was a skipped GCC shared epilogue, not a guest pointer
+  defect; psxport `54af32cb` restores the callee-saved registers, and unattended 240-second plus
+  windowed 150-second runs have zero faults (`scratch/logs/i24-fix2.log`, `i24-windowed.log`).
+- notes: NONE for entering and continuing through the first BATTLE initialization window. Gameplay
+  and later BATTLE behavior remain open; the natural movie/menu path is separately owned by RE-16.
+
+### RE-16 — TITLE natural movie-end transition into the common menu path
+- status: re-partial
+- deps: RE-13, RE-14
+- evidence: `tools/re_title_natural.py` reuses the SHA-bound movie-owner measurement, decodes the retail timeout and input exits, and scans all 138,642 TITLE words for callers. Natural completion at 2,293 VSync ticks returns `0`; Start/right mask `0x820` returns `1`; both converge at epilogue `0x8006FC0C`. The sole call at `0x800713DC` executes no `v0` consumer before the same title-screen initializer `0x8006FE30`, `SetDispMask(1)`, and menu initializer `0x8006FEC4`. Its 3/3 self-test shows the other answer when the timeout changes, refuses a destroyed common continuation, and rejects a one-byte identity mutation. The correctly classified `vs-natural.pad` trace is idle through frame 5,899 and records 792–1,683-primitive TITLE batches before the first Cross press and later 24-primitive BATTLE batches. Issue #26 is resolved as an artifact-provenance error: its black captures were later 320x224 BATTLE/loading fields, not TITLE-menu frames.
+- where: `tools/re_title_natural.py` + SHA-bound `TITLE.PRG` + `docs/issues/0026-menu-black-after-natural-movie-end.md`
+- gap: The caller-side control-flow split is ruled out and the natural trace reaches TITLE production, but no correctly-provenanced natural-end menu screenshot exists. A later serialized run must capture one before this step can claim a visible natural menu. The stored black fields belong to RE-17/issue #27 instead.
+- notes: No native override, fallback, magic timing value, or framework change is introduced by this classification. The prior “black natural menu” diagnosis was removed rather than preserved as a tombstone.
+
+### RE-17 — BATTLE completed-field ownership before native world production
+- status: re-partial
+- deps: RE-15
+- evidence: SHA-bound `tools/re_frame.py` uniquely derives presenter `0x8007629C`, dynamic OT submit owner `0x8008A3A0`, viewport initializer `0x800760CC`, its 320x240 input/320x224 draw convention, projection-distance word `0x8005E248`, and setter `0x8007CCF0`. It also proves that the presenter restores GTE offset `(160,112)` every field. `--check-source` gates `game/render/battle_frame.cpp` to that address and requires retained `ov_battle_gen_8007629C`; destructive controls pass 6/6. `VagrantRuntime` composes a per-Core `BattleFrameProducer`; after the generated presenter translates the dynamic OT, guest VBlank flushes and commits that completed field instead of assigning BATTLE to the old catch-all. Clang builds both `vagrant_seam` and the full generated `vagrant_port`; focused runtime/context plus clang-format/clang-tidy tests pass.
+- where: `tools/re_frame.py` + `game/render/battle_frame.{h,cpp}` + `game/core/vagrant_context.h` + `game/core/vagrant_runtime.cpp` + `game/sync/vblank.cpp` + `docs/battle-rendering.md`
+- gap: Static ownership and product linkage are verified, but no live run was made while another game's singleton launch was active. Reach, one-present-per-completed-field behavior, and pixels therefore remain unverified. This producer is a field fence over guest-translated primitives, not the semantic native world producer required for widescreen and interpolation (issue #27).
+- notes: Widescreen begins at the BATTLE world camera/projection owner before screen-space vertices; UI stays 4:3. Interpolation begins with previous/current semantic camera and object snapshots and re-renders through that world producer. The existing post-projection `RenderQueue` is too late to perform faithful world-motion lerp. `VagrantRuntime` explicitly declares the `interpolatedNative` target profile, but its producers call neutral commits and expose no camera/world-pass input, so checkout-local `fps60=1` is currently inert for these fields rather than interpolation.
 
 ## ownership
 
@@ -200,7 +226,7 @@ measures it against this executable.
 - evidence: MEASURED 2026-08-24 by `tools/re_heap.py` on the owned SLUS_010.40 (sha1-gated): the image's unique arena-argument call site `0x80042B2C` (`lui a0,0x8010/ori 0xC000/lui a1,0xF/jal X/ori a1,0x2000`, found among 83,964 scanned word-aligned candidates, exactly one match) targets `vs_main_initHeap 0x80043F74`; the callee's own store sequence names free-list heads `heapA 0x800501A8` and `heapB 0x800501B8`; rood-reverse's independent labels (CC0) agree on all three. The FIRST decomp-seeded native body is `game/core/game_heap.cpp` (`vagrant::heap::initHeap`, from rood-reverse main.c `vs_main_initHeap`, CC0), installed through psxport's override registry as `{0x80043F74, initHeap, gen_func_80043F74}` via `shard_set_override`. LIVE GATES, all against pinned psxport d2266f4b on the real disc run: (1) REACHED — `[mirror-verify] 0x80043F74 OK (pass #1)` prints ONLY inside the override dispatch path after running BOTH legs (an uninstalled override runs substrate directly and can print nothing), so the OK line is simultaneously install-proof, ran-proof, and byte-match; (2) BYTE/SBS — mirror-verify compares every touched RAM byte + scratchpad + v0/v1/s0-s7/t8/sp/fp/ra/hi/lo between the native leg and the pure-substrate leg on live guest state; (3) DISCRIMINATOR RAN BOTH WAYS — a deliberately sabotaged body (`blockSz = value>>4` instead of `value>>4 - 1`) turned the same gate RED naming the exact bytes (`MISMATCH ram 0x8010C008: native=00 substrate=FF`) and aborted, so a hollow gen-vs-gen pass cannot produce the green line. The hermetic `vagrant_game_heap_test` pins the body's 11-word contract on a real Core without a disc. Instrument negatives: destroyed call-site shape, destroyed capacity shift, duplicated caller, and a +4 shipping constant are each refused with denominators (`re_heap.py --selftest`: 5/5 PASS).
 - where: game/core/game_heap.{h,cpp} (facts + native body + registry wiring in VagrantRuntime::registerOverrides) + tools/re_heap.py (instrument and shipped-vs-measured gate) + tests/test_game_heap.cpp (hermetic contract)
 - gap: NONE for the first body's ownership claim. Ownership covers this ONE initialiser; `vs_main_allocHeap`/`freeHeap` and every other decomp-backed function stay on the substrate until their own measured step. The ovhit atexit hit-count dump cannot fire in this window because both of its end states abort (menu-boundary fail-fast with input, intro-movie wait-stall without); the mirror-verify line carries the reach proof instead.
-- notes: rood-reverse is ~55-63% matched overall (its own decomp.dev badges; not measured here — and the psxport port's axis is SBS RAM parity, not object identity, so the two percentages are not comparable). The consumption pattern proven here — measure from our bytes, lift the CC0 body readable, install {addr, native, gen}, prove reached+byte-exact, sabotage-discriminate — is the template every later body reuses. Widescreen source lead only: BATTLE/BATTLE.PRG's matching reference resets `SetGeomOffset(160,112)` every frame, initializes the battle view through `func_800760CC(0x140,0xF0,projectionDistance,...)`, and changes projection via `vs_battle_setProjectionDistance`. `projectionDistance` also changes during camera transitions. A future wide implementation must target that world-camera path, not globally replace `SetGeomOffset`/`SetGeomScreen`: menu, title, and other overlay calls have their own 2D/UI intent. This has no shipping address or runtime confirmation until BATTLE is emitted and reached.
+- notes: rood-reverse is ~55-63% matched overall (its own decomp.dev badges; not measured here — and the psxport port's axis is SBS RAM parity, not object identity, so the two percentages are not comparable). The consumption pattern proven here — measure from our bytes, lift the CC0 body readable, install {addr, native, gen}, prove reached+byte-exact, sabotage-discriminate — is the template every later body reuses. RE-17 and `docs/battle-rendering.md` now own the BATTLE viewport, widescreen, and interpolation boundary; do not duplicate it in the heap-ownership record.
 
 ## platform
 
