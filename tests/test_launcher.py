@@ -7,6 +7,8 @@ import os
 import subprocess
 import sys
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from unittest import mock
 
@@ -57,6 +59,20 @@ class FakeHost(launcher.Host):
 
 
 class LauncherTest(unittest.TestCase):
+    def test_help_exits_before_preflight_or_disc_discovery(self):
+        for spelling in ("-h", "--help"):
+            with self.subTest(spelling=spelling):
+                output = StringIO()
+                with (
+                    mock.patch.object(launcher, "execute") as execute,
+                    redirect_stdout(output),
+                    self.assertRaises(SystemExit) as result,
+                ):
+                    launcher.main([spelling])
+                self.assertEqual(result.exception.code, 0)
+                self.assertIn("Provision, build, and launch", output.getvalue())
+                execute.assert_not_called()
+
     def test_no_argument_route_builds_and_launches_current_target(self):
         events = []
         psxport = ROOT / "external/psxport"
@@ -127,13 +143,22 @@ class LauncherTest(unittest.TestCase):
         # unimplemented XA/STR streaming frontier and a 3-second abort killed real sessions.
         psxport = ROOT / "external/psxport"
         with (
-            mock.patch.dict(launcher.os.environ, {}, clear=True),
+            mock.patch.dict(
+                launcher.os.environ,
+                {
+                    "PSXPORT_VK_HEADLESS": "1",
+                    "PSXPORT_NOAUDIO": "1",
+                    "PSXPORT_NOPACE": "1",
+                },
+                clear=True,
+            ),
             mock.patch.object(launcher.os, "execve") as execve,
         ):
             launcher.launch(psxport)
         environment = execve.call_args.args[2]
         self.assertEqual(environment["PSXPORT_VK_WINDOW"], "1")
-        self.assertNotIn("PSXPORT_VK_HEADLESS", environment)
+        for key in ("PSXPORT_VK_HEADLESS", "PSXPORT_NOAUDIO", "PSXPORT_NOPACE"):
+            self.assertNotIn(key, environment)
         self.assertEqual(environment["PSXPORT_WATCHDOG"], "15")
         self.assertEqual(environment["PSXPORT_ASSET_DIR"], str(psxport))
         execve.assert_called_once_with(launcher.PORT, [str(launcher.PORT)], environment)
@@ -147,8 +172,10 @@ class LauncherTest(unittest.TestCase):
         ):
             launcher.launch(psxport)
         environment = execve.call_args.args[2]
-        self.assertEqual(environment["PSXPORT_VK_HEADLESS"], "1")
+        for key in ("PSXPORT_VK_HEADLESS", "PSXPORT_NOAUDIO", "PSXPORT_NOPACE"):
+            self.assertEqual(environment[key], "1")
         self.assertNotIn("PSXPORT_VK_WINDOW", environment)
+        self.assertNotIn("PSXPORT_HEADLESS", environment)
         self.assertEqual(environment["PSXPORT_WATCHDOG"], "15")
 
     def test_compilers_are_accepted_by_capability_without_identity_policy(self):

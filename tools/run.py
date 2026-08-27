@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import os
 import platform
+import runpy
 import shutil
 import subprocess
 import sys
@@ -376,8 +377,7 @@ def configure_and_build(psxport: Path, cc: str, cxx: str) -> None:
 
 
 def launch(psxport: Path) -> None:
-    environment = os.environ.copy()
-    environment.setdefault("PSXPORT_ASSET_DIR", str(psxport))
+    policy = runpy.run_path(str(psxport / "tools/port/launch_environment.py"))
     # A PLAY LAUNCH NEVER HANGS SILENTLY. Two layers do the crashing so the player never gets an
     # unclosable frozen window:
     #   * frame-progress watchdog (15s): a stoppage in presented frames is fail-fast by design and
@@ -386,16 +386,17 @@ def launch(psxport: Path) -> None:
     #     the region ([spin] FATAL ...).
     # Set PSXPORT_HEADLESS=1 for the agent-style headless launch; PSXPORT_WATCHDOG=0 disables the
     # first layer only.
-    environment.setdefault("PSXPORT_WATCHDOG", "15")
     if os.environ.get("PSXPORT_HEADLESS", "") not in ("", "0"):
+        environment = policy["agent_environment"](os.environ)
         say(
             "launching headless (PSXPORT_HEADLESS=1); BATTLE later initialization and gameplay "
             "remain fail-fast boundaries…"
         )
-        environment["PSXPORT_VK_HEADLESS"] = "1"
     else:
+        environment = policy["player_environment"](os.environ)
         say("launching the game window; press Start (Enter) during the intro to reach the menu…")
-        environment["PSXPORT_VK_WINDOW"] = "1"
+    environment.setdefault("PSXPORT_ASSET_DIR", str(psxport))
+    environment.setdefault("PSXPORT_WATCHDOG", "15")
     os.execve(PORT, [str(PORT)], environment)
 
 
