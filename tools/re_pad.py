@@ -15,18 +15,17 @@ from re_crt0 import DEFAULT_EXE, FIXTURE_SHA1, Image, Refuse, s16
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FACTS_SRC = os.path.join(ROOT, "game", "input", "pad_facts.h")
-CONFIG_SRC = os.path.join(ROOT, "game", "core", "game_config.cpp")
 DELIVERY_SRC = os.path.join(ROOT, "game", "input", "pad_delivery.cpp")
-VBLANK_SRC = os.path.join(ROOT, "game", "sync", "vblank.cpp")
+FRAME_SRC = os.path.join(ROOT, "game", "sync", "frame_loop.cpp")
 CONTEXT_SRC = os.path.join(ROOT, "game", "core", "vagrant_context.h")
 
 
-def read_config():
-    return "\n".join(open(path).read() for path in (FACTS_SRC, CONFIG_SRC))
+def read_facts():
+    return open(FACTS_SRC, encoding="utf-8").read()
 
 
 def read_delivery_sources():
-    return {path: open(path).read() for path in (DELIVERY_SRC, VBLANK_SRC, CONTEXT_SRC)}
+    return {path: open(path).read() for path in (DELIVERY_SRC, FRAME_SRC, CONTEXT_SRC)}
 
 
 def words(img):
@@ -189,12 +188,12 @@ def parse_constant(text, name):
     m = re.search(rf"\b{name}\s*=\s*(0x[0-9A-Fa-f]+|[0-9]+)u?", text)
     if not m:
         raise Refuse(
-            f"{CONFIG_SRC}: did not find {name}; cannot compare shipping pad seam"
+            f"{FACTS_SRC}: did not find {name}; cannot compare title pad fact"
         )
     return int(m.group(1), 0)
 
 
-def check_config(measured, text):
+def check_source(measured, text):
     fields = {
         "kSlot0Buffer": "slot0",
         "kSlot1Buffer": "slot1",
@@ -210,21 +209,13 @@ def check_config(measured, text):
         )
         if not ok:
             failures.append(constant)
-    for field, constant in (
-        ("padSlot0Buf", "kSlot0Buffer"),
-        ("padSlot1Buf", "kSlot1Buffer"),
-        ("padSlotPtrTable", "kDriverPointerTable"),
-        ("padSlotPtrStride", "kDriverPointerStride"),
-    ):
-        if not re.search(rf"\.{field}\s*=\s*vagrant::pad::{constant}\b", text):
-            failures.append(f"{field} binding")
     if failures:
         raise Refuse("shipping mismatch: " + ", ".join(failures))
 
 
 def check_delivery_source(sources):
     delivery = sources[DELIVERY_SRC]
-    vblank = sources[VBLANK_SRC]
+    frame = sources[FRAME_SRC]
     context = sources[CONTEXT_SRC]
     failures = []
     if "core.game->pad.serviceFrame();" not in delivery:
@@ -237,10 +228,12 @@ def check_delivery_source(sources):
         re.S,
     ):
         failures.append("high-byte-first packet normalization")
-    handler = vblank.find("rec_dispatch(c, kVBlankHandler);")
-    service = vblank.find("padDelivery.serviceField(*c);")
-    if handler < 0 or service <= handler:
-        failures.append("post-handler display-field delivery")
+    if not re.search(r"\.input\s*=\s*serviceInput\b", frame):
+        failures.append("native frame-driver input binding")
+    input_service = frame.find("services_.input(core);")
+    audio_service = frame.find("services_.audio(core);")
+    if input_service < 0 or audio_service <= input_service:
+        failures.append("input-before-audio field order")
     if not re.search(r"\bPadDelivery\s+padDelivery\s*\{\s*\}\s*;", context):
         failures.append("per-Core PadDelivery ownership")
     if failures:
@@ -250,7 +243,7 @@ def check_delivery_source(sources):
 def selftest(img, measured):
     print("== re_pad selftest ==")
     checks = 0
-    check_config(measured, read_config())
+    check_source(measured, read_facts())
     checks += 1
 
     original = img.data
@@ -284,7 +277,7 @@ def selftest(img, measured):
     finally:
         img.data = original
 
-    text = read_config()
+    text = read_facts()
     changed = text.replace(
         f"kSlot0Buffer = 0x{measured['slot0']:08X}",
         f"kSlot0Buffer = 0x{measured['slot0'] + 4:08X}",
@@ -293,7 +286,7 @@ def selftest(img, measured):
     if changed == text:
         raise AssertionError("shipping mutation anchor did not fire")
     try:
-        check_config(measured, changed)
+        check_source(measured, changed)
         raise AssertionError("+4 shipping slot was accepted")
     except Refuse as e:
         if "kSlot0Buffer" not in str(e):
@@ -319,12 +312,12 @@ def selftest(img, measured):
 
 def main(argv):
     args = list(argv)
-    do_check = "--check-config" in args
+    do_check = "--check-source" in args
     do_selftest = "--selftest" in args
-    args = [a for a in args if a not in ("--check-config", "--selftest")]
+    args = [a for a in args if a not in ("--check-source", "--selftest")]
     if len(args) > 1:
         print(
-            "usage: re_pad.py [--check-config] [--selftest] [SLUS_010.40]",
+            "usage: re_pad.py [--check-source] [--selftest] [SLUS_010.40]",
             file=sys.stderr,
         )
         return 2
@@ -348,11 +341,11 @@ def main(argv):
             f"({m['decoder_scanned']} candidates scanned)"
         )
         print(
-            "  boundary: the measured VBlank host turn services and normalizes these packets; "
+            "  boundary: VagrantFrameDriver services and normalizes these packets once per field; "
             "later menu behavior is not claimed"
         )
         if do_check:
-            check_config(m, read_config())
+            check_source(m, read_facts())
             check_delivery_source(read_delivery_sources())
         if do_selftest:
             selftest(img, m)

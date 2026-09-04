@@ -2,12 +2,11 @@
 """re_overlay.py — MEASURE the load base of every .PRG overlay module in SLUS_010.40 (RE-03).
 
   python3 tools/re_overlay.py [/path/to/disc.chd]   # the full measurement, with citations
-  python3 tools/re_overlay.py --check-config        # diff the SHIPPING config/seeds against the bytes
   python3 tools/re_overlay.py --selftest            # prove every gate here can print the OTHER answer
 
-WHY THIS EXISTS. An overlay is keyed BY its load address: a wrong base emits a whole module of
-correctly-decoded instructions at WRONG addresses, and every `jal` target, pointer test and router
-lookup is then silently wrong — it does not fail cleanly, it reads as a framework bug. rood-reverse's
+WHY THIS EXISTS. An overlay is keyed BY its load address: a wrong base maps a whole module at wrong
+addresses, and every `jal` target, pointer test and indirect branch is then silently wrong.
+rood-reverse's
 splat configs STATE a `vram:` per module. That is a hypothesis about a different build pipeline, not
 evidence about this port, so nothing here reads those configs. Everything below is derived from our
 own extracted bytes plus our own disc's ISO directory.
@@ -67,8 +66,6 @@ from resolve_disc import resolve  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXE_ON_DISC = "SLUS_010.40"
 PRG_DIR = os.path.join(ROOT, "scratch", "raw", "prg")
-CONFIG_SRC = os.path.join(ROOT, "game", "core", "game_config.cpp")
-SEEDS_SRC = os.path.join(ROOT, "game", "recomp_seeds.json")
 ROOD_CONFIG = os.path.join(ROOT, "external", "rood-reverse", "config")
 
 SECTOR = 2048
@@ -774,81 +771,11 @@ def report(r, imgs, out=print):
     return 1 if failures else 0
 
 
-# --------------------------------------------------------------------- the shipping-config gates --
-
-def parse_config(text):
-    """The 3 `.overlaySlots` bases out of the SHIPPING game_config.cpp, by text."""
-    lines = [line for line in text.splitlines() if ".overlaySlots" in line]
-    if not lines:
-        raise Refuse(f"{CONFIG_SRC} has no .overlaySlots initialiser — nothing to check")
-    if len(lines) != 1:
-        raise Refuse(f"{CONFIG_SRC} has {len(lines)} lines containing .overlaySlots; expected one")
-    toks = re.findall(r"\{\s*(0[xX][0-9a-fA-F]+|[0-9]+)\s*,\s*nullptr\s*\}", lines[0])
-    if len(toks) != 3:
-        raise Refuse(f".overlaySlots must contain exactly 3 literal-base/null-callback entries on "
-                     f"one line; parsed {len(toks)} from {lines[0]!r}")
-    return [int(tok, 0) for tok in toks]
-
-
-def parse_seeds(text):
-    """overlay_bases out of recomp_seeds.json. Its `//` comments are stripped the way emit.py does."""
-    lines = [ln for ln in text.splitlines() if not ln.lstrip().startswith("//")]
-    import json
-    data = json.loads("\n".join(lines))
-    return {k: int(v, 0) if isinstance(v, str) else v
-            for k, v in data.get("overlay_bases", {}).items()}
-
-
-def check_config(r, out=print, config_text=None, seeds_text=None):
-    if config_text is None:
-        config_text = open(CONFIG_SRC, encoding="utf-8").read()
-    if seeds_text is None:
-        seeds_text = open(SEEDS_SRC, encoding="utf-8").read()
-    cfg = parse_config(config_text)
-    seeds = parse_seeds(seeds_text)
-    want_slots = [d for d, _v in r.slots]
-    fails = 0
-    checks = 0
-
-    out("== --check-config: the SHIPPING files vs these bytes " + "=" * 26)
-    out(f"  game_config.cpp .overlaySlots      : {len(cfg)} entries")
-    out(f"  recomp_seeds.json overlay_bases    : {len(seeds)} entries")
-    out(f"  measured slots {len(want_slots)} · measured modules {len(r.bases)}")
-    if len(cfg) != len(want_slots):
-        out(f"  FAILED slot count: config has {len(cfg)}, measurement found {len(want_slots)}")
-        fails += 1
-    checks += 1
-    for i, (dest, _vas) in enumerate(r.slots):
-        checks += 1
-        got = cfg[i] if i < len(cfg) else None
-        ok = got == dest
-        fails += 0 if ok else 1
-        out(f"  {'ok    ' if ok else 'FAILED'} overlaySlots[{i}].base "
-            f"config={('0x%08X' % got) if got is not None else 'MISSING':>10} "
-            f"measured=0x{dest:08X}")
-    for stem, (base, how) in sorted(r.bases.items()):
-        checks += 1
-        got = seeds.get(stem)
-        ok = got == base
-        fails += 0 if ok else 1
-        out(f"  {'ok    ' if ok else 'FAILED'} overlay_bases[{stem}] "
-            f"seeds={('0x%08X' % got) if got is not None else 'MISSING':>10} "
-            f"measured=0x{base:08X} [{how}]")
-    extra = sorted(set(seeds) - set(r.bases))
-    for stem in extra:
-        checks += 1
-        fails += 1
-        out(f"  FAILED overlay_bases[{stem}] is declared in the seeds but NOTHING was measured for "
-            "it — a base with no measurement behind it is exactly what this gate exists to stop")
-    out(f"  {checks} checks, {fails} FAILED")
-    return 1 if fails else 0
-
-
 # ---------------------------------------------------------------------------------- the selftest --
 
 def selftest(disc, out=print):
     """Every claim this tool makes, fed a case that MUST come out the OTHER way."""
-    out("== selftest plan: 7 checks, each one a case whose answer is known WITHOUT this tool " + "=" * 1)
+    out("== selftest plan: 6 checks, each one a case whose answer is known WITHOUT this tool " + "=" * 1)
     for i, t in enumerate([
         "M2 recovers the boot exe's OWN load address, known independently from its PS-EXE header",
         "M2 on a module shifted by one word must NOT still answer the unshifted base",
@@ -856,7 +783,6 @@ def selftest(disc, out=print):
         "M3 rejects an owned image changed by one byte BEFORE comparing its address",
         "M3 rejects a reference vram changed by one word after identity passes",
         "M1's disc referee REJECTS a descriptor whose LBA is not a file start",
-        "--check-config names BOTH a changed shipping slot and a changed module seed",
     ], 1):
         out(f"   [{i}] {t}")
     out("")
@@ -946,39 +872,13 @@ def selftest(disc, out=print):
     if not ok:
         fails.append(6)
 
-    # [7] the config gate must go RED on a one-word change to a SHIPPING value.
-    r, _i2, _e2 = measure(disc)
-    text = open(CONFIG_SRC, encoding="utf-8").read()
-    cfg = parse_config(text)
-    old = f"{{0x{cfg[0]:08X}, nullptr}}"
-    new = f"{{0x{cfg[0] + 4:08X}, nullptr}}"
-    if text.count(old) != 1:
-        raise Refuse(f"selftest could not uniquely locate shipping slot text {old!r}")
-    bad_text = text.replace(old, new)
-    seeds_text = open(SEEDS_SRC, encoding="utf-8").read()
-    seed_old = f'"BATTLE": "0x{r.bases["BATTLE"][0]:08X}"'
-    seed_new = f'"BATTLE": "0x{r.bases["BATTLE"][0] + 4:08X}"'
-    if seeds_text.count(seed_old) != 1:
-        raise Refuse(f"selftest could not uniquely locate shipping seed text {seed_old!r}")
-    bad_seeds = seeds_text.replace(seed_old, seed_new)
-    sink = []
-    rc = check_config(r, out=sink.append, config_text=bad_text, seeds_text=bad_seeds)
-    slot_line = next((ln.strip() for ln in sink if "FAILED overlaySlots[0]" in ln), "MISSING")
-    seed_line = next((ln.strip() for ln in sink if "FAILED overlay_bases[BATTLE]" in ln), "MISSING")
-    ok = rc == 1 and slot_line != "MISSING" and seed_line != "MISSING"
-    out(f"  [7] {'PASS' if ok else 'FAIL'} with SHIPPING slot 0 and BATTLE seed moved +4, "
-        f"the gate returns {rc} and prints BOTH: {slot_line}; {seed_line}")
-    if not ok:
-        fails.append(7)
-
     out("")
-    passed = 7 - len(fails)
-    out(f"selftest: 7 checks, {passed} PASS, 0 SKIP, {len(fails)} FAIL "
+    passed = 6 - len(fails)
+    out(f"selftest: 6 checks, {passed} PASS, 0 SKIP, {len(fails)} FAIL "
         f"{fails if fails else ''}")
     out("  Not covered by this selftest, stated explicitly: nothing here observes a RUNNING loader, "
         "so a base that is correct statically but rewritten at run time would pass every check "
-        "above. The resident + reached-overlay substrate statically contains TITLE, BATTLE, and "
-        "INITBTL, but this instrument does not observe or validate runtime rewriting "
+        "above. The dynarec adapter must separately prove runtime mapping and invalidation "
         "(RE-04/RE-05/RE-15).")
     return 1 if fails else 0
 
@@ -987,15 +887,12 @@ def main(argv):
     ap = argparse.ArgumentParser(add_help=True, description=__doc__.splitlines()[0])
     ap.add_argument("disc", nargs="?")
     ap.add_argument("--selftest", action="store_true")
-    ap.add_argument("--check-config", action="store_true")
     a = ap.parse_args(argv)
     try:
-        disc = resolve(a.disc, verbose=not (a.selftest or a.check_config))
+        disc = resolve(a.disc, verbose=not a.selftest)
         if a.selftest:
             return selftest(disc)
         r, imgs, _exe = measure(disc)
-        if a.check_config:
-            return check_config(r)
         return report(r, imgs)
     except Refuse as e:
         print(f"[re_overlay] REFUSING: {e}", file=sys.stderr)

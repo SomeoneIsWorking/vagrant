@@ -2,18 +2,12 @@
 
 #include "core.h"
 #include "game.h"
-#include "override_registry.h"
 #include "render_queue.h"
 #include "vagrant_context.h"
 
 #include <cstdint>
 #include <cstdlib>
 #include <lucent/log.h>
-
-#ifdef VAGRANT_HAVE_SUBSTRATE
-extern void ov_title_gen_8006F174(Core *);
-extern void ov_title_set_override(std::uint32_t, OverrideFn);
-#endif
 
 namespace {
 
@@ -29,30 +23,6 @@ vagrant::TitleMovieProducer *producer(Core &core) {
   }
   return &static_cast<vagrant::VagrantContext *>(core.gameCtx)->titleMovie;
 }
-
-#ifdef VAGRANT_HAVE_SUBSTRATE
-void title_movie_dct_out_callback(Core *core) {
-#ifdef VAGRANT_TEST_DISABLE_TITLE_MOVIE_PRODUCER
-  // Negative-control seam only: preserve guest MDEC completion, slice upload, and callback chaining
-  // while withholding the semantic native scanout owner. This exists only in a separate test build.
-  ov_title_gen_8006F174(core);
-#else
-  // The generated body remains authoritative for every guest effect. Observing frameComplete only
-  // after the super-call ensures the final slice has reached guest VRAM before it becomes presentable.
-  ov_title_gen_8006F174(core);
-  if (core->mem_r32(kMovieFrameComplete) == 0) {
-    return;
-  }
-
-  vagrant::TitleMovieProducer *movie = producer(*core);
-  if (!movie) {
-    lucent::error("vagrant-title-movie", "TITLE MDEC callback reached without a VagrantContext");
-    std::abort();
-  }
-  movie->frameCompleted();
-#endif
-}
-#endif
 
 } // namespace
 
@@ -75,24 +45,11 @@ bool TitleMovieProducer::present(Core &core) {
   RenderQueue &queue = core.game->activeRq();
   queue.reset();
   queue.flush(&core);
-  core.game->presentation.commit(&core);
-  lucent::debug("vagrant-title-movie", "presented completed guest-decoded TITLE movie frame");
+  lucent::debug("vagrant-title-movie", "prepared completed guest-decoded TITLE movie frame");
   return true;
 }
 
-void registerTitleMovieOverrides() {
-#ifdef VAGRANT_HAVE_SUBSTRATE
-  overrides::install(kTitleMovieDctOutCallback,
-                     "VagrantTitleMovie::_decDCToutCallback",
-                     title_movie_dct_out_callback,
-                     ov_title_gen_8006F174,
-                     ov_title_set_override);
-#else
-  lucent::debug("vagrant-title-movie", "TITLE movie registration deferred: no generated substrate in this target");
-#endif
-}
-
-bool presentTitleMovie(Core &core) {
+bool prepareTitleMovieField(Core &core) {
   TitleMovieProducer *movie = producer(core);
   return movie && movie->present(core);
 }

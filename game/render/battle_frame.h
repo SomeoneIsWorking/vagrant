@@ -17,7 +17,6 @@ private:
   bool frameReady_ = false;
 };
 
-void registerBattleFrameOverrides();
-bool presentBattleFrame(Core &core);
+bool prepareBattleField(Core &core);
 
 } // namespace vagrant

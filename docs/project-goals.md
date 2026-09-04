@@ -3,7 +3,7 @@
 ## G001 — Faithful, playable PC port
 
 Deliver Vagrant Story from the USA `SLUS_010.40` executable and user-supplied disc content as a
-portable PC application. The retained static-recompilation substrate and independent retail-backed
+portable PC application. The authenticated retail bytes, independent emulator, and retail-backed
 instruments remain the falsifiers for native replacements; isolated compilation or reaching a menu
 does not satisfy this goal.
 
@@ -40,7 +40,8 @@ scope.
 
 ## Constraints
 
-- `generated/` remains derived, ignored, and unedited.
+- The gameplay product executes guest instructions only through psxport's dynarec and contains no
+  offline-generated guest code or interpreter fallback.
 - Retail-derived addresses and behavior ship only with executable-backed measurements and gates.
 - The matching CC0 rood-reverse decomp is a readable source supply, not independent proof.
 - The zero-argument launcher must provision from user-owned assets and run the current product without

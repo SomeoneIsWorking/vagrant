@@ -4,7 +4,7 @@ kind: claim
 status: falsified
 created: 2026-08-21
 tags: boot,cd,re-04
-depends: game/sync/vblank.cpp#vagrant_vblank_turn, game/recomp_seeds.json#main_reentry, tools/run.py#launch, tools/re_async_cd.py#measure, external/psxport
+depends: docs/issues/0014-vagrant-vsync-waits-forever-because-resident-vbl.md, tools/re_vblank.py#measure, tools/re_async_cd.py#measure, external/psxport
 falsified_on: 2026-08-21
 ---
 

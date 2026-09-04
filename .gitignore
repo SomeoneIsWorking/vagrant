@@ -1,10 +1,9 @@
-# Build + generated artifacts (the recompiled substrate is ~hundreds of MB of emitted C)
+# Build and runtime artifacts.
 build/
 scratch/
-generated/
 
-# The recompiled substrate's INPUTS come from YOUR OWN disc and are never committed: the disc image
-# and anything extracted from it are the copyright holder's, not this repo's.
+# Runtime inputs come from YOUR OWN disc and are never committed: the disc image and anything
+# extracted from it are the copyright holder's, not this repo's.
 #
 # Kept NARROW on purpose. Everything extracted lands under scratch/ (already ignored above); the
 # patterns here are the belt to that braces, for a file dropped in the repo root. Broad patterns

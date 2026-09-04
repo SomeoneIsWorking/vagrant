@@ -29,13 +29,8 @@ struct HeapHeader {
   std::uint32_t blockSz; // capacity in 16-byte units for a node, 0 for a chain head
 };
 
-// initHeap — the guest ABI body replacing gen_func_80043F74: seeds heapA with [kArenaBase,
-// kArenaBase+kArenaSize) as the single free block, leaves heapB an empty chain, and ends with
-// v0 = &heapB and v1 = 0x80050000 exactly as the substrate body does (mirror-verify compares both).
+// initHeap seeds heapA with [kArenaBase, kArenaBase+kArenaSize) as the single free block, leaves
+// heapB an empty chain, and preserves the measured guest ABI result registers.
 void initHeap(Core *core);
-
-// registerHeapOverride — wires (kInitHeap, initHeap, gen_func_80043F74) into the override registry
-// via shard_set_override. A no-op unless the recompiled substrate is linked.
-void registerHeapOverride();
 
 } // namespace vagrant::heap

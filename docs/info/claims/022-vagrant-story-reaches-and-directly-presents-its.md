@@ -4,7 +4,7 @@ kind: claim
 status: holds
 created: 2026-08-22
 tags: render,title,re-14
-depends: game/render/title_menu.cpp#title_menu_items_complete, game/render/title_menu.cpp#TitleMenuProducer::present, game/sync/vblank.cpp#vagrant_vblank_turn, tools/re_title_menu.py#measure
+depends: game/render/title_menu.cpp#title_menu_items_complete, game/render/title_menu.cpp#TitleMenuProducer::present, game/sync/frame_loop.cpp#VagrantFrameDriver::stepFrame, tools/re_title_menu.py#measure
 reconfirmed: 2026-08-24
 verified_at: 2026-08-24 20:08:15
 ---
@@ -16,6 +16,9 @@ Vagrant Story reaches and directly presents its first TITLE menu after an intact
 ## Evidence
 
 2026-08-22 against psxport d2266f4b and owned SLUS_010.40: shipping switches live 24-bit movie output to 15-bit 512x224 and presents readable Vagrant Story/New Game/Continue/Sound at present 64, 241809/691200 nonblack, SHA256 7b93beafa44f1b9a76c511e396b9bbc179f09c004eea5725e1b3e19194198529. VAGRANT_TEST_DISABLE_TITLE_MENU_PRODUCER retains the exact generated super and transition but hits the 65536-item queue fail-fast with same-index present absent. re_title_menu 3/3.
+
+The live evidence belongs to the retired guest-loop route. The producer remains wired to prepare a
+field for VagrantFrameDriver's single commit, but the new native phase path has not reached it yet.
 
 ## What would falsify it
 

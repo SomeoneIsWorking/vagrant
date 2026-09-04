@@ -16,8 +16,8 @@ updated: 2026-08-27
 `SetGeomOffset(160,112)`, projection-distance word `0x8005E248`, and setter `0x8007CCF0`.
 
 `game/render/battle_frame.{h,cpp}` installs a retained-super completion fence on the measured
-presenter. The per-Core `BattleFrameProducer` flushes and commits only after that guest presenter has
-translated its dynamic OT. Clang builds the seam and full generated product; the runtime/context test,
+presenter. The per-Core `BattleFrameProducer` flushes only after that guest presenter has translated
+its dynamic OT; `VagrantFrameDriver` owns the one field commit. Clang builds the seam and full generated product; the runtime/context test,
 clang-format/clang-tidy gate, and `re_frame.py` 6/6 controlled-mutation self-test pass.
 
 This is a render-ownership prerequisite, not a native world renderer and not a visual fix. A serialized
@@ -46,7 +46,7 @@ field fence itself fixes pixels.
 
 ## Serialized product gate
 
-The completed operator-owned recipe uses the real Clang-built product, at paced guest speed, against
+The historical operator-owned recipe used the former guest-loop product, at paced guest speed, against
 the recording that reaches BATTLE around pad frame 6000:
 
 ```sh

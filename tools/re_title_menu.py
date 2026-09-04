@@ -94,10 +94,7 @@ def check_source(measured, text):
             f"{SOURCE}: kTitleMenuItemsComplete=0x{shipped:08X}, "
             f"measured 0x{measured['menu_items']:08X}"
         )
-    generated = f"ov_title_gen_{measured['menu_items']:08X}"
-    if text.count(generated) < 2:
-        raise Refuse(f"{SOURCE}: measured generated super body {generated} is not retained and installed")
-    print(f"  [ ok ] shipping completion/super: 0x{shipped:08X} / {generated}")
+    print(f"  [ ok ] native completion fact: 0x{shipped:08X}")
 
 
 def selftest(title, measured, source_text):

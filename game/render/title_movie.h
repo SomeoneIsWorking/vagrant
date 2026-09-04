@@ -6,7 +6,7 @@ namespace vagrant {
 
 // TITLE's guest libpress path owns STR streaming, VLC expansion, MDEC decode, double buffering, and
 // RGB24 uploads into VRAM. This producer owns only the missing host scanout boundary: a completed
-// guest frame makes the already-selected display buffer eligible for one native present at VBlank.
+// guest frame makes the already-selected display buffer eligible for the native driver's next field.
 class TitleMovieProducer {
 public:
   void frameCompleted();
@@ -20,7 +20,6 @@ private:
   bool frameReady_ = false;
 };
 
-void registerTitleMovieOverrides();
-bool presentTitleMovie(Core &core);
+bool prepareTitleMovieField(Core &core);
 
 } // namespace vagrant

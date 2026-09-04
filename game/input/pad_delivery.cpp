@@ -14,8 +14,7 @@ void PadDelivery::normalizeButtonByteOrder(Core &core, std::uint32_t buffer) {
 }
 
 void PadDelivery::serviceField(Core &core) const {
-  // Poll/replay exactly once. Vagrant's resident entry never returns to the generic native frame
-  // loop, so its measured VBlank host turn owns this call.
+  // Poll/replay exactly once at VagrantFrameDriver's native-owned field boundary.
   core.game->pad.serviceFrame();
 
 #ifdef VAGRANT_TEST_DISABLE_PAD_NORMALIZATION

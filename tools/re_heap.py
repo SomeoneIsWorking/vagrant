@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Measure Vagrant Story's own heap initialiser and its free-list control blocks.
 
-RE-07's supply instrument: the first native body seeded from the matching decomp
+RE-07's supply instrument: the first semantic native body informed by the matching decomp
 (external/rood-reverse, CC0 — `vs_main_initHeap`) is gated here against OUR bytes. Nothing may be
 imported merely because the reference names it, so this tool derives every shipped constant from the
 owned executable: it finds the unique arena-argument call site by its immediate shape, decodes the
@@ -231,10 +231,6 @@ def check_source(measured, text):
         print(f"  [{'ok' if ok else 'FAIL':>4}] {constant} shipped=0x{got:08X} measured=0x{want:08X}")
         if not ok:
             failures.append(constant)
-    if "overrides::install(kInitHeap" not in text:
-        failures.append("registry install at kInitHeap")
-    if "gen_func_80043F74" not in text:
-        failures.append("substrate gen pairing")
     if failures:
         raise Refuse("shipping mismatch: " + ", ".join(failures))
 
@@ -342,8 +338,8 @@ def main(argv):
         )
         print(f"  arena 0x{m['arena_base']:08X}+0x{m['arena_size']:X} handed at the sole caller")
         print(
-            "  boundary: ownership covers this initialiser alone; alloc/free callers stay on the "
-            "substrate until their own RE step"
+            "  boundary: ownership covers this initialiser alone; alloc/free callers remain "
+            "ordinary dynarec guest code until their own RE step"
         )
         rood_corroboration(m)
         if do_check:

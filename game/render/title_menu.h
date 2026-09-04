@@ -17,7 +17,6 @@ private:
   bool frameReady_ = false;
 };
 
-void registerTitleMenuOverrides();
-bool presentTitleMenu(Core &core);
+bool prepareTitleMenuField(Core &core);
 
 } // namespace vagrant

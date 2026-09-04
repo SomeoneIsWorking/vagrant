@@ -20,7 +20,7 @@ Against BATTLE.PRG SHA-1 `d53aaccc3b3a2fc057d05e0dcea92f7182bc72a9`:
   argument there and calls `SetGeomScreen`.
 
 The shipping `BattleFrameProducer` owns only the completed-field fence. It retained-super-calls
-`0x8007629C`, then lets the VBlank owner flush and commit the already-translated guest batch. It does
+`0x8007629C`, then flushes the already-translated guest batch for VagrantFrameDriver's single commit. It does
 not yet recreate scene geometry semantically.
 
 ## What the current framework paths do for Vagrant
@@ -30,16 +30,16 @@ their game-owned inputs:
 
 - `VagrantRuntime` does not publish a `GuestWidescreenProjection`. The generic guest-projection plan
   therefore has no Vagrant aspect policy, and that plan is GTE-path-only in any case.
-- Native `gpu_vk_wide_engine` can see the user's aspect toggle, but its durable per-frame OFX recenter
-  lives in the framework's native frame loop. Vagrant does not run that loop; its guest VBlank is the
-  field authority, and BATTLE's presenter restores OFX=160 itself. Generic 2D widening heuristics are
+- Native `gpu_vk_wide_engine` can see the user's aspect toggle, and Vagrant now runs through the
+  framework's native shell. However, the title driver does not yet own a semantic BATTLE world pass,
+  and BATTLE's presenter restores OFX=160 itself. Generic 2D widening heuristics are
   not a substitute for a widened BATTLE world projection.
 - `VagrantRuntime` explicitly declares the `interpolatedNative` target profile, so native,
   widescreen, and temporal controls remain part of this title's intended product. Every current
   Vagrant producer still calls the neutral `FramePresenter::commit` without passing the temporal
   decorator, however, and Vagrant supplies no
   `fps60ReadSceneCam` or `fps60WorldPass` callback. Consequently `fps60=1` in the checkout-local
-  settings file is not evidence that Vagrant fields are interpolated; the present path bypasses the
+  settings file is not evidence that Vagrant fields are interpolated; the current field path bypasses the
   temporal object.
 
 Do not wire the existing decorator merely to make the toggle execute. With no Vagrant semantic world

@@ -1,77 +1,12 @@
-# Vagrant Story (SLUS-01040, USA) — a PC-native port built on the psxport framework
-# (external/psxport submodule).
-#
-# The framework (PSX-generic static-recomp substrate + runtime + HW backends + SBS harness + SDL_GPU
-# renderer) is the reusable `psxport` library; this repo adds the game (game/**) and the gitignored,
-# reproducibly emitted SLUS_010.40 substrate (generated/**). See docs/re-frontier.md for the current
-# verified boundary.
 cmake_minimum_required(VERSION 3.21)
 
-# ccache, when available. The recompiled substrate is hundreds of MB of generated C, so compilation is
-# essentially the whole cost of an iteration. Must be set BEFORE project(), which is when CMake probes
-# the compiler.
-find_program(CCACHE_PROGRAM ccache)
-if(CCACHE_PROGRAM)
-  set(CMAKE_C_COMPILER_LAUNCHER   "${CCACHE_PROGRAM}")
-  set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-  message(STATUS "ccache: ${CCACHE_PROGRAM}")
-endif()
+project(vagrant_story_port LANGUAGES NONE)
 
-project(vagrantstory CXX C)
-
-# PSXPORT_DIR — WHERE THE FRAMEWORK SOURCE COMES FROM. Defaults to external/psxport, which is no
-# longer a git submodule (2026-08-16): tools/psxport_sync.py --auto (called by run.sh) makes it a
-# SYMLINK to the workspace's shared framework clone when one exists, or a private clone at this
-# repo's psxport.pin on a fresh machine. So a fresh clone of this repo alone still builds standalone:
-# that property is what "each game is its own project using psxport as the framework" means, and it
-# must stay testable.
-#
-# Point it at a specific framework checkout to build against in-progress framework work:
-#
-#   cmake -S . -B build -DPSXPORT_DIR=/path/to/psxport
-#
-# It is a CACHE path, so it survives reconfigures. Everything else in this file and in cmake/ derives
-# from it — never re-spell `external/psxport` at a call site, or the two halves of a build can come
-# from different checkouts.
-set(PSXPORT_DIR "${CMAKE_SOURCE_DIR}/external/psxport" CACHE PATH
-    "psxport framework source directory (default: external/psxport)")
-if(NOT EXISTS "${PSXPORT_DIR}/cmake/psxport.cmake")
-  message(FATAL_ERROR "PSXPORT_DIR=${PSXPORT_DIR} has no cmake/psxport.cmake — "
-                      "run `python3 tools/psxport_sync.py --auto`, or point PSXPORT_DIR at a psxport checkout.")
-endif()
-message(STATUS "psxport framework: ${PSXPORT_DIR}")
-
-# RECORD WHAT THIS CONFIGURE RESOLVED, so `tools/psxport_sync.py --check` can compare the framework
-# you actually BUILT against with the one psxport.pin RECORDS. The framework is no longer a git
-# submodule (external/psxport is a symlink to the workspace's shared clone, or a private clone at the
-# pin — see tools/psxport_sync.py); the pin is provenance, and this file is what keeps it honest.
-execute_process(COMMAND git -C "${PSXPORT_DIR}" rev-parse HEAD
-                OUTPUT_VARIABLE PSXPORT_RESOLVED_SHA OUTPUT_STRIP_TRAILING_WHITESPACE
-                ERROR_QUIET RESULT_VARIABLE _psxport_rev_rc)
-if(NOT _psxport_rev_rc EQUAL 0)
-  set(PSXPORT_RESOLVED_SHA "unknown")   # honest: never silently record a plausible-looking sha
-endif()
-file(WRITE "${CMAKE_BINARY_DIR}/psxport_resolved.txt"
-     "dir = ${PSXPORT_DIR}\ncommit = ${PSXPORT_RESOLVED_SHA}\n")
-message(STATUS "psxport commit: ${PSXPORT_RESOLVED_SHA}")
-
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-option(BUILD_TESTING "Build the Vagrant Story verification targets" ON)
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
-
-find_package(ZLIB REQUIRED)
-find_package(zstd CONFIG QUIET)
-if(NOT TARGET zstd::libzstd_shared)
-  find_library(ZSTD_LIBRARY zstd REQUIRED)
-  add_library(zstd::libzstd_shared SHARED IMPORTED)
-  set_target_properties(zstd::libzstd_shared PROPERTIES IMPORTED_LOCATION "${ZSTD_LIBRARY}")
-endif()
-find_package(Threads REQUIRED)
-
-# libchdr (CHD access) comes from the Beetle PSX submodule NESTED under psxport (PSXPORT_DIR, above).
-add_subdirectory(${PSXPORT_DIR}/vendor/beetle-psx/deps/libchdr
-                 ${CMAKE_BINARY_DIR}/libchdr_build EXCLUDE_FROM_ALL)
-
-include(cmake/vagrant_port.cmake)
+# Break-first migration boundary: the generated-source product has been removed. The
+# gameplay target remains unavailable until Vagrant Story is composed against
+# psxport's dynarec-only executor and image-scoped native override API.
+add_custom_target(vagrant_port ALL
+  COMMAND ${CMAKE_COMMAND} -E echo
+          "Vagrant Story product unavailable: the title adapter to psxport's dynarec-only executor has not been implemented"
+  COMMAND ${CMAKE_COMMAND} -E false
+  VERBATIM)

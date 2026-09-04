@@ -164,10 +164,7 @@ def check_source(measured, text):
         raise Refuse(f"{SOURCE}: callback=0x{callback:08X}, measured 0x{measured['dct_callback']:08X}")
     if complete != measured["frame_complete"]:
         raise Refuse(f"{SOURCE}: frameComplete=0x{complete:08X}, measured 0x{measured['frame_complete']:08X}")
-    generated = f"ov_title_gen_{callback:08X}"
-    if text.count(generated) < 2:
-        raise Refuse(f"{SOURCE}: measured generated super body {generated} is not retained and installed")
-    print(f"  [ ok ] shipping callback/frameComplete/super: 0x{callback:08X} / 0x{complete:08X} / {generated}")
+    print(f"  [ ok ] native callback/frameComplete facts: 0x{callback:08X} / 0x{complete:08X}")
 
 
 def selftest(title, measured, source_text):

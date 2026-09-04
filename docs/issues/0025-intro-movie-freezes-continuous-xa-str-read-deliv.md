@@ -32,8 +32,10 @@ and the custom exception exit acking — per sector, continuously. Three defects
    pull -> up to ~6% A/V drift.
 
 Fixed in framework commit f9b5db8f (routing + push-mode ring + backpressure + wall-locked drive
-clock + backlog servo). Vagrant side: the SPU field advance is stood up in
-game/sync/vblank.cpp vagrant_vblank_turn (the resident program's only per-field seam).
+clock + backlog servo). The historical proof advanced SPU from the retired VBlank host turn;
+`VagrantFrameDriver` now owns that same once-per-field audio service. The new finite phase route has
+not yet reached the intro, so this issue's live falsifier remains historical evidence rather than a
+current product-run claim.
 
 Falsifier MET: unattended windowed play streams the intro past LBA 262930 with live audio and no
 freeze; headless leaves the old 0x80022484 retry loop entirely and now runs on to issue #24.

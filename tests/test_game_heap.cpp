@@ -55,7 +55,7 @@ int main() {
   expect_word("heapB.blockSz", c->mem_r32(vagrant::heap::kControlB + 8), 0);
 
   // Register leaves must match the substrate body exactly (mirror-verify compares v0/v1):
-  // gen_func_80043F74 ends with v0 = &heapB and v1 = 0x80050000.
+  // The measured retail body ends with v0 = &heapB and v1 = 0x80050000.
   expect_word("v0", c->r[2], vagrant::heap::kControlB);
   expect_word("v1", c->r[3], 0x80050000u);
   expect_word("a0 preserved", c->r[4], kArenaBase);

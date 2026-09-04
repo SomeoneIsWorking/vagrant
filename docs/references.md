@@ -68,20 +68,14 @@ SLUS_010.40 alone) is a map into the exact executable this repo extracts.
    resident words at `0x80010000..0x8001000C`. This closes the static mapping and gates the shipped
    seed/config copies; observing a running loader still awaits a substrate.
 
-### Why a matching decomp matters STRUCTURALLY to psxport
+### Why a matching decomp matters to the hybrid
 
-psxport's override registry wants `(addr, native, gen)` triples where the native body must byte-match
-the substrate body it replaces. Producing that native body is normally the expensive part of every
-step: RE the function, port it, then prove byte-equivalence. A matching decomp is a **pre-verified
-supply of exactly those bodies** — its own CI already proves each one assembles to the target's bytes.
-
-No other title in this workspace has that, which is why this port is worth standing up: it is the
-cheapest available test of whether psxport's ownership pipeline can consume a decomp wholesale rather
-than one hand-RE'd function at a time. `RE-07` now proves the first consumption slice: the measured
-`vs_main_initHeap` body is installed as a retained-super override and mirror-verifies byte-exact on
-the live boot path. The result proves the pipeline for one body, not wholesale ownership of the
-decomp; allocator operations and every later candidate still require their own measured reach and
-mirror gate.
+The matching decomp is readable evidence for naming state and selecting cohesive native overrides.
+It does not execute in the product and does not replace comparison against the authenticated retail
+image. Ordinary guest instructions stay in psxport's dynarec; a native owner must still have an exact
+guest address, ABI/state contract, scoped activation, and differential evidence against the ordinary
+dynarec path. `RE-07` establishes the first such semantic body for `vs_main_initHeap`; registration
+waits for the image-scoped adapter tracked by S015.
 
 ### Keeping the pin honest
 
@@ -97,5 +91,3 @@ decomp here and do not depend on its toolchain; it is a read-only reference tree
 - **decomp.dev** lists this project among ~150 matching decomps (Vagrant Story ~62.63% when the
   workspace survey was written). psxport itself cannot report there — our axis is RAM parity, not
   object identity — see `external/psxport/docs/prior-art.md`.
-- **`mstan/psxrecomp`** (PolyForm Noncommercial) ships PS1 static-recompilation ports of other titles.
-  **READ AND LEARN ONLY** — copying its code would drag the noncommercial term into this repo.

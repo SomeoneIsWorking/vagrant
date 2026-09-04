@@ -32,3 +32,9 @@ black `scratch/screenshots/re12/negative_present_1.ppm` and no second present.
 
 This resolves first-picture absence only. After the two splash loops, GP1 switches to 24-bit and the
 next boundary is TITLE's intro/MDEC/FMV path, which watchdogs without a further present (RE-13).
+
+The native-frame route reconfirmed this resolution on 2026-08-27. PID 3119901 loaded TITLE.PRG from
+the USA CHD, advanced the new `TitleSplashPhase` for 48 producer fields without guest VSync, and
+exited its 60-field budget normally. Inspected capture
+`scratch/screenshots/viewable/re23_present_45.png` clearly shows the publisher text; the run measured
+29,499/691,200 non-black pixels (4.27%).

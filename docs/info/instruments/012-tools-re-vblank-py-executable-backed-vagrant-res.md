@@ -11,7 +11,7 @@ tools/re_vblank.py — executable-backed Vagrant resident VBlank/VSync route mea
 
 ## Validated by
 
-4/4 selftest: the real SHA-bound image produces the complete route, including the HookEntryInt setjmp buffer and restored PC; destroying the handler's counter increment yields 0 matches across 83,943 candidates; shifting the shipped handler +4 names kVBlankHandler and refuses; deleting restored PC 0x8001FAD0 from main_reentry names that seed class and refuses
+5/5 selftest: the real SHA-bound image produces the complete retail route, including the HookEntryInt setjmp buffer and restored PC; destroying the handler's counter increment yields 0 matches across 83,943 candidates; shifting shipped VSync +4 names kVSync; deleting the fatal VSync binding is refused; restoring a guest-VBlank host turn is refused. The shipping gate also requires finite frame-driver input/audio/producer/present/pace ownership and the absence of restored PC 0x8001FAD0 from reachable seeds.
 
 ## Known failure modes
 

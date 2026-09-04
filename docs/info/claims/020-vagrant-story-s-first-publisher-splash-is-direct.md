@@ -4,9 +4,9 @@ kind: claim
 status: holds
 created: 2026-08-22
 tags: render,title,runtime
-depends: game/render/title_startup.cpp#title_draw_sprite, game/render/title_startup_recipe.cpp#TitleSpriteRecipe::decode, game/sync/vblank.cpp#vagrant_vblank_turn, game/core/vagrant_runtime.cpp#VagrantRuntime::registerOverrides, tools/re_title_startup.py#measure
-reconfirmed: 2026-08-24
-verified_at: 2026-08-24 20:08:15
+depends: game/render/title_splash.cpp#TitleSplashPhase::advanceAfterField
+reconfirmed: 2026-08-27 22:33:13
+verified_at: 2026-08-27 22:33:13
 ---
 
 ## Claim
@@ -16,6 +16,9 @@ Vagrant Story's first publisher splash is directly produced from TITLE's measure
 ## Evidence
 
 2026-08-22: tools/re_title_startup.py --check-source --selftest derives/gates 0x8006A778 and passes 3/3 negatives; real-disc ./run.sh writes scratch/screenshots/re12/positive_present_8.ppm at 29,499/691,200 non-black (4.27%), visually legible; test-only VAGRANT_TEST_DISABLE_TITLE_PRODUCER build writes scratch/screenshots/re12/negative_present_1.ppm at mean/extrema zero and no present_2 before the same 24-bit MDEC watchdog
+
+The native phase route now reaches the producer through `TitleSplashPhase` and
+`VagrantFrameDriver`'s single commit.
 
 ## What would falsify it
 
@@ -44,3 +47,7 @@ Post-commit 4bd0718 positive real-disc capture preserves the publisher-splash pa
 ## Re-confirmed 2026-08-24
 
 Fresh shipping replay on this landed code path preserved the readable TITLE startup sequence before menu present_64; producer controls and 7/7 CTest remained green
+
+## Re-confirmed 2026-08-27 22:33:13
+
+2026-08-27 exact clean psxport 3c342ec3 Clang product PID 3180949 reached TitleSplashPhase through the native frame loop, completed all 728 measured _drawSprt fields, and wrote seven inspected non-black player-view captures spanning readable Square Electronic Arts and SQUARESOFT fades. The next mandatory fatal was later TITLE 0x8006E988 -> gametimeUpdate -> VSync(2), so the producer route itself completed.

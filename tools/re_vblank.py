@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Measure Vagrant's resident VBlank/VSync delivery route from the owned PS-EXE.
+"""Measure retail VBlank/VSync, then gate Vagrant's native-field ownership.
 
 Sony libetc waits on a counter incremented by the guest's installed VBlank handler. This tool derives
 VSync, its wait helper, startIntrVSync, the handler, callback table, registrar, callback-system
-wrapper, and public wrapper without taking any address as a search input. It then gates the
-game-owned host-turn seam that dispatches the intact handler at the framework's
-video-standard-derived field rate.
+wrapper, and public wrapper without taking any address as a search input. The retail route remains
+evidence, but the shipping gate requires VagrantFrameDriver to own the field and guest VSync to be a
+fatal PlatformHle binding; the guest handler and its host-turn injection are forbidden.
 """
 
-import json
 import os
 import re
 import struct
@@ -23,8 +22,8 @@ from re_spu_transfer import (
 )
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SOURCE = os.path.join(ROOT, "game", "sync", "vblank.cpp")
-SEEDS = os.path.join(ROOT, "game", "recomp_seeds.json")
+FACTS = os.path.join(ROOT, "game", "sync", "vsync_facts.h")
+FRAME = os.path.join(ROOT, "game", "sync", "frame_loop.cpp")
 
 
 def measure(img, verify_identity=True):
@@ -254,60 +253,62 @@ def measure(img, verify_identity=True):
     }
 
 
-def source_constant(text, name):
+def source_constant(path, text, name):
     match = re.search(rf"\b{name}\s*=\s*(0x[0-9A-Fa-f]+)", text)
     if not match:
-        raise Refuse(f"{SOURCE}: did not find {name}")
+        raise Refuse(f"{path}: did not find {name}")
     return int(match.group(1), 0)
 
 
-def seed_reentries(text):
-    lines = [line for line in text.splitlines() if not line.lstrip().startswith("//")]
-    data = json.loads("\n".join(lines))
-    return [
-        int(value, 0) if isinstance(value, str) else value
-        for value in data.get("main_reentry", [])
-    ]
-
-
-def check_source(measured, text, seeds_text):
-    expected = {
-        "kStartIntrVSync": measured["start"],
-        "kVBlankHandler": measured["handler"],
-        "kVBlankCounter": measured["counter"],
+def read_shipping_sources():
+    return {
+        path: open(path, encoding="utf-8").read()
+        for path in (FACTS, FRAME)
     }
+
+
+def check_source(measured, sources):
+    facts = sources[FACTS]
+    frame = sources[FRAME]
     failures = []
-    for name, value in expected.items():
-        shipped = source_constant(text, name)
-        ok = shipped == value
-        print(
-            f"  [{'ok' if ok else 'FAIL':>4}] {name} shipped=0x{shipped:08X} measured=0x{value:08X}"
-        )
-        if not ok:
-            failures.append(name)
+    shipped = source_constant(FACTS, facts, "kVSync")
+    ok = shipped == measured["vsync"]
+    print(
+        f"  [{'ok' if ok else 'FAIL':>4}] kVSync shipped=0x{shipped:08X} measured=0x{measured['vsync']:08X}"
+    )
+    if not ok:
+        failures.append("kVSync")
 
     wiring = {
-        "guest handler dispatch": r"rec_dispatch\s*\(\s*c\s*,\s*kVBlankHandler\s*\)",
-        "guest startIntrVSync super-call": r"gen_func_8001FF94\s*\(\s*c\s*\)",
-        "measured arming override": r"overrides::install\s*\(\s*kStartIntrVSync\b",
-        "video-standard field rate": (
-            r"rec_host_turn_register\s*\(\s*c\s*,\s*vagrant_vblank_turn\s*,\s*"
-            r"gpu_field_rate_millihz\s*\(\s*c\s*\)\s*\)"
-        ),
+        "input field service": r"\.input\s*=\s*serviceInput\b",
+        "audio field service": r"\.audio\s*=\s*serviceAudio\b",
+        "single presentation fence": r"services_\.present\(core\)\s*;",
+        "native field pacing": r"services_\.pace\(core\)\s*;",
     }
     for name, pattern in wiring.items():
-        ok = re.search(pattern, text, re.DOTALL) is not None
+        haystack = frame
+        ok = re.search(pattern, haystack, re.DOTALL) is not None
         print(f"  [{'ok' if ok else 'FAIL':>4}] {name}")
         if not ok:
             failures.append(name)
-    reentries = seed_reentries(seeds_text)
-    seed_ok = reentries.count(measured["reentry"]) == 1
-    print(
-        f"  [{'ok' if seed_ok else 'FAIL':>4}] restored setjmp PC "
-        f"0x{measured['reentry']:08X} appears exactly once in main_reentry"
-    )
-    if not seed_ok:
-        failures.append("main_reentry")
+
+    present_calls = len(re.findall(r"services_\.present\s*\(\s*core\s*\)", frame))
+    one_present = present_calls == 1
+    print(f"  [{'ok' if one_present else 'FAIL':>4}] exactly one driver presentation call site")
+    if not one_present:
+        failures.append("presentation call count")
+
+    forbidden = {
+        "guest VBlank handler dispatch": r"kVBlankHandler",
+        "guest VBlank host-turn injection": r"vagrant_vblank_turn",
+    }
+    shipping = frame
+    for name, pattern in forbidden.items():
+        absent = re.search(pattern, shipping, re.DOTALL) is None
+        print(f"  [{'ok' if absent else 'FAIL':>4}] no {name}")
+        if not absent:
+            failures.append(name)
+
     if failures:
         raise Refuse("shipping mismatch: " + ", ".join(failures))
 
@@ -315,11 +316,8 @@ def check_source(measured, text, seeds_text):
 def selftest(img, measured):
     print("== re_vblank selftest ==")
     checks = 0
-    with open(SOURCE, encoding="utf-8") as source_file:
-        text = source_file.read()
-    with open(SEEDS, encoding="utf-8") as seeds_file:
-        seeds_text = seeds_file.read()
-    check_source(measured, text, seeds_text)
+    sources = read_shipping_sources()
+    check_source(measured, sources)
     checks += 1
 
     original = img.data
@@ -340,31 +338,22 @@ def selftest(img, measured):
     finally:
         img.data = original
 
-    old = f"kVBlankHandler = 0x{measured['handler']:08X}"
-    changed = text.replace(old, f"kVBlankHandler = 0x{measured['handler'] + 4:08X}", 1)
-    if changed == text:
+    old = f"kVSync = 0x{measured['vsync']:08X}"
+    changed = sources[FACTS].replace(old, f"kVSync = 0x{measured['vsync'] + 4:08X}", 1)
+    if changed == sources[FACTS]:
         raise AssertionError("shipping mutation anchor did not fire")
+    sabotaged = dict(sources)
+    sabotaged[FACTS] = changed
     try:
-        check_source(measured, changed, seeds_text)
-        raise AssertionError("+4 shipping handler was accepted")
+        check_source(measured, sabotaged)
+        raise AssertionError("+4 shipping VSync was accepted")
     except Refuse as error:
-        if "kVBlankHandler" not in str(error):
+        if "kVSync" not in str(error):
             raise AssertionError(f"shipping negative did not name field: {error}")
-        print(f"  [ ok ] +4 shipping handler refused: {error}")
+        print(f"  [ ok ] +4 shipping VSync refused: {error}")
         checks += 1
 
-    changed_seeds = seeds_text.replace(f'    "0x{measured["reentry"]:08X}"\n', "", 1)
-    if changed_seeds == seeds_text:
-        raise AssertionError("main_reentry mutation anchor did not fire")
-    try:
-        check_source(measured, text, changed_seeds)
-        raise AssertionError("missing restored setjmp PC was accepted")
-    except Refuse as error:
-        if "main_reentry" not in str(error):
-            raise AssertionError(f"seed negative did not name field: {error}")
-        print(f"  [ ok ] missing restored setjmp PC refused: {error}")
-        checks += 1
-    print(f"re_vblank selftest: {checks}/4 PASS")
+    print(f"re_vblank selftest: {checks}/3 PASS")
 
 
 def main(argv):
@@ -381,7 +370,7 @@ def main(argv):
     try:
         img = Image(args[0] if args else DEFAULT_EXE)
         measured = measure(img)
-        print("== Vagrant resident VBlank/VSync delivery route ==")
+        print("== Vagrant retail VBlank/VSync evidence and native ownership ==")
         print(
             f"  VSync 0x{measured['vsync']:08X} -> wait helper 0x{measured['wait_helper']:08X} "
             f"-> counter 0x{measured['counter']:08X}"
@@ -404,15 +393,11 @@ def main(argv):
             f"HookEntryInt 0x{measured['hook_entry_int']:08X}"
         )
         print(
-            "  boundary: the host supplies display-field timing; the intact guest handler owns "
-            "counter and callback semantics"
+            "  retail evidence only: the future dynarec adapter owns ordinary guest execution; "
+            "the native frame owner must not invoke the retail handler directly"
         )
         if do_check:
-            with open(SOURCE, encoding="utf-8") as source_file:
-                source_text = source_file.read()
-            with open(SEEDS, encoding="utf-8") as seeds_file:
-                seeds_text = seeds_file.read()
-            check_source(measured, source_text, seeds_text)
+            check_source(measured, read_shipping_sources())
         if do_selftest:
             selftest(img, measured)
         return 0

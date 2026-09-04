@@ -21,7 +21,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_TITLE = os.path.join(ROOT, "scratch", "raw", "prg", "TITLE.PRG")
 DEFAULT_BATTLE = os.path.join(ROOT, "scratch", "raw", "prg", "BATTLE.PRG")
 DEFAULT_INITBTL = os.path.join(ROOT, "scratch", "raw", "prg", "INITBTL.PRG")
-CONFIG = os.path.join(ROOT, "game", "core", "game_config.cpp")
 BATTLE_SOURCE = os.path.join(ROOT, "game", "render", "battle_frame.cpp")
 
 TITLE_SHA1 = "f74a76e6215edebf607d0c2af56481050edb139a"
@@ -338,40 +337,6 @@ def config_value(text, field):
     return int(match.group(1), 0)
 
 
-def check_config(text):
-    failures = []
-    # These fields describe the retired fixed-layout native frame loop. Vagrant's measured guest
-    # contract is dynamic, so a non-zero value would assert an address/layout the bytes contradict.
-    zero_fields = (
-        "otRegionBase",
-        "otRegionStride",
-        "packetPoolBase",
-        "packetPoolStride",
-        "otBasePtr",
-        "poolPtrCur",
-        "poolPtrLast",
-        "clearOtagR",
-        "putDrawEnv",
-        "drawSync",
-    )
-    for field in zero_fields:
-        value = config_value(text, field)
-        ok = value == 0
-        print(
-            f"  [{'ok' if ok else 'FAIL':>4}] {field}=0x{value:08X} (dynamic guest owner)"
-        )
-        if not ok:
-            failures.append(field)
-    for field, expected in (("preserveVramBackdrop", 1), ("paceQuota", 1)):
-        value = config_value(text, field)
-        ok = value == expected
-        print(f"  [{'ok' if ok else 'FAIL':>4}] {field}={value} expected={expected}")
-        if not ok:
-            failures.append(field)
-    if failures:
-        raise Refuse("shipping frame contract mismatch: " + ", ".join(failures))
-
-
 def check_battle_source(measured, text):
     match = re.search(
         r"\bkBattleFramePresenter\s*=\s*(0x[0-9A-Fa-f]+)u?", text
@@ -384,26 +349,12 @@ def check_battle_source(measured, text):
             f"{BATTLE_SOURCE}: kBattleFramePresenter=0x{shipped:08X}, "
             f"measured 0x{measured['battle_present']:08X}"
         )
-    generated = f"ov_battle_gen_{measured['battle_present']:08X}"
-    if text.count(generated) < 2:
-        raise Refuse(
-            f"{BATTLE_SOURCE}: measured generated super body {generated} "
-            "is not retained and installed"
-        )
-    print(
-        f"  [ ok ] BATTLE shipping completion/super: "
-        f"0x{shipped:08X} / {generated}"
-    )
+    print(f"  [ ok ] BATTLE native completion fact: 0x{shipped:08X}")
 
 
 def selftest(title, battle, initbtl, measured, battle_source):
     print("== re_frame selftest ==")
     checks = 0
-    with open(CONFIG, encoding="utf-8") as source:
-        config = source.read()
-    check_config(config)
-    checks += 1
-
     original = title.data
     mutable = bytearray(original)
     off = title.off(measured["title_present"] + 0x88)
@@ -451,18 +402,6 @@ def selftest(title, battle, initbtl, measured, battle_source):
     finally:
         battle.data = original
 
-    changed = config.replace(".otRegionBase = 0", ".otRegionBase = 4", 1)
-    if changed == config:
-        raise AssertionError("shipping mutation anchor did not fire")
-    try:
-        check_config(changed)
-        raise AssertionError("non-zero fixed OT base was accepted")
-    except Refuse as error:
-        if "otRegionBase" not in str(error):
-            raise AssertionError(f"shipping negative did not name field: {error}")
-        print(f"  [ ok ] counterfeit fixed OT base refused: {error}")
-        checks += 1
-
     shifted = battle_source.replace(
         f"0x{measured['battle_present']:08X}u",
         f"0x{measured['battle_present'] + 4:08X}u",
@@ -474,22 +413,21 @@ def selftest(title, battle, initbtl, measured, battle_source):
     except Refuse as error:
         print(f"  [ ok ] shifted BATTLE shipping completion refused: {error}")
         checks += 1
-    print(f"re_frame selftest: {checks}/6 PASS")
+    print(f"re_frame selftest: {checks}/4 PASS")
 
 
 def main(argv):
     args = list(argv)
-    do_check = "--check-config" in args
     do_check_source = "--check-source" in args
     do_selftest = "--selftest" in args
     args = [
         arg
         for arg in args
-        if arg not in ("--check-config", "--check-source", "--selftest")
+        if arg not in ("--check-source", "--selftest")
     ]
     if len(args) not in (0, 3):
         print(
-            "usage: re_frame.py [--check-config] [--check-source] [--selftest] "
+            "usage: re_frame.py [--check-source] [--selftest] "
             "[TITLE.PRG BATTLE.PRG INITBTL.PRG]",
             file=sys.stderr,
         )
@@ -526,12 +464,9 @@ def main(argv):
             f"0x{measured['projection_setter']:08X} stores it and calls SetGeomScreen"
         )
         print(
-            "  boundary: OT/pool bases are guest-heap results, not fixed regions; keep the legacy "
-            "native-loop GameConfig fields zero"
+            "  boundary: OT/pool bases are guest-heap results; the dynarec adapter must map them "
+            "from live guest state"
         )
-        if do_check:
-            with open(CONFIG, encoding="utf-8") as source:
-                check_config(source.read())
         with open(BATTLE_SOURCE, encoding="utf-8") as source:
             battle_source = source.read()
         if do_check_source:

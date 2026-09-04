@@ -51,5 +51,5 @@ Fix: emit.py ra_branch_continuations() — per-site, static, conservative; call 
 
 Falsifier MET: unattended run passes this read and continues; 240s headless / 150s windowed with
 zero faults (scratch/logs/i24-fix2.log, i24-windowed.log). One follow-on defect found and fixed on
-the way: the presenter capture grew unbounded past the title products because nothing committed it
-(vagrant-side commit in vagrant_vblank_turn).
+the historical guest-loop route: presenter capture grew unbounded past title products because no
+field fence committed it. The current owner is VagrantFrameDriver's single commit.

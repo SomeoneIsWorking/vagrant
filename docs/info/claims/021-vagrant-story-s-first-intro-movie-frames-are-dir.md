@@ -4,7 +4,7 @@ kind: claim
 status: holds
 created: 2026-08-22
 tags: render,title,mdec,re-13
-depends: game/render/title_movie.cpp#title_movie_dct_out_callback, game/render/title_movie.cpp#TitleMovieProducer::present, game/sync/vblank.cpp#vagrant_vblank_turn, tools/re_title_movie.py#measure
+depends: game/render/title_movie.cpp#title_movie_dct_out_callback, game/render/title_movie.cpp#TitleMovieProducer::present, game/sync/frame_loop.cpp#VagrantFrameDriver::stepFrame, tools/re_title_movie.py#measure
 reconfirmed: 2026-08-24
 verified_at: 2026-08-24 20:08:15
 ---
@@ -16,6 +16,9 @@ Vagrant Story's first intro movie frames are directly presented from TITLE's int
 ## Evidence
 
 2026-08-22 against psxport 57a17a14: tools/re_title_movie.py --check-source --selftest derives/gates callback 0x8006F174 and frameComplete 0x800DEDDC, passing 3/3 negatives. The no-argument owned-disc shipping present_200 is coherent and 678339/691200 nonblack (98.14%), SHA256 0c3a55101d1b4e07a69c4eb39084d039d73936d920e3a32e1ea577900574ed7e. A compile-time VAGRANT_TEST_DISABLE_TITLE_MOVIE_PRODUCER build retains guest execution, completes 4000 DMA1 outputs, reaches the same 24-bit mode, and produces no present_200 before watchdog.
+
+The live evidence belongs to the retired guest-loop route. The producer remains wired to prepare a
+field for VagrantFrameDriver's single commit, but the new native phase path has not reached it yet.
 
 ## What would falsify it
 

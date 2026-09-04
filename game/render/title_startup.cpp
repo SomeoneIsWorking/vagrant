@@ -2,18 +2,12 @@
 
 #include "core.h"
 #include "game.h"
-#include "override_registry.h"
 #include "producer_scope.h"
 #include "render_queue.h"
 #include "vagrant_context.h"
 
 #include <cstdlib>
 #include <lucent/log.h>
-
-#ifdef VAGRANT_HAVE_SUBSTRATE
-extern void ov_title_gen_8006A778(Core *);
-extern void ov_title_set_override(std::uint32_t, OverrideFn);
-#endif
 
 namespace {
 
@@ -29,30 +23,6 @@ vagrant::TitleStartupProducer *producer(Core &core) {
   }
   return &static_cast<vagrant::VagrantContext *>(core.gameCtx)->titleStartup;
 }
-
-#ifdef VAGRANT_HAVE_SUBSTRATE
-void title_draw_sprite(Core *core) {
-#ifdef VAGRANT_TEST_DISABLE_TITLE_PRODUCER
-  // Negative-control seam only: retain the measured guest body while withholding the semantic native
-  // producer. This compiles into an explicitly separate test build, never the shipping target.
-  ov_title_gen_8006A778(core);
-#else
-  const vagrant::TitleSpriteRecipe recipe =
-      vagrant::TitleSpriteRecipe::decode(core->r[4], core->r[5], core->r[6], core->r[7]);
-
-  // Preserve TITLE's static packet-buffer writes, DrawSync, and DrawPrim side effects. The native
-  // producer owns only the picture; the generated body stays linked, runnable, and oracle-selectable.
-  ov_title_gen_8006A778(core);
-
-  vagrant::TitleStartupProducer *title = producer(*core);
-  if (!title) {
-    lucent::error("vagrant-title", "TITLE _drawSprt reached without a VagrantContext");
-    std::abort();
-  }
-  title->enqueue(recipe);
-#endif
-}
-#endif
 
 } // namespace
 
@@ -74,9 +44,8 @@ bool TitleStartupProducer::present(Core &core) {
   }
 
   RenderQueue &queue = core.game->activeRq();
-  // _drawSprt's generated super-call executes its guest GP0 primitive before this boundary. Native mode
-  // deliberately replaces that guest-origin queue item with the semantic producer below; retaining both
-  // would be two renderers for one leaf and would make the producer gate meaningless.
+  // The title adapter calls enqueue after the ordinary guest body completes. Native presentation
+  // replaces that guest-origin queue item; retaining both would render one leaf twice.
   queue.reset();
   const GpuState &gpu = core.game->gpu;
   {
@@ -122,21 +91,11 @@ bool TitleStartupProducer::present(Core &core) {
   const std::size_t produced = pending_.size();
   pending_.clear();
   queue.flush(&core);
-  core.game->presentation.commit(&core);
-  lucent::debug("vagrant-title", "presented {} native TITLE sprite(s)", produced);
+  lucent::debug("vagrant-title", "prepared {} native TITLE sprite(s)", produced);
   return true;
 }
 
-void registerTitleStartupOverrides() {
-#ifdef VAGRANT_HAVE_SUBSTRATE
-  overrides::install(
-      kTitleDrawSprite, "VagrantTitle::_drawSprt", title_draw_sprite, ov_title_gen_8006A778, ov_title_set_override);
-#else
-  lucent::debug("vagrant-title", "TITLE producer registration deferred: no generated substrate in this target");
-#endif
-}
-
-bool presentTitleStartup(Core &core) {
+bool prepareTitleStartupField(Core &core) {
   TitleStartupProducer *title = producer(core);
   return title && title->present(core);
 }

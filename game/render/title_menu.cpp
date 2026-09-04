@@ -2,18 +2,12 @@
 
 #include "core.h"
 #include "game.h"
-#include "override_registry.h"
 #include "render_queue.h"
 #include "vagrant_context.h"
 
 #include <cstdint>
 #include <cstdlib>
 #include <lucent/log.h>
-
-#ifdef VAGRANT_HAVE_SUBSTRATE
-extern void ov_title_gen_800705AC(Core *);
-extern void ov_title_set_override(std::uint32_t, OverrideFn);
-#endif
 
 namespace {
 
@@ -28,22 +22,6 @@ vagrant::TitleMenuProducer *producer(Core &core) {
   }
   return &static_cast<vagrant::VagrantContext *>(core.gameCtx)->titleMenu;
 }
-
-#ifdef VAGRANT_HAVE_SUBSTRATE
-void title_menu_items_complete(Core *core) {
-  // Retain the exact guest menu state updates and DrawPrim submissions. Native ownership begins only
-  // at the measured completed-pass boundary.
-  ov_title_gen_800705AC(core);
-#ifndef VAGRANT_TEST_DISABLE_TITLE_MENU_PRODUCER
-  vagrant::TitleMenuProducer *menu = producer(*core);
-  if (!menu) {
-    lucent::error("vagrant-title-menu", "TITLE menu pass completed without a VagrantContext");
-    std::abort();
-  }
-  menu->frameCompleted();
-#endif
-}
-#endif
 
 } // namespace
 
@@ -60,27 +38,14 @@ bool TitleMenuProducer::present(Core &core) {
   frameReady_ = false;
 
   // The intact DrawPrim path has already translated this completed guest pass into the native queue.
-  // Flush it once at the following intact VBlank and let the neutral presenter own the frame fence.
+  // Flush it once at the native field boundary; VagrantFrameDriver owns the single frame fence.
   RenderQueue &queue = core.game->activeRq();
   queue.flush(&core);
-  core.game->presentation.commit(&core);
-  lucent::debug("vagrant-title-menu", "presented completed TITLE menu pass");
+  lucent::debug("vagrant-title-menu", "prepared completed TITLE menu pass");
   return true;
 }
 
-void registerTitleMenuOverrides() {
-#ifdef VAGRANT_HAVE_SUBSTRATE
-  overrides::install(kTitleMenuItemsComplete,
-                     "VagrantTitleMenu::_drawTitleMenuItems",
-                     title_menu_items_complete,
-                     ov_title_gen_800705AC,
-                     ov_title_set_override);
-#else
-  lucent::debug("vagrant-title-menu", "TITLE menu registration deferred: no generated substrate in this target");
-#endif
-}
-
-bool presentTitleMenu(Core &core) {
+bool prepareTitleMenuField(Core &core) {
   TitleMenuProducer *menu = producer(core);
   return menu && menu->present(core);
 }

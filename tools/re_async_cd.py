@@ -317,6 +317,7 @@ def selftest(img, measured):
     for label, va, expected in (
         ("destroyed data-callback completion", measured["read_callback"] + 0x114, "matched 0"),
         ("changed DsEndReadySystem Pause", measured["end_ready"] + 0x3C, "matched 0"),
+        ("destroyed libds Ready value", measured["status_tick"] + 0x70, "matched 0"),
         ("destroyed libds ReadN-active predicate", measured["status_tick"] + 0x1EC, "matched 0"),
     ):
         mutated = bytearray(original)
@@ -332,7 +333,7 @@ def selftest(img, measured):
             checks += 1
         finally:
             img.data = original
-    print(f"re_async_cd selftest: {checks}/3 PASS")
+    print(f"re_async_cd selftest: {checks}/4 PASS")
 
 
 def main(argv):

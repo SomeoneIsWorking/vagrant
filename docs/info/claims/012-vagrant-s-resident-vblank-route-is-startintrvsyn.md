@@ -4,18 +4,22 @@ kind: claim
 status: holds
 created: 2026-08-21
 tags: re-10,vsync,vblank,boot
-depends: tools/re_vblank.py#measure, game/sync/vblank.cpp#vagrant_start_intr_vsync, game/recomp_seeds.json#main_reentry, external/psxport
+depends: tools/re_vblank.py#measure, game/sync/vsync_facts.h#kVSync, external/psxport
 reconfirmed: 2026-08-22 18:14:39
 verified_at: 2026-08-22 18:14:39
 ---
 
 ## Claim
 
-Vagrant's resident VBlank route is startIntrVSync 0x8001FF94 -> guest handler 0x8001FFEC -> counter 0x80032114 and eight callbacks at 0x800320F4; delivering display fields through that intact handler clears Sony VSync waits without host-owned counter semantics
+Vagrant's retail resident VBlank route is startIntrVSync 0x8001FF94 -> guest handler 0x8001FFEC -> counter 0x80032114 and eight callbacks at 0x800320F4; historical field delivery through that route cleared Sony VSync waits. This is binary/runtime evidence, not the current product owner: shipping fields are native and guest VSync is fatal.
 
 ## Evidence
 
 tools/re_vblank.py uniquely derives and gates the route from SHA-verified SLUS_010.40 with a 4/4 both-answer selftest, including setjmp buffer 0x80031084 -> restored PC 0x8001FAD0 and HookEntryInt 0x80026954; against pinned psxport 9f1bb927, scratch/logs/re05-pinned-final-irq-dma.log records the restored entry, armed DMA4 callbacks, guest counter 0 -> 173, and the downstream asynchronous-CD stack
+
+The 2026-08-27 shipping gate is 5/5: it retains the retail measurement, requires fatal VSync
+`0x8001F6C4`, and refuses restored guest-handler, host-turn, guest-main-dispatch, or re-entry-seed
+reachability. `VagrantFrameDriver` owns fields instead.
 
 ## What would falsify it
 

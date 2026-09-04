@@ -2,9 +2,9 @@
 """Measure Vagrant's boot-time SPU DMA completion route from the owned PS-EXE.
 
 The game waits on a guest flag after SpuWrite. Sony's SPU library registers its completion on DMA
-channel 4, and libapi's low-level callback owner stores handlers in an eight-word table. psxport
-already completes DMA4 and dispatches through GameConfig::dmaCallbackTable; this instrument derives
-that table and the complete StartSound -> writer -> waiter/callback chain from executable bytes.
+channel 4, and libapi's low-level callback owner stores handlers in an eight-word table. This
+instrument derives that table and the complete StartSound -> writer -> waiter/callback chain from
+executable bytes, then checks the title's typed fact used by the future dynarec adapter.
 
 Every search is uniqueness-gated. The selftest destroys one executable shape and shifts the shipped
 table by four bytes, proving that the instrument can report both answers.
@@ -17,7 +17,7 @@ import sys
 from re_crt0 import DEFAULT_EXE, FIXTURE_SHA1, Image, Refuse, s16
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG = os.path.join(ROOT, "game", "core", "game_config.cpp")
+FACTS = os.path.join(ROOT, "game", "core", "resident_facts.h")
 
 
 def words(img):
@@ -252,29 +252,26 @@ def measure(img, verify_identity=True):
     }
 
 
-def check_config(measured, text):
+def check_source(measured, text):
     match = re.search(r"\bkDmaCallbackTable\s*=\s*(0x[0-9A-Fa-f]+)", text)
     if not match:
-        raise Refuse(f"{CONFIG}: did not find kDmaCallbackTable")
+        raise Refuse(f"{FACTS}: did not find kDmaCallbackTable")
     shipped = int(match.group(1), 0)
-    bound = re.search(r"\.dmaCallbackTable\s*=\s*kDmaCallbackTable\b", text) is not None
-    ok = shipped == measured["dma_table"] and bound
+    ok = shipped == measured["dma_table"]
     print(
         f"  [{'ok' if ok else 'FAIL':>4}] dmaCallbackTable shipped=0x{shipped:08X} "
-        f"measured=0x{measured['dma_table']:08X} binding={'yes' if bound else 'NO'}"
+        f"measured=0x{measured['dma_table']:08X}"
     )
     if shipped != measured["dma_table"]:
         raise Refuse("shipping mismatch: dmaCallbackTable")
-    if not bound:
-        raise Refuse("shipping mismatch: dmaCallbackTable is not bound to kDmaCallbackTable")
 
 
 def selftest(img, measured):
     print("== re_spu_transfer selftest ==")
     checks = 0
-    with open(CONFIG, encoding="utf-8") as config_file:
+    with open(FACTS, encoding="utf-8") as config_file:
         text = config_file.read()
-    check_config(measured, text)
+    check_source(measured, text)
     checks += 1
 
     original = img.data
@@ -298,7 +295,7 @@ def selftest(img, measured):
     if changed == text:
         raise AssertionError("shipping mutation anchor did not fire")
     try:
-        check_config(measured, changed)
+        check_source(measured, changed)
         raise AssertionError("+4 shipping table was accepted")
     except Refuse as error:
         if "dmaCallbackTable" not in str(error):
@@ -310,11 +307,11 @@ def selftest(img, measured):
 
 def main(argv):
     args = list(argv)
-    do_check = "--check-config" in args
+    do_check = "--check-source" in args
     do_selftest = "--selftest" in args
-    args = [arg for arg in args if arg not in ("--check-config", "--selftest")]
+    args = [arg for arg in args if arg not in ("--check-source", "--selftest")]
     if len(args) > 1:
-        print("usage: re_spu_transfer.py [--check-config] [--selftest] [SLUS_010.40]", file=sys.stderr)
+        print("usage: re_spu_transfer.py [--check-source] [--selftest] [SLUS_010.40]", file=sys.stderr)
         return 2
     try:
         img = Image(args[0] if args else DEFAULT_EXE)
@@ -338,8 +335,8 @@ def main(argv):
         )
         print("  boundary: psxport owns DMA4 completion; the guest callback body and wait flag stay guest-owned")
         if do_check:
-            with open(CONFIG, encoding="utf-8") as config_file:
-                check_config(measured, config_file.read())
+            with open(FACTS, encoding="utf-8") as config_file:
+                check_source(measured, config_file.read())
         if do_selftest:
             selftest(img, measured)
         return 0

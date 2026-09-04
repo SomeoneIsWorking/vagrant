@@ -15,11 +15,12 @@ import sys
 
 from re_frame import DEFAULT_TITLE, TITLE_BASE, TITLE_SHA1, Overlay, jal_word
 from re_crt0 import Refuse, s16
-from re_spu_transfer import unique_shape
+from re_spu_transfer import based_address, jal_target, unique_shape
 
 DRAW_SYNC = 0x80028650
 DRAW_PRIM = 0x80028BE8
 SOURCE = "game/render/title_startup.cpp"
+SPLASH_FACTS = "game/render/title_splash_facts.h"
 
 
 def materialized_address(overlay, hi_offset, lo_offset, base_reg, destination_reg):
@@ -115,13 +116,80 @@ def measure(title, verify_identity=True):
             f"to sprite leaf ({shown}); expected exactly 2"
         )
 
+    title_entry, title_entry_scanned = unique_shape(
+        title,
+        "TITLE entry",
+        {
+            0x00: 0x3C038006,
+            0x08: 0x27BDFFC0,
+            0x48: jal_word(0x80071B14),
+            0x50: jal_word(0x80071254),
+            0xB0: jal_word(0x8006FE30),
+        },
+    )
+    init_environment = jal_target(title_entry + 0x50, title.r32(title_entry + 0x50))
+    if jal_target(init_environment + 0x70, title.r32(init_environment + 0x70)) != publisher_owner:
+        raise Refuse("TITLE environment no longer owns the measured publisher/developer splash")
+
+    settings = materialized_address(title, init_environment + 0x08, init_environment + 0x10, 16, 17)
+    title_screen_count = based_address(
+        title.r32(init_environment + 0x4C), title.r32(init_environment + 0x5C), 3
+    )
+    inventory = materialized_address(title, init_environment + 0x9C, init_environment + 0xA0, 4, 4)
+    state_flags = materialized_address(title, init_environment + 0xB0, init_environment + 0xB4, 2, 2)
+    intro_playing = based_address(title.r32(title_entry + 0x60), title.r32(title_entry + 0x64), 3)
+    menu_states = materialized_address(title, title_entry + 0x7C, title_entry + 0x80, 6, 6)
+    publisher_data = materialized_address(title, publisher_owner + 0x4C, publisher_owner + 0x50, 16, 16)
+    developer_data = materialized_address(title, publisher_owner + 0x1B0, publisher_owner + 0x1B4, 5, 5)
+    buttons_hi = title.r32(publisher_owner + 0x1F0)
+    buttons_read = title.r32(publisher_owner + 0x200)
+    if (
+        buttons_hi >> 26 != 0x0F
+        or (buttons_hi >> 16) & 31 != 2
+        or buttons_read >> 26 != 0x25
+        or (buttons_read >> 21) & 31 != 2
+    ):
+        raise Refuse("TITLE developer splash no longer reads the button state through r2")
+    buttons_state = (((buttons_hi & 0xFFFF) << 16) + s16(buttons_read & 0xFFFF)) & 0xFFFFFFFF
+
+    splash_calls = {
+        "clear_image": jal_target(publisher_owner + 0x3C, title.r32(publisher_owner + 0x3C)),
+        "draw_image": jal_target(publisher_owner + 0x5C, title.r32(publisher_owner + 0x5C)),
+        "set_def_disp": jal_target(publisher_owner + 0x8C, title.r32(publisher_owner + 0x8C)),
+        "set_def_draw": jal_target(publisher_owner + 0xA8, title.r32(publisher_owner + 0xA8)),
+        "put_disp": jal_target(publisher_owner + 0xC0, title.r32(publisher_owner + 0xC0)),
+        "put_draw": jal_target(publisher_owner + 0xC8, title.r32(publisher_owner + 0xC8)),
+        "draw_sync": jal_target(publisher_owner + 0xD0, title.r32(publisher_owner + 0xD0)),
+        "set_disp_mask": jal_target(publisher_owner + 0xE0, title.r32(publisher_owner + 0xE0)),
+        "process_pad": jal_target(publisher_owner + 0x288, title.r32(publisher_owner + 0x288)),
+    }
+
     return {
         "draw_sprite": draw_sprite,
         "packet": packet,
         "publisher_owner": publisher_owner,
         "publisher_calls": calls,
+        "title_entry": title_entry,
+        "init_game_data": jal_target(title_entry + 0x48, title.r32(title_entry + 0x48)),
+        "game_save_screen": jal_target(title_entry + 0x40, title.r32(title_entry + 0x40)),
+        "memset": jal_target(init_environment + 0x34, title.r32(init_environment + 0x34)),
+        "set_mono": jal_target(init_environment + 0x8C, title.r32(init_environment + 0x8C)),
+        "set_cd_volume": jal_target(init_environment + 0x94, title.r32(init_environment + 0x94)),
+        "save_file_exists": jal_target(title_entry + 0x6C, title.r32(title_entry + 0x6C)),
+        "copy_title_bg": jal_target(title_entry + 0x98, title.r32(title_entry + 0x98)),
+        "settings": settings,
+        "title_screen_count": title_screen_count,
+        "inventory": inventory,
+        "state_flags": state_flags,
+        "intro_playing": intro_playing,
+        "menu_states": menu_states,
+        "publisher_data": publisher_data,
+        "developer_data": developer_data,
+        "buttons_state": buttons_state,
+        "splash_calls": splash_calls,
         "scanned": scanned,
         "publisher_scanned": publisher_scanned,
+        "title_entry_scanned": title_entry_scanned,
     }
 
 
@@ -134,10 +202,45 @@ def check_source(measured, text):
         raise Refuse(
             f"{SOURCE}: kTitleDrawSprite=0x{shipped:08X}, measured 0x{measured['draw_sprite']:08X}"
         )
-    gen = f"ov_title_gen_{measured['draw_sprite']:08X}"
-    if text.count(gen) < 2:
-        raise Refuse(f"{SOURCE}: measured generated super body {gen} is not retained and installed")
-    print(f"  [ ok ] shipping producer address/super-call: 0x{shipped:08X} / {gen}")
+    print(f"  [ ok ] native producer address: 0x{shipped:08X}")
+
+    with open(SPLASH_FACTS, encoding="utf-8") as source:
+        facts = source.read()
+    expected = {
+        "kInitGameData": measured["init_game_data"],
+        "kGameSaveScreen": measured["game_save_screen"],
+        "kMemset": measured["memset"],
+        "kDrawImage": measured["splash_calls"]["draw_image"],
+        "kDrawSprite": measured["draw_sprite"],
+        "kClearImage": measured["splash_calls"]["clear_image"],
+        "kSetDefDispEnv": measured["splash_calls"]["set_def_disp"],
+        "kSetDefDrawEnv": measured["splash_calls"]["set_def_draw"],
+        "kPutDispEnv": measured["splash_calls"]["put_disp"],
+        "kPutDrawEnv": measured["splash_calls"]["put_draw"],
+        "kDrawSync": measured["splash_calls"]["draw_sync"],
+        "kSetDispMask": measured["splash_calls"]["set_disp_mask"],
+        "kProcessPadState": measured["splash_calls"]["process_pad"],
+        "kSetMonoSound": measured["set_mono"],
+        "kSetCdVolume": measured["set_cd_volume"],
+        "kCopyTitleBgData": measured["copy_title_bg"],
+        "kSettings": measured["settings"],
+        "kTitleScreenCount": measured["title_screen_count"],
+        "kInventoryIndices": measured["inventory"],
+        "kStateFlags": measured["state_flags"],
+        "kIntroMoviePlaying": measured["intro_playing"],
+        "kMenuItemStates": measured["menu_states"],
+        "kButtonsState": measured["buttons_state"],
+        "kPublisherData": measured["publisher_data"],
+        "kDeveloperData": measured["developer_data"],
+    }
+    failures = []
+    for name, want in expected.items():
+        match = re.search(rf"\b{name}\s*=\s*(0x[0-9A-Fa-f]+)u?", facts)
+        if not match or int(match.group(1), 0) != want:
+            failures.append(name)
+    if failures:
+        raise Refuse(f"{SPLASH_FACTS}: measured fact mismatch: " + ", ".join(failures))
+    print(f"  [ ok ] native splash facts: {len(expected)}/{len(expected)} measured constants")
 
 
 def selftest(title, measured, source_text):
@@ -207,6 +310,10 @@ def main(argv=None):
             f"  publisher/developer: 0x{measured['publisher_owner']:08X}; calls="
             + ",".join(f"0x{va:08X}" for va in measured["publisher_calls"])
             + f"; scanned={measured['publisher_scanned']}"
+        )
+        print(
+            f"  TITLE entry 0x{measured['title_entry']:08X}; settings=0x{measured['settings']:08X}; "
+            f"publisher/developer data=0x{measured['publisher_data']:08X}/0x{measured['developer_data']:08X}"
         )
         with open(SOURCE, encoding="utf-8") as source:
             source_text = source.read()

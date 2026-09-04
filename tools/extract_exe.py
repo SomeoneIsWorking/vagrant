@@ -8,9 +8,8 @@ Extracts SLUS_010.40 (the boot target named in SYSTEM.CNF: `BOOT = cdrom:\\SLUS_
 SHA-1 against the value the rood-reverse decompilation states for its own target. Nothing extracted
 is ever committed — scratch/ is gitignored, and the executable is the copyright holder's.
 
-Extraction and recompilation remain separate operations. This tool provisions only the resident
-executable; tools/extract_overlays.py owns the independently verified overlay inputs. All copyrighted
-bytes stay under gitignored scratch/.
+This tool provisions only the resident executable; tools/extract_overlays.py owns the independently
+verified runtime overlay images. All copyrighted bytes stay under gitignored scratch/.
 """
 import hashlib
 import os

@@ -10,7 +10,7 @@ namespace vagrant {
 
 // Per-Core native producer for TITLE's immediate sprite leaf. The intact overlay uploads texture and
 // CLUT data to VRAM and retains every guest write; this owner translates the leaf's semantic arguments
-// into direct render-queue quads at the guest-owned VBlank boundary.
+// into direct render-queue quads at the native frame driver's completed-field boundary.
 class TitleStartupProducer {
 public:
   void enqueue(const TitleSpriteRecipe &sprite);
@@ -24,7 +24,6 @@ private:
   std::vector<TitleSpriteRecipe> pending_;
 };
 
-void registerTitleStartupOverrides();
-bool presentTitleStartup(Core &core);
+bool prepareTitleStartupField(Core &core);
 
 } // namespace vagrant

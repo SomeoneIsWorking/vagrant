@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Provision the exact code overlays consumed by the static recompiler.
+"""Provision the exact runtime code images consumed by the Vagrant Story port.
 
-The disc names Vagrant Story's modules ``*.PRG`` while psxport's generic emitter
-consumes ``*.BIN`` files from one directory.  This tool owns that boundary: it
-extracts each explicitly supported module, verifies it against rood-reverse's
-SHA-bound matching target, and writes the emitter-facing name under gitignored
-``scratch/``.  Adding a module requires adding its disc path and identity here;
-the emitter directory is never treated as an open-ended cache.
+The disc names Vagrant Story's modules ``*.PRG``. This tool extracts each explicitly
+supported module, verifies it against rood-reverse's SHA-bound matching target, and
+writes the normalized runtime-image name under gitignored ``scratch/``. Adding a
+module requires adding its disc path and identity here; the image directory is never
+treated as an open-ended cache.
 """
 
 import hashlib
@@ -100,7 +99,7 @@ def provision(disc_path=None, *, reader=None):
     )
     if unexpected:
         raise OverlayError(
-            "emitter input directory contains unowned module(s): "
+            "runtime image directory contains unowned module(s): "
             + ", ".join(unexpected)
         )
     print(f"[overlay] verified {len(outputs)} of {len(OVERLAYS)} required module(s)")
