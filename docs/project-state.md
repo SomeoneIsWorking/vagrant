@@ -21,6 +21,7 @@ This is the factual capability inventory. Epic intent is in `docs/project-goals.
 | S013 | Vagrant Story is playable through the complete game | missing | S003, S004, S006, S009 | G001 |
 | S014 | Streaming CD/XA and audio behavior is owned beyond the verified intro path | partial | S003 | G001 |
 | S015 | The gameplay product executes authenticated guest images through psxport's dynarec-only runtime | missing | S001, S002 | G001 |
+| S016 | Hosted CI truthfully distinguishes repository policy from native product support on Linux, Windows, macOS, and Android | partial | S015 | G001 |
 
 ## Current focus
 
@@ -205,3 +206,20 @@ Missing capability: there is no Vagrant Story title adapter for psxport's per-Co
 authenticated image generations, typed exits, invalidation, or image-scoped native overrides. The
 product must remain unavailable until that adapter executes real resident and `.PRG` blocks without
 linking or selecting an interpreter.
+
+### S016 — Platform CI coverage
+
+Partial capability: `.github/workflows/ci.yml` runs the maintained asset-free structure and launcher
+verifier on one Linux host with full history, read-only permissions, pinned actions, and an explicit
+timeout. The job is intentionally host-neutral policy coverage rather than a Linux product claim.
+
+| Platform | Applicability | Current CI evidence and exact gap |
+| --- | --- | --- |
+| Linux x86-64 | applicable portable-PC target | Repository policy is covered; S015 leaves no native/dynarec executable to compile, execute, lint, or package. |
+| Windows x86-64 | applicable portable-PC target | Missing: no native/dynarec executable, supported Windows build, runtime test, or package boundary exists. |
+| macOS arm64 | applicable portable-PC target | Missing: no native/dynarec executable, Apple-Silicon build, runtime test, or application package exists. |
+| Android arm64 | applicable future portable target | Missing: no Android title integration, shared `android-port` consumer, native runtime, APK build, or install test exists. |
+
+Gap: create platform jobs only after the corresponding native runtime boundary exists and can be
+exercised with redistributable synthetic inputs; repeating the Python policy verifier on another host
+does not establish platform support.
