@@ -43,6 +43,9 @@ int main() {
   vagrant::VagrantRuntime runtime;
   psxport_install_game(runtime);
   Core core;
+  if (!require(core.gameCtx != nullptr, "VagrantRuntime did not create its per-Core title context")) {
+    return 1;
+  }
   const auto image = residentFixture();
   const auto loaded = runtime.loadResidentImage(core, image, "SLUS_010.40");
   if (!require(static_cast<bool>(loaded), "measured resident image was refused") ||

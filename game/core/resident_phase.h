@@ -1,5 +1,7 @@
 #pragma once
 
+#include "cd/native_file.h"
+
 #include <cstdint>
 
 class Core;
@@ -32,6 +34,7 @@ struct ResidentCallServices {
   Call2 call2 = nullptr;
   Call4 call4 = nullptr;
   ReadFile readFile = nullptr;
+  cd::ReadSector readSector = nullptr;
 };
 
 ResidentCallServices productionResidentCallServices();

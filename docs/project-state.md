@@ -218,6 +218,14 @@ SHA-256 admission for the three reached TITLE/BATTLE/INITBTL `.PRG` files at the
 bases. Staged loads copy verified bytes; `adoptTransfer` authenticates an already completed CD sector
 write in guest RAM without copying it again. Both paths call psxport's central executable-write
 invalidation, retire the prior generation in its address slot, and register the new image identity.
+`VagrantRuntime::createContext` now gives each Core its own `OverlayImages`. The finite resident
+phase calls `readAndLoadTitle` at its measured TITLE read boundary. It uses the same whole-sector
+acquisition as `readNativeFile`, which acknowledges a sector only when all 2,048 bytes arrive, then
+authenticates the complete 271-sector buffer through `OverlayImages::loadTransfer` before any RAM
+write or identity activation. The compile-backed synthetic contract refuses a 1,608-byte final
+sector even when RAM already holds matching image bytes. A full-length altered replacement and a
+short replacement both preserve RAM and the prior image generation. This is a native phase handoff,
+not yet the process adapter or a real-title execution result.
 The focused synthetic test proves changed payload refusal is atomic, unknown slot residency is
 refused, and TITLE→BATTLE replacement executes a newly translated block with zero fallback. The
 resident-memory adoption test refuses changed payload, changed final-sector padding, and foreign

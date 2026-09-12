@@ -2,6 +2,7 @@
 
 #include "core.h"
 #include "game.h"
+#include "vagrant_context.h"
 
 #include <iomanip>
 #include <sstream>
@@ -40,11 +41,12 @@ const GuestProgramImage VagrantRuntime::programImage_{
     .stackBias = {true, -8},
 };
 
-void *VagrantRuntime::createContext(Core &) {
-  return nullptr;
+void *VagrantRuntime::createContext(Core &core) {
+  return new VagrantContext(core);
 }
 
-void VagrantRuntime::destroyContext(void *) {
+void VagrantRuntime::destroyContext(void *context) {
+  delete static_cast<VagrantContext *>(context);
 }
 
 void VagrantRuntime::registerOverrides(Game &) {

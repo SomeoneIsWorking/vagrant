@@ -19,6 +19,7 @@ NATIVE_TESTS = frozenset({
     "vagrant_native_runtime",
     "vagrant_overlay_images",
     "vagrant_title_entry",
+    "vagrant_title_transfer",
     "vagrant_title_startup_recipe",
 })
 sys.path.insert(0, str(ROOT))

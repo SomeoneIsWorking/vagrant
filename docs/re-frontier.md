@@ -58,7 +58,9 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
   in-RAM TITLE-to-BATTLE replacement executes newly translated code with zero fallback.
 - where: `tools/re_overlay.py`, `tools/extract_overlays.py`, `tests/test_overlay_inputs.py`,
   `game/core/overlay_images.cpp`, `tests/test_vagrant_overlay_images.cpp`
-- gap: The natural CD queue's successful Loaded transition must call the resident-memory publisher;
+- gap: The finite resident TITLE read now publishes only after all 271 native sectors complete and
+  the acquired buffer passes image authentication.
+  A future path using the natural CD queue must publish only at its successful Loaded transition;
   the publisher does not infer or set queue state. The resident-to-TITLE guest continuation and later
   overlays remain open.
 
@@ -217,15 +219,18 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
 ### RE-20 — native CD command and finite menu-sound loads
 - status: re-partial
 - deps: RE-04, RE-19
-- evidence: Exact CD facts and native file/command owners remain under `game/cd/`.
-- where: `game/cd/`, `tools/re_cd.py`, `tools/re_async_cd.py`
-- gap: Validate override ABI, failure paths, and ordinary dynarec comparison. The measured TITLE
-  request is `0x87800` bytes (271 complete sectors), including the final 440 bytes beyond the
-  authenticated ISO file length; `readNativeFile` copies that entire request before returning true.
-  It does not publish executable-image identity. `ResidentPhase` sees only a boolean copy result,
-  while `VagrantRuntime::createContext` creates no per-Core `OverlayImages` owner. The title adapter
-  must retain successful transfer completion and authenticate those resident bytes through
-  `OverlayImages::adoptTransfer` before guest entry.
+- evidence: Exact CD facts and native file/command owners remain under `game/cd/`. The measured
+  TITLE request is `0x87800` bytes (271 complete sectors), including the final 440 bytes beyond the
+  authenticated ISO file length. `readNativeSectors` acquires the complete extent before any guest
+  RAM write. `VagrantRuntime::createContext` gives each Core an `OverlayImages` owner;
+  `ResidentPhase` calls `readAndLoadTitle` at that acquisition boundary before its TITLE field wait.
+  `OverlayImages::loadTransfer` authenticates the buffer before copying RAM and activating identity.
+  The shipping-path synthetic test rejects a short final sector even with matching RAM and preserves
+  a prior identity and RAM on both short and complete altered replacements.
+- where: `game/cd/`, `game/core/title_transfer.cpp`, `tests/test_vagrant_title_transfer.cpp`,
+  `tools/re_cd.py`, `tools/re_async_cd.py`
+- gap: Validate override ABI, failure paths, and ordinary dynarec comparison on the real title.
+  The process adapter and resident-to-TITLE guest continuation remain uncomposed.
 
 ### RE-21 — TITLE GPU timeout arm
 - status: re-partial

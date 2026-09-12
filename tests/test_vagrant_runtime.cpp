@@ -1,8 +1,10 @@
 #include "cd/cd_facts.h"
+#include "cd/native_file.h"
 #include "core.h"
 #include "core/resident_facts.h"
 #include "core/resident_phase.h"
 #include "game.h"
+#include "lucent/content.h"
 #include "render/title_splash_facts.h"
 #include "save/title_memcard_facts.h"
 #include "save/title_memcard_init.h"
@@ -13,8 +15,10 @@
 
 #include <cstdio>
 #include <memory>
+#include <vector>
 
 namespace {
+constexpr std::size_t kRetailTitleImageBytes = 554568u;
 int g_events[16] = {};
 int g_eventCount = 0;
 struct GuestCall {
@@ -136,6 +140,15 @@ guestCall4(Core &core, std::uint32_t address, std::uint32_t a0, std::uint32_t a1
   return result;
 }
 
+std::uint32_t zeroSector(Core &, std::uint32_t lba, std::span<std::uint8_t> destination) {
+  if (lba == vagrant::resident::kTitlePrgLba) {
+    g_fileReads[g_fileReadCount++] = {
+        .lba = lba, .size = vagrant::resident::kTitlePrgSize, .destination = vagrant::resident::kTitleOverlayBase};
+  }
+  std::fill(destination.begin(), destination.end(), 0u);
+  return static_cast<std::uint32_t>(destination.size());
+}
+
 bool readFile(Core &, std::uint32_t lba, std::uint32_t size, std::uint32_t destination) {
   g_fileReads[g_fileReadCount++] = {.lba = lba, .size = size, .destination = destination};
   return true;
@@ -168,7 +181,15 @@ bool expectCallAddresses(const std::uint32_t *expected, int count) {
 
 int main() {
   auto game = std::make_unique<Game>();
-  vagrant::VagrantContext contextStorage;
+  std::vector<std::uint8_t> titleBytes(kRetailTitleImageBytes, 0u);
+  auto titleHash = lucent::content::sha256_hex(
+      lucent::content::sha256({reinterpret_cast<const std::byte *>(titleBytes.data()), titleBytes.size()}));
+  std::array<vagrant::OverlaySpec, 3> specs{{
+      {vagrant::OverlayKind::Title, "TITLE.PRG", vagrant::resident::kTitleOverlayBase, titleBytes.size(), titleHash},
+      {vagrant::OverlayKind::Battle, "BATTLE.PRG", 0x80068800u, 4u, titleHash},
+      {vagrant::OverlayKind::InitBattle, "INITBTL.PRG", 0x800F9800u, 4u, titleHash},
+  }};
+  vagrant::VagrantContext contextStorage(game->core, std::move(specs));
   game->core.gameCtx = &contextStorage;
   auto *context = &contextStorage;
   context->libDsField = vagrant::cd::LibDsField({.call0 = libDsCall0});
@@ -178,6 +199,7 @@ int main() {
       .call2 = guestCall2,
       .call4 = guestCall4,
       .readFile = readFile,
+      .readSector = zeroSector,
   };
   context->residentPhase = vagrant::ResidentPhase(residentServices);
   context->titleSplash = vagrant::TitleSplashPhase(residentServices);

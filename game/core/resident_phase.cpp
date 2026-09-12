@@ -5,6 +5,7 @@
 #include "core.h"
 #include "core/game_time.h"
 #include "core/resident_facts.h"
+#include "core/title_transfer.h"
 #include "guest_call.h"
 #include "render/title_splash_facts.h"
 #include "vagrant_context.h"
@@ -49,7 +50,12 @@ void writeRect(Core &core, std::uint32_t address, std::int16_t x, std::int16_t y
 namespace vagrant {
 
 ResidentCallServices productionResidentCallServices() {
-  return {.call0 = call0, .call1 = call1, .call2 = call2, .call4 = call4, .readFile = cd::readNativeFile};
+  return {.call0 = call0,
+          .call1 = call1,
+          .call2 = call2,
+          .call4 = call4,
+          .readFile = cd::readNativeFile,
+          .readSector = cd::readDiscSector};
 }
 
 ResidentPhase::ResidentPhase() : ResidentPhase(productionResidentCallServices()) {
@@ -60,7 +66,8 @@ ResidentPhase::ResidentPhase(ResidentCallServices services) : services_(services
 }
 
 void ResidentPhase::requireServices(const ResidentCallServices &services) {
-  if (services.call0 && services.call1 && services.call2 && services.call4 && services.readFile) {
+  if (services.call0 && services.call1 && services.call2 && services.call4 && services.readFile &&
+      services.readSector) {
     return;
   }
   lucent::error("vagrant-resident", "ResidentPhase requires every finite guest-call service");
@@ -289,12 +296,10 @@ void ResidentPhase::finishTitleReinit(Core &core) {
   core.mem_w32(resident::kGameTime, 0u);
   core.mem_w32(resident::kMainStateFlag, 0u);
   core.r[29] += 0x30u;
-  if (!services_.readFile(core, resident::kTitlePrgLba, resident::kTitlePrgSize, resident::kTitleOverlayBase)) {
-    lucent::error("vagrant-resident",
-                  "TITLE.PRG read failed at LBA {} size {} destination 0x{:08X}",
-                  resident::kTitlePrgLba,
-                  resident::kTitlePrgSize,
-                  resident::kTitleOverlayBase);
+  auto &overlays = static_cast<VagrantContext *>(core.gameCtx)->overlayImages;
+  auto admitted = readAndLoadTitle(core, overlays, services_.readSector);
+  if (!admitted) {
+    lucent::error("vagrant-resident", "TITLE.PRG load refused: {}", admitted.detail);
     std::abort();
   }
   state_ = ResidentPhaseState::TitleProgramLoadFieldWait;
