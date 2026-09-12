@@ -219,12 +219,13 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
 - deps: RE-04, RE-19
 - evidence: Exact CD facts and native file/command owners remain under `game/cd/`.
 - where: `game/cd/`, `tools/re_cd.py`, `tools/re_async_cd.py`
-- gap: Validate override ABI, failure paths, and ordinary dynarec comparison. Raw CD file copies do
-  not publish executable-image identity or write the final sector's bytes beyond the requested file
-  length. `ResidentPhase` sees only a boolean copy result, while `VagrantRuntime::createContext`
-  creates no `OverlayImages` owner. The title adapter must own successful whole-sector completion,
-  authenticate the completed TITLE transfer through `OverlayImages::adoptTransfer`, and retain its
-  identity before guest entry.
+- gap: Validate override ABI, failure paths, and ordinary dynarec comparison. The measured TITLE
+  request is `0x87800` bytes (271 complete sectors), including the final 440 bytes beyond the
+  authenticated ISO file length; `readNativeFile` copies that entire request before returning true.
+  It does not publish executable-image identity. `ResidentPhase` sees only a boolean copy result,
+  while `VagrantRuntime::createContext` creates no per-Core `OverlayImages` owner. The title adapter
+  must retain successful transfer completion and authenticate those resident bytes through
+  `OverlayImages::adoptTransfer` before guest entry.
 
 ### RE-21 — TITLE GPU timeout arm
 - status: re-partial
