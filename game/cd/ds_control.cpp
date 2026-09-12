@@ -4,8 +4,8 @@
 // queue. Async DsCommand/DsPacket, callbacks, query results, reads, and XA streaming remain
 // guest-owned until their contracts are measured; reaching one here refuses instead of reporting
 // fabricated success.
-#include "cd/cd_facts.h"
 #include "cd/ds_control.h"
+#include "cd/cd_facts.h"
 #include "cd_control.h"
 #include "core.h"
 #include "ds_control_contract.h"

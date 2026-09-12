@@ -66,7 +66,8 @@ FrameServices productionFrameServices() {
   };
 }
 
-VagrantFrameDriver::VagrantFrameDriver() : VagrantFrameDriver(productionFrameServices()) {}
+VagrantFrameDriver::VagrantFrameDriver() : VagrantFrameDriver(productionFrameServices()) {
+}
 
 VagrantFrameDriver::VagrantFrameDriver(FrameServices services) : services_(services) {
   requireServices(services_);
@@ -98,10 +99,8 @@ void VagrantFrameDriver::stepFrame(Core &core, std::uint32_t frame) {
     lastFieldOwner_ = FieldOwner::Title;
   } else if (services_.battle(core)) {
     lastFieldOwner_ = FieldOwner::Battle;
-  } else if (services_.titleMovie(core)) {
-    lastFieldOwner_ = FieldOwner::Title;
   } else {
-    lastFieldOwner_ = FieldOwner::Resident;
+    lastFieldOwner_ = services_.titleMovie(core) ? FieldOwner::Title : FieldOwner::Resident;
   }
 
   services_.present(core);

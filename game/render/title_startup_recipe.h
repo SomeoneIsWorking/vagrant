@@ -4,6 +4,13 @@
 
 namespace vagrant {
 
+struct PackedTitleSprite {
+  std::uint32_t xy;
+  std::uint32_t uvClut;
+  std::uint32_t wh;
+  std::uint32_t tpageFade;
+};
+
 // Semantic arguments of TITLE's _drawSprt leaf, decoded from the guest ABI. Keeping this rule pure
 // lets the unit gate exercise the exact production decoder without constructing a GPU.
 struct TitleSpriteRecipe {
@@ -20,7 +27,7 @@ struct TitleSpriteRecipe {
   int clutY = 0;
   std::uint8_t shade = 0;
 
-  static TitleSpriteRecipe decode(std::uint32_t xy, std::uint32_t uvClut, std::uint32_t wh, std::uint32_t tpageFade);
+  static TitleSpriteRecipe decode(PackedTitleSprite packed);
 };
 
 } // namespace vagrant

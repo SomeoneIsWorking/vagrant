@@ -50,11 +50,17 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
   (exclusive).
   `OverlayImages::loadTransfer` checks those whole-sector extents, refuses changed padding, copies the
   complete transfer to RAM, and invalidates the transfer while the image identity ends at file EOF.
-  The isolated real-disc check accepted all three transfers and refused all three changed tails.
+  The isolated real-disc check read all three exact transfers, adopted their completed sector bytes
+  from guest RAM, and refused all three changed tails through both staged and resident admission.
+  `OverlayImages::adoptTransfer` checks the same authenticated extent after CD has already written
+  guest RAM, publishes it without a second copy, and invalidates the previous slot generation. Its
+  synthetic test refuses changed payload, changed padding, and foreign tail residency; a valid
+  in-RAM TITLE-to-BATTLE replacement executes newly translated code with zero fallback.
 - where: `tools/re_overlay.py`, `tools/extract_overlays.py`, `tests/test_overlay_inputs.py`,
   `game/core/overlay_images.cpp`, `tests/test_vagrant_overlay_images.cpp`
-- gap: The exact transfer publisher remains disconnected from the natural CD queue's Loaded
-  transition and the resident-to-TITLE guest continuation; later overlays remain open.
+- gap: The natural CD queue's successful Loaded transition must call the resident-memory publisher;
+  the publisher does not infer or set queue state. The resident-to-TITLE guest continuation and later
+  overlays remain open.
 
 ## Resident services
 
@@ -203,7 +209,8 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
 - status: re-partial
 - deps: RE-18
 - evidence: `tools/re_resident.py`, typed facts, and `game/core/resident_phase.cpp` retain the finite
-  owner boundaries recovered from the retail executable.
+  owner boundaries recovered from the retail executable. The native synthetic contract exercises
+  those phases through injected services; production leaves now call psxport's bounded guest executor.
 - where: `tools/re_resident.py`, `game/core/resident_phase.cpp`, `game/core/resident_facts.h`
 - gap: Connect only after the dynarec entry boundary exists; do not recreate a second runtime.
 
@@ -212,7 +219,9 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
 - deps: RE-04, RE-19
 - evidence: Exact CD facts and native file/command owners remain under `game/cd/`.
 - where: `game/cd/`, `tools/re_cd.py`, `tools/re_async_cd.py`
-- gap: Validate override ABI, failure paths, and ordinary dynarec comparison.
+- gap: Validate override ABI, failure paths, and ordinary dynarec comparison. Raw CD file copies do
+  not publish executable-image identity; the title adapter must authenticate the completed TITLE
+  sector transfer through `OverlayImages::adoptTransfer` before guest entry.
 
 ### RE-21 — TITLE GPU timeout arm
 - status: re-partial

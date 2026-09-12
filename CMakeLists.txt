@@ -41,6 +41,28 @@ add_library(vagrant_runtime STATIC
 target_include_directories(vagrant_runtime PUBLIC game/core)
 target_link_libraries(vagrant_runtime PUBLIC psxport)
 
+# These authored native owners remain usable without the unavailable process adapter. Link their
+# synthetic contracts against the same library the eventual title composition will consume.
+add_library(vagrant_native STATIC
+  game/cd/ds_control.cpp
+  game/cd/libds_field.cpp
+  game/cd/native_file.cpp
+  game/core/game_heap.cpp
+  game/core/game_time.cpp
+  game/core/resident_phase.cpp
+  game/input/pad_delivery.cpp
+  game/render/battle_frame.cpp
+  game/render/title_menu.cpp
+  game/render/title_movie.cpp
+  game/render/title_splash.cpp
+  game/render/title_startup.cpp
+  game/render/title_startup_recipe.cpp
+  game/save/title_memcard_init.cpp
+  game/save/title_save_check.cpp
+  game/sync/frame_loop.cpp)
+target_include_directories(vagrant_native PUBLIC game game/core game/render)
+target_link_libraries(vagrant_native PUBLIC psxport vagrant_runtime)
+
 if(BUILD_TESTING)
   add_executable(vagrant_image_contract tests/test_vagrant_image_contract.cpp)
   target_link_libraries(vagrant_image_contract PRIVATE vagrant_runtime)
@@ -53,6 +75,22 @@ if(BUILD_TESTING)
   add_executable(vagrant_title_entry tests/test_vagrant_title_entry.cpp)
   target_link_libraries(vagrant_title_entry PRIVATE vagrant_runtime)
   add_test(NAME vagrant_title_entry COMMAND vagrant_title_entry)
+
+  add_executable(vagrant_ds_control_contract tests/test_ds_control_contract.cpp)
+  target_link_libraries(vagrant_ds_control_contract PRIVATE vagrant_native)
+  add_test(NAME vagrant_ds_control_contract COMMAND vagrant_ds_control_contract)
+
+  add_executable(vagrant_game_heap tests/test_game_heap.cpp)
+  target_link_libraries(vagrant_game_heap PRIVATE vagrant_native)
+  add_test(NAME vagrant_game_heap COMMAND vagrant_game_heap)
+
+  add_executable(vagrant_title_startup_recipe tests/test_title_startup_recipe.cpp)
+  target_link_libraries(vagrant_title_startup_recipe PRIVATE vagrant_native)
+  add_test(NAME vagrant_title_startup_recipe COMMAND vagrant_title_startup_recipe)
+
+  add_executable(vagrant_native_runtime tests/test_vagrant_runtime.cpp)
+  target_link_libraries(vagrant_native_runtime PRIVATE vagrant_native)
+  add_test(NAME vagrant_native_runtime COMMAND vagrant_native_runtime)
 endif()
 
 # Break-first migration boundary: the generated-source product has been removed. The

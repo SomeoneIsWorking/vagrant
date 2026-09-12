@@ -35,7 +35,7 @@ verified retail inputs -> psxport runtime image mapping -> dynarec execution
 | Player launcher | Handle help and expose the one explicit unavailable-product boundary until the dynarec adapter exists | `run.sh`, `bootstrap.py`, `tools/run.py`, `tools/launcher/runtime_boundary.py` | `bootstrap.main`, `run.main`, `require_product` | `README.md` |
 | Retail input resolution | Apply explicit argument, environment, `.env`, then drop-in precedence and refuse missing/ambiguous assets | `tools/resolve_disc.py` | `resolve_disc` | `docs/references.md` |
 | Executable/overlay provisioning | Extract and identity-check the resident executable and reached overlay images | `tools/extract_exe.py`, `tools/extract_overlays.py`, `tools/discdump.py` | each tool's `main` | `docs/references.md` |
-| Dynarec title adapter | Compose authenticated resident/overlay images, typed exits, image generations, invalidation, and image-scoped native handlers against psxport | `game/core/vagrant_runtime.{h,cpp}` for resident admission; `game/core/overlay_images.{h,cpp}` for per-Core TITLE/BATTLE/INITBTL file and completed-sector admission; `game/core/title_entry.{h,cpp}` for the resident-to-TITLE call gate; compose remaining execution owners beside them | `vagrant::VagrantRuntime::loadResidentImage`, `vagrant::OverlayImages::load`, `vagrant::OverlayImages::loadTransfer`, `vagrant::enterTitle` | `CLAUDE.md` |
+| Dynarec title adapter | Compose authenticated resident/overlay images, typed exits, image generations, invalidation, and image-scoped native handlers against psxport | `game/core/vagrant_runtime.{h,cpp}` for resident admission; `game/core/overlay_images.{h,cpp}` for per-Core TITLE/BATTLE/INITBTL file, staged-sector, and completed resident-sector admission; `game/core/title_entry.{h,cpp}` for the resident-to-TITLE call gate; compose remaining execution owners beside them | `vagrant::VagrantRuntime::loadResidentImage`, `vagrant::OverlayImages::load`, `vagrant::OverlayImages::loadTransfer`, `vagrant::OverlayImages::adoptTransfer`, `vagrant::enterTitle` | `CLAUDE.md` |
 | Process composition | Load typed configuration, construct the title adapter and peer owners, and enter the bounded product loop | boundary: `tools/launcher/runtime_boundary.py`; future C++ application owner beside the title adapter | target: `vagrant::Application` | `CLAUDE.md` |
 | Runtime composition | Hold cohesive per-Core title owners without absorbing their behavior | `game/core/vagrant_context.h` | `vagrant::VagrantContext` | `CLAUDE.md` |
 | CD/libds behavior | Classify the measured blocking control owners, establish the libds postcondition, and copy finite resident/TITLE extents from the real disc | `game/cd/cd_facts.h`, `game/cd/ds_control.cpp`, `game/cd/libds_field.{h,cpp}`, `game/cd/native_file.{h,cpp}` | `vagrant::cd::handleDsControlB`, `vagrant::cd::LibDsField`, `readNativeFile` | `docs/re-frontier.md` |
@@ -53,22 +53,22 @@ verified retail inputs -> psxport runtime image mapping -> dynarec execution
 | BATTLE semantic world production | Read named pre-GTE camera/object/material state and build faithful 4:3 native world geometry; own later widescreen and interpolation inputs | target: game/render/battle_world.{h,cpp}, with cohesive camera/object peers as their semantics are measured | target: `vagrant::BattleWorldProducer` | `docs/battle-rendering.md` |
 | Native game heap | Implement the measured readable game-heap behavior; the future title adapter owns image-scoped registration and original calls | `game/core/game_heap.h`, `game/core/game_heap.cpp` | `vagrant::heap::initHeap` | `docs/references.md` |
 | RE instruments | Measure shipping facts from SHA-bound executable/overlay bytes and gate every shipped constant/owner against its source | `tools/re_crt0.py`, `tools/re_overlay.py`, `tools/re_frame.py`, `tools/re_title_natural.py`, and peer `tools/re_*.py` | each tool's `measure` / `main` | `docs/re-frontier.md` |
-| Verification | Exercise the launcher refusal, provisioning policy, structure rules, measured contracts, and later dynarec integration through hermetic positive/refusal cases | `tests/`, `tools/verify.py`, `tools/quality/structure.py` | `verify.main`, Python test mains | `CLAUDE.md` |
+| Verification | Build and run current C++ image and native-owner contracts, enforce compile coverage and C++ policy, and exercise launcher, provisioning, and structure contracts | `CMakeLists.txt`, `tests/`, `tools/verify.py`, `tools/quality/structure.py`, shared `external/psxport/tools/check_cpp_style.py` | `verify.main`, CTest and Python test mains | `README.md` |
 | Project registries | Query proof, instrument trust, atomic issues, and ordered RE dependencies | `tools/info.py`, `tools/catalog.py`, `tools/re_frontier.py`, `docs/info/`, `docs/issues/`, `docs/re-frontier.md` | each tool's `main` | — |
 | Framework platform layer | Own Lightrec execution, PSX hardware services, rendering backend, UI, configuration, and shared presentation mechanisms | `external/psxport/` | target per-Core executor API | `external/psxport/CLAUDE.md` |
 
 ## Source tree
 
 ```text
-game/  —  2,721 lines, 50 files
+game/  —  2,730 lines, 48 files
 ├─ cd/     270 lines, 8 files
-├─ core/ 1,147 lines, 16 files
+├─ core/ 1,148 lines, 14 files
 ├─ input/   68 lines, 3 files
-├─ render/ 675 lines, 14 files
-├─ save/   362 lines, 6 files
-└─ sync/   199 lines, 3 files
-tools/ —  9,178 lines, 34 files
-tests/ —  1,441 lines, 11 files
+├─ render/ 682 lines, 14 files
+├─ save/   364 lines, 6 files
+└─ sync/   198 lines, 3 files
+tools/ —  9,299 lines, 34 files
+tests/ —  1,489 lines, 10 files
 ```
 
 Refresh this annotated tree with

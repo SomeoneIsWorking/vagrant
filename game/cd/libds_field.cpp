@@ -10,7 +10,7 @@
 namespace {
 
 void call0(Core &core, std::uint32_t address) {
-  rc0(&core, address);
+  psx::cpu::dispatchGuestToReturn0(core, address, psx::cpu::ExecutionBudget::currentTurn(core), "libds field tick");
 }
 
 } // namespace
@@ -21,7 +21,8 @@ LibDsFieldServices productionLibDsFieldServices() {
   return {.call0 = call0};
 }
 
-LibDsField::LibDsField() : LibDsField(productionLibDsFieldServices()) {}
+LibDsField::LibDsField() : LibDsField(productionLibDsFieldServices()) {
+}
 
 LibDsField::LibDsField(LibDsFieldServices services) : services_(services) {
   requireServices(services_);

@@ -95,8 +95,8 @@ bool syntheticCall() {
   const auto resident = runtime.loadResidentImage(core, residentBytes, "SLUS_010.40");
   vagrant::OverlayImages overlays(core, specs);
   const auto title = overlays.load(vagrant::OverlayKind::Title, titleBytes);
-  if (!require(static_cast<bool>(resident) && static_cast<bool>(title), "synthetic images were refused")) {
-    return false;
+  if (!resident.identity.has_value() || !title.identity.has_value()) {
+    return require(false, "synthetic images were refused");
   }
   core.pc = vagrant::resident::kTitleCallSite;
   core.r[2] = 0xAAu;
@@ -166,8 +166,8 @@ bool retailAdmission(const std::filesystem::path &directory) {
   const auto resident = runtime.loadResidentImage(core, residentBytes, "SLUS_010.40");
   vagrant::OverlayImages overlays(core);
   const auto title = overlays.load(vagrant::OverlayKind::Title, titleBytes);
-  if (!require(static_cast<bool>(resident) && static_cast<bool>(title), "retail image admission failed")) {
-    return false;
+  if (!resident.identity.has_value() || !title.identity.has_value()) {
+    return require(false, "retail image admission failed");
   }
   core.pc = vagrant::resident::kTitleCallSite;
   if (!require(vagrant::validateTitleEntry(core, *resident.identity, *title.identity).empty(),

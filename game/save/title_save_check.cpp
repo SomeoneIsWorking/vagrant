@@ -10,7 +10,8 @@
 
 namespace vagrant {
 
-TitleSaveCheck::TitleSaveCheck() : TitleSaveCheck(productionResidentCallServices()) {}
+TitleSaveCheck::TitleSaveCheck() : TitleSaveCheck(productionResidentCallServices()) {
+}
 
 TitleSaveCheck::TitleSaveCheck(ResidentCallServices services) : services_(services) {
   if (!services_.call0 || !services_.call1 || !services_.call2 || !services_.call4) {

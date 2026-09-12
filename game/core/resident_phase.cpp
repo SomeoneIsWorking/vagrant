@@ -15,23 +15,25 @@
 namespace {
 
 std::uint32_t call0(Core &core, std::uint32_t address) {
-  rc0(&core, address);
+  psx::cpu::dispatchGuestToReturn0(core, address, psx::cpu::ExecutionBudget::currentTurn(core), "resident call0");
   return core.r[2];
 }
 
 std::uint32_t call1(Core &core, std::uint32_t address, std::uint32_t a0) {
-  rc1(&core, address, a0);
+  psx::cpu::dispatchGuestToReturn1(core, address, a0, psx::cpu::ExecutionBudget::currentTurn(core), "resident call1");
   return core.r[2];
 }
 
 std::uint32_t call2(Core &core, std::uint32_t address, std::uint32_t a0, std::uint32_t a1) {
-  rc2(&core, address, a0, a1);
+  psx::cpu::dispatchGuestToReturn2(
+      core, address, a0, a1, psx::cpu::ExecutionBudget::currentTurn(core), "resident call2");
   return core.r[2];
 }
 
 std::uint32_t
 call4(Core &core, std::uint32_t address, std::uint32_t a0, std::uint32_t a1, std::uint32_t a2, std::uint32_t a3) {
-  rc4(&core, address, a0, a1, a2, a3);
+  psx::cpu::dispatchGuestToReturn4(
+      core, address, a0, a1, a2, a3, psx::cpu::ExecutionBudget::currentTurn(core), "resident call4");
   return core.r[2];
 }
 
@@ -50,7 +52,8 @@ ResidentCallServices productionResidentCallServices() {
   return {.call0 = call0, .call1 = call1, .call2 = call2, .call4 = call4, .readFile = cd::readNativeFile};
 }
 
-ResidentPhase::ResidentPhase() : ResidentPhase(productionResidentCallServices()) {}
+ResidentPhase::ResidentPhase() : ResidentPhase(productionResidentCallServices()) {
+}
 
 ResidentPhase::ResidentPhase(ResidentCallServices services) : services_(services) {
   requireServices(services_);

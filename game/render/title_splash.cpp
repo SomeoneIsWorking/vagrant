@@ -20,7 +20,8 @@ void writeRect(Core &core, std::uint32_t address, std::int16_t x, std::int16_t y
 
 namespace vagrant {
 
-TitleSplashPhase::TitleSplashPhase() : TitleSplashPhase(productionResidentCallServices()) {}
+TitleSplashPhase::TitleSplashPhase() : TitleSplashPhase(productionResidentCallServices()) {
+}
 
 TitleSplashPhase::TitleSplashPhase(ResidentCallServices services) : services_(services) {
   if (!services_.call0 || !services_.call1 || !services_.call2 || !services_.call4) {

@@ -8,9 +8,9 @@ UseTab: Never
 BreakBeforeBraces: Attach
 AllowShortBlocksOnASingleLine: Never
 AllowShortCaseExpressionOnASingleLine: false
-AllowShortFunctionsOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: Never
-AllowShortLambdasOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: None
 AllowShortLoopsOnASingleLine: false
 BinPackArguments: false
 BinPackParameters: false

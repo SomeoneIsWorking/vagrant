@@ -10,7 +10,7 @@ int main() {
   const std::uint32_t uvClut = static_cast<std::uint32_t>(clut) << 16u;
   const std::uint32_t wh = 256u | (48u << 16u);
   const std::uint32_t tpageFade = 5u | (124u << 16u);
-  const vagrant::TitleSpriteRecipe r = vagrant::TitleSpriteRecipe::decode(xy, uvClut, wh, tpageFade);
+  const vagrant::TitleSpriteRecipe r = vagrant::TitleSpriteRecipe::decode({xy, uvClut, wh, tpageFade});
 
   if (r.x != 32 || r.y != 88 || r.width != 256 || r.height != 48 || r.u != 0 || r.v != 0 || r.texturePageX != 320 ||
       r.texturePageY != 0 || r.textureMode != 0 || r.clutX != 320 || r.clutY != 64 || r.shade != 4) {
@@ -20,7 +20,7 @@ int main() {
 
   // Signed screen coordinates and over-range fade clamp are both live ABI properties, not display
   // assumptions. This is the other answer for the decoder's two non-trivial boundaries.
-  const auto edge = vagrant::TitleSpriteRecipe::decode(0xFFF0FFF8u, 0u, 0x00010001u, 0x00FF0000u);
+  const auto edge = vagrant::TitleSpriteRecipe::decode({0xFFF0FFF8u, 0u, 0x00010001u, 0x00FF0000u});
   if (edge.x != -8 || edge.y != -16 || edge.shade != 0) {
     std::fprintf(stderr, "TITLE sprite signed-coordinate/fade boundary mismatch\n");
     return 1;

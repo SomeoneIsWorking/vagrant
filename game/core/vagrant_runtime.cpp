@@ -17,8 +17,8 @@ bool matchesResidentHeader(const psx::cpu::PsxExeImage &image) {
 
 std::string headerMismatch(const psx::cpu::PsxExeImage &image) {
   std::ostringstream detail;
-  detail << "SLUS_010.40 PS-X EXE header mismatch: entry=0x" << std::hex << std::uppercase << image.entry
-         << ", text=0x" << image.textAddress << "+0x" << image.textBytes;
+  detail << "SLUS_010.40 PS-X EXE header mismatch: entry=0x" << std::hex << std::uppercase << image.entry << ", text=0x"
+         << image.textAddress << "+0x" << image.textBytes;
   return detail.str();
 }
 
@@ -44,11 +44,14 @@ void *VagrantRuntime::createContext(Core &) {
   return nullptr;
 }
 
-void VagrantRuntime::destroyContext(void *) {}
+void VagrantRuntime::destroyContext(void *) {
+}
 
-void VagrantRuntime::registerOverrides(Game &) {}
+void VagrantRuntime::registerOverrides(Game &) {
+}
 
-void VagrantRuntime::bootInit(Core &) {}
+void VagrantRuntime::bootInit(Core &) {
+}
 
 const GuestProgramImage *VagrantRuntime::guestProgramImage() const {
   return &programImage_;
@@ -69,11 +72,11 @@ const char *VagrantRuntime::discEnvVar() const {
 psx::cpu::PsxExeLoadResult
 VagrantRuntime::loadResidentImage(Core &core, std::span<const std::uint8_t> bytes, std::string_view imageName) const {
   const auto parsed = psx::cpu::parsePsxExeImage(bytes);
-  if (!parsed) {
+  if (!parsed.image.has_value()) {
     return {std::nullopt, {}, parsed.detail};
   }
-  if (!matchesResidentHeader(*parsed.image)) {
-    return {std::nullopt, {}, headerMismatch(*parsed.image)};
+  if (!matchesResidentHeader(parsed.image.value())) {
+    return {std::nullopt, {}, headerMismatch(parsed.image.value())};
   }
   return psx::cpu::loadPsxExeImage(core, bytes, imageName);
 }

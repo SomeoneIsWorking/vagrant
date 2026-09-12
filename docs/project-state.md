@@ -215,16 +215,20 @@ real resident and `.PRG` blocks without linking or selecting an interpreter.
 The first image boundary is owned by `vagrant::VagrantRuntime`: it checks the measured resident PS-X
 header and delegates publication to psxport's `loadPsxExeImage`. `vagrant::OverlayImages` adds exact
 SHA-256 admission for the three reached TITLE/BATTLE/INITBTL `.PRG` files at their measured load
-bases. Each accepted load copies the verified bytes, calls psxport's central executable-write
-invalidation, retires the prior generation in its address slot, and registers the new image identity.
+bases. Staged loads copy verified bytes; `adoptTransfer` authenticates an already completed CD sector
+write in guest RAM without copying it again. Both paths call psxport's central executable-write
+invalidation, retire the prior generation in its address slot, and register the new image identity.
 The focused synthetic test proves changed payload refusal is atomic, unknown slot residency is
-refused, and TITLE→BATTLE replacement executes a newly translated block with zero fallback.
+refused, and TITLE→BATTLE replacement executes a newly translated block with zero fallback. The
+resident-memory adoption test refuses changed payload, changed final-sector padding, and foreign
+tail residency before publishing a valid replacement with the same zero-fallback result.
 The isolated real-input admission check accepted 3/3 exact TITLE/BATTLE/INITBTL files, resolved each
-measured entry to its new image generation, and refused 1/1 changed TITLE file. That check mapped
-retail bytes but did not execute them. `vagrant::enterTitle` now admits the exact resident
-`0x80042BD8` direct call only when PC, call/delay words, and both resident/TITLE image generations
-agree. Its synthetic run executed the call, TITLE return, and resident continuation through 3
-translated blocks and 6 guest instructions with zero fallback; stale and altered call cases were
+measured entry to its new image generation, and refused 1/1 changed TITLE file. The completed-sector
+check read the same disc and adopted 3/3 exact transfers from guest RAM while refusing 3/3 changed
+tails. Those checks mapped retail bytes but did not execute them. `vagrant::enterTitle` now admits the
+exact resident `0x80042BD8` direct call only when PC, call/delay words, and both resident/TITLE
+image generations agree. Its synthetic run executed the call, TITLE return, and resident continuation
+through 3 translated blocks and 6 guest instructions with zero fallback; stale and altered call cases were
 refused before dispatch. A read-only admission of the exact retail resident and TITLE bytes accepted
 the call and refused a changed word without executing retail guest code. This remains structural
 adapter coverage: no retail bytes have entered a current gameplay product, and no authenticated

@@ -45,10 +45,17 @@ public:
   // Publish a completed whole-sector CD transfer. The final sector's bytes beyond the ISO file
   // length are part of the guest RAM write, but not of the executable image identity.
   OverlayLoadResult loadTransfer(OverlayKind kind, std::span<const std::uint8_t> sectors);
+  // Admit bytes already delivered to the measured guest RAM slot by a completed CD transfer.
+  // The caller owns proof that the guest queue reached its successful completion state.
+  OverlayLoadResult adoptTransfer(OverlayKind kind);
 
 private:
-  OverlayLoadResult
-  publish(OverlayKind kind, std::span<const std::uint8_t> imageBytes, std::span<const std::uint8_t> sectorTail);
+  const OverlaySpec *specFor(OverlayKind kind) const;
+  OverlayLoadResult publishTransfer(OverlayKind kind, std::span<const std::uint8_t> sectors, bool alreadyResident);
+  OverlayLoadResult publish(OverlayKind kind,
+                            std::span<const std::uint8_t> imageBytes,
+                            std::span<const std::uint8_t> sectorTail,
+                            bool alreadyResident);
 
   Core &core_;
   std::array<OverlaySpec, 3> specs_;

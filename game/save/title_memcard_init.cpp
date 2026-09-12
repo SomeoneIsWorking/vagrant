@@ -9,7 +9,8 @@
 
 namespace vagrant {
 
-TitleMemcardInit::TitleMemcardInit() : TitleMemcardInit(productionResidentCallServices()) {}
+TitleMemcardInit::TitleMemcardInit() : TitleMemcardInit(productionResidentCallServices()) {
+}
 
 TitleMemcardInit::TitleMemcardInit(ResidentCallServices services) : services_(services) {
   if (!services_.call0 || !services_.call1 || !services_.call4 || !services_.readFile) {

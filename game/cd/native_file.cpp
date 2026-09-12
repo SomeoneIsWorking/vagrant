@@ -3,7 +3,6 @@
 #include "core.h"
 #include "disc.h"
 #include "game.h"
-#include "overlay_router.h"
 
 #include <algorithm>
 #include <array>
@@ -30,7 +29,6 @@ bool readNativeFile(Core &core, std::uint32_t lba, std::uint32_t size, std::uint
     }
     copied += count;
   }
-  overlay_note_load(&core, destination);
   lucent::debug("vagrant-cd", "native file read LBA {} size {} -> 0x{:08X}", lba, size, destination);
   return true;
 }

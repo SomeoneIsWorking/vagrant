@@ -43,15 +43,17 @@ It currently exits with the missing-adapter message above. Help remains availabl
 `./run.sh --help`. Focused migration checks do not use the launcher:
 
 ```sh
-uv run --frozen python tools/verify.py
+CXX=clang++ uv run --frozen python tools/verify.py
 uv run --frozen python tools/extract_exe.py /path/to/disc.chd
 uv run --frozen python tools/extract_overlays.py /path/to/disc.chd
 ```
 
 The extraction commands place authenticated runtime inputs under gitignored `scratch/`. The normal
-verifier checks the Python launcher boundary, exact-image provisioning behavior, the 1,200-line source
-cap, Python-only automation, absence of retired execution dependencies, and product-code bans on
-direct stderr and process-environment reads.
+verifier configures a Ninja build under `build/verify`, builds and runs seven native image/title
+contracts, checks first-party C++ with clang-format and clang-tidy, then runs the Python tests and
+structure policy. It checks the Python launcher boundary, exact-image provisioning behavior, the
+1,200-line source cap, Python-only automation, absence of retired execution dependencies, and
+product-code bans on direct stderr and process-environment reads.
 
 The eventual fresh-clone product requires `uv`, CMake, Git, a C++20 compiler, and psxport's documented
 native dependencies. Maintainer C++ verification uses Clang, clang-format, and clang-tidy; the shipped
