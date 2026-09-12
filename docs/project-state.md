@@ -134,7 +134,12 @@ authenticated runtime images. Issues 0022–0024 preserve the retired pipeline's
 cross-overlay targets, computed control flow, and shared epilogues; they are not implementation
 requirements for the new runtime.
 
-Gap: the native phase path does not currently re-enter BATTLE. A room/world field, gameplay loop,
+The title's `OverlayImages` owner now admits the reached BATTLE and INITBTL files at their measured
+bases and retires the older TITLE/BATTLE generation in the shared slot. The synthetic contract
+executes a translated block before and after replacement, checks that the old translation is
+invalidated, and refuses altered bytes and unknown existing residency without changing Core state.
+
+Gap: the title adapter does not currently re-enter BATTLE. A room/world field, gameplay loop,
 later overlays, and complete BATTLE execution are not verified.
 
 ### S007 — First measured native game body
@@ -207,11 +212,18 @@ authenticated image generations, typed exits, invalidation, or image-scoped nati
 product must remain unavailable until that adapter executes real resident and `.PRG` blocks without
 linking or selecting an interpreter.
 
-The first image boundary is now owned by `vagrant::VagrantRuntime`: it checks the measured resident
-PS-X header and delegates publication to psxport's `loadPsxExeImage`, which registers the image and
-performs the central executable-write invalidation. `vagrant_image_contract` proves that route and
-refuses a changed entry. This is structural adapter coverage only; no retail bytes have entered a
-current product, and no dynarec gameplay execution is claimed.
+The first image boundary is owned by `vagrant::VagrantRuntime`: it checks the measured resident PS-X
+header and delegates publication to psxport's `loadPsxExeImage`. `vagrant::OverlayImages` adds exact
+SHA-256 admission for the three reached TITLE/BATTLE/INITBTL `.PRG` files at their measured load
+bases. Each accepted load copies the verified bytes, calls psxport's central executable-write
+invalidation, retires the prior generation in its address slot, and registers the new image identity.
+The focused synthetic test proves changed payload refusal is atomic, unknown slot residency is
+refused, and TITLE→BATTLE replacement executes a newly translated block with zero fallback.
+The isolated real-input admission check accepted 3/3 exact TITLE/BATTLE/INITBTL files, resolved each
+measured entry to its new image generation, and refused 1/1 changed TITLE file. That check mapped
+retail bytes but did not execute them. This remains structural adapter coverage: no retail bytes
+have entered a current gameplay product, and no authenticated resident-to-overlay gameplay route
+is claimed.
 
 ### S016 — Platform CI coverage
 

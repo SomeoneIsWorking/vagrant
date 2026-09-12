@@ -44,8 +44,11 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
 - evidence: `tools/re_overlay.py` verifies 20 non-empty PRGs by owned-byte self-consistency and
   SHA-bound independent metadata. BATTLE/TITLE/ENDING load at `0x80068800`;
   INITBTL/SCREFF2/MAINMENU at `0x800F9800`; MENU0-5,7-9,B-F at `0x80102800`; `MENUA.PRG` is empty.
-- where: `tools/re_overlay.py`, `tools/extract_overlays.py`, `tests/test_overlay_inputs.py`
-- gap: Runtime image generation, replacement, and cache invalidation belong to the dynarec adapter.
+- where: `tools/re_overlay.py`, `tools/extract_overlays.py`, `tests/test_overlay_inputs.py`,
+  `game/core/overlay_images.cpp`, `tests/test_vagrant_overlay_images.cpp`
+- gap: `game/core/overlay_images.cpp` now applies the measured bases and complete SHA-256 identity
+  for the three reached images, with synthetic generation replacement and cache-invalidation proof.
+  Wire its per-Core owner into the title adapter's real CD load route; later overlays remain open.
 
 ## Resident services
 
@@ -119,8 +122,10 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
 - deps: RE-03
 - evidence: `TITLE.PRG` is 554,568 bytes, SHA-1
   `f74a76e6215edebf607d0c2af56481050edb139a`, loads at `0x80068800`, and enters at `0x80071334`.
-- where: `tools/extract_overlays.py`, `tests/test_overlay_inputs.py`
-- gap: Map/enter/replace the image through psxport and prove invalidation.
+- where: `tools/extract_overlays.py`, `tests/test_overlay_inputs.py`,
+  `game/core/overlay_images.cpp`, `tests/test_vagrant_overlay_images.cpp`
+- gap: The title-owned loader now admits and replaces TITLE with synthetic Lightrec invalidation
+  proof. Wire the authenticated retail load/entry through the product's CD and dynarec route.
 
 ### RE-12 — TITLE publisher/developer splash producer
 - status: re-partial
@@ -152,8 +157,11 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
 - deps: RE-03
 - evidence: Exact BATTLE and INITBTL bytes, bases, and historical reach remain recorded by the
   extraction and frame instruments.
-- where: `tools/extract_overlays.py`, `tools/re_frame.py`, `tests/test_overlay_inputs.py`
-- gap: Runtime map/entry/invalidation and image-scoped native registration are missing.
+- where: `tools/extract_overlays.py`, `tools/re_frame.py`, `tests/test_overlay_inputs.py`,
+  `game/core/overlay_images.cpp`, `tests/test_vagrant_overlay_images.cpp`
+- gap: BATTLE/INITBTL admission and TITLE→BATTLE generation replacement now have a focused
+  synthetic Lightrec proof. Runtime CD-load integration, reached entries, and image-scoped native
+  registration remain missing.
 
 ### RE-16 — natural movie-end transition
 - status: re-partial
