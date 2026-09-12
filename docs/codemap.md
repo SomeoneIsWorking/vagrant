@@ -35,7 +35,7 @@ verified retail inputs -> psxport runtime image mapping -> dynarec execution
 | Player launcher | Handle help and expose the one explicit unavailable-product boundary until the dynarec adapter exists | `run.sh`, `bootstrap.py`, `tools/run.py`, `tools/launcher/runtime_boundary.py` | `bootstrap.main`, `run.main`, `require_product` | `README.md` |
 | Retail input resolution | Apply explicit argument, environment, `.env`, then drop-in precedence and refuse missing/ambiguous assets | `tools/resolve_disc.py` | `resolve_disc` | `docs/references.md` |
 | Executable/overlay provisioning | Extract and identity-check the resident executable and reached overlay images | `tools/extract_exe.py`, `tools/extract_overlays.py`, `tools/discdump.py` | each tool's `main` | `docs/references.md` |
-| Dynarec title adapter | Compose the authenticated resident/overlay images, typed exits, image generations, invalidation, and image-scoped native handlers against psxport | composition root: `game/core/vagrant_context.h`; split into a dedicated title-adapter module when the shared API lands | target: `vagrant::TitleAdapter` | `CLAUDE.md` |
+| Dynarec title adapter | Compose the authenticated resident/overlay images, typed exits, image generations, invalidation, and image-scoped native handlers against psxport | `game/core/vagrant_runtime.{h,cpp}` for the resident image boundary; compose remaining execution owners beside it | `vagrant::VagrantRuntime::loadResidentImage` | `CLAUDE.md` |
 | Process composition | Load typed configuration, construct the title adapter and peer owners, and enter the bounded product loop | boundary: `tools/launcher/runtime_boundary.py`; future C++ application owner beside the title adapter | target: `vagrant::Application` | `CLAUDE.md` |
 | Runtime composition | Hold cohesive per-Core title owners without absorbing their behavior | `game/core/vagrant_context.h` | `vagrant::VagrantContext` | `CLAUDE.md` |
 | CD/libds behavior | Classify the measured blocking control owners, establish the libds postcondition, and copy finite resident/TITLE extents from the real disc | `game/cd/cd_facts.h`, `game/cd/ds_control.cpp`, `game/cd/libds_field.{h,cpp}`, `game/cd/native_file.{h,cpp}` | `vagrant::cd::handleDsControlB`, `vagrant::cd::LibDsField`, `readNativeFile` | `docs/re-frontier.md` |
@@ -78,9 +78,8 @@ Refresh this annotated tree with
 
 - Boot, overlay, ABI, camera, or render constants measured from retail bytes → the narrow matching
   `tools/re_*.py` instrument first, then the owning typed module.
-- New runtime orchestration → split a dedicated title-adapter module from
-  `game/core/vagrant_context.h` when the shared API lands; implementation stays in its cohesive peer
-  subsystem.
+- New runtime orchestration → keep it in a dedicated title-adapter module beside
+  `game/core/vagrant_runtime.{h,cpp}`; implementation stays in its cohesive peer subsystem.
 - Per-Core product state → its owner under `game/input/`, `game/render/`, `game/save/`, or `game/sync/`, composed by
   `VagrantContext`.
 - BATTLE world camera/projection/object production → the semantic BATTLE render owner described in

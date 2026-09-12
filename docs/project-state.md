@@ -207,6 +207,12 @@ authenticated image generations, typed exits, invalidation, or image-scoped nati
 product must remain unavailable until that adapter executes real resident and `.PRG` blocks without
 linking or selecting an interpreter.
 
+The first image boundary is now owned by `vagrant::VagrantRuntime`: it checks the measured resident
+PS-X header and delegates publication to psxport's `loadPsxExeImage`, which registers the image and
+performs the central executable-write invalidation. `vagrant_image_contract` proves that route and
+refuses a changed entry. This is structural adapter coverage only; no retail bytes have entered a
+current product, and no dynarec gameplay execution is claimed.
+
 ### S016 — Platform CI coverage
 
 Partial capability: `.github/workflows/ci.yml` runs the maintained asset-free structure and launcher

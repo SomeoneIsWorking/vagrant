@@ -28,12 +28,15 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
   entry path.
 
 ### RE-02 — resident runtime mapping and entry
-- status: todo
+- status: re-partial
 - deps: RE-01
-- evidence: The exact resident image identity, load range, and entry are verified by RE-01.
-- where: intended title adapter named in `docs/codemap.md`
-- gap: Map the authenticated image, enter `0x8001F544`, and prove all gameplay guest execution is
-  dynarec-only.
+- evidence: `vagrant::VagrantRuntime::loadResidentImage` now refuses a structurally valid PS-X EXE
+  whose measured resident header differs, then delegates the accepted image to psxport's central
+  `loadPsxExeImage` publication and image catalog. `vagrant_image_contract` proves the positive
+  entry/range/catalog path and the changed-entry refusal with a synthetic PS-X shape.
+- where: `game/core/vagrant_runtime.{h,cpp}`, `tests/test_vagrant_image_contract.cpp`
+- gap: Authenticate the complete retail file before this boundary, enter `0x8001F544` in the actual
+  title adapter, and prove all gameplay guest execution is dynarec-only.
 
 ### RE-03 — load bases for all PRG images
 - status: re-verified
