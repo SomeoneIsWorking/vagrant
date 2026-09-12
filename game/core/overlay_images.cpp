@@ -33,6 +33,8 @@ const std::array<OverlaySpec, 3> kRetailOverlays{{
      "c2d6eeb4347b01b3e2ffaf5a812a074601f1878ce8399f48e1e2adad943024fc"},
 }};
 
+constexpr std::size_t kCdSectorBytes = 2048u;
+
 std::optional<std::size_t> slotFor(std::uint32_t guestBase) {
   if (guestBase == 0x80068800u) {
     return 0;
@@ -57,6 +59,33 @@ OverlayImages::OverlayImages(Core &core) : core_(core), specs_(kRetailOverlays) 
 OverlayImages::OverlayImages(Core &core, std::array<OverlaySpec, 3> specs) : core_(core), specs_(std::move(specs)) {}
 
 OverlayLoadResult OverlayImages::load(OverlayKind kind, std::span<const std::uint8_t> bytes) {
+  return publish(kind, bytes, {});
+}
+
+OverlayLoadResult OverlayImages::loadTransfer(OverlayKind kind, std::span<const std::uint8_t> sectors) {
+  const auto found = std::find_if(specs_.begin(), specs_.end(), [kind](const OverlaySpec &spec) {
+    return spec.kind == kind;
+  });
+  if (found == specs_.end()) {
+    return {std::nullopt, "unknown Vagrant overlay kind"};
+  }
+  const std::size_t tailBytes = (kCdSectorBytes - found->byteCount % kCdSectorBytes) % kCdSectorBytes;
+  if (found->byteCount > sectors.size() || sectors.size() - found->byteCount != tailBytes) {
+    return {std::nullopt, found->name + " transfer is not the measured whole-sector extent"};
+  }
+  const auto image = sectors.first(found->byteCount);
+  const auto tail = sectors.subspan(found->byteCount);
+  if (!std::all_of(tail.begin(), tail.end(), [](std::uint8_t byte) {
+        return byte == 0u;
+      })) {
+    return {std::nullopt, found->name + " final-sector padding differs from the authenticated disc"};
+  }
+  return publish(kind, image, tail);
+}
+
+OverlayLoadResult OverlayImages::publish(OverlayKind kind,
+                                         std::span<const std::uint8_t> bytes,
+                                         std::span<const std::uint8_t> sectorTail) {
   const auto found = std::find_if(specs_.begin(), specs_.end(), [kind](const OverlaySpec &spec) {
     return spec.kind == kind;
   });
@@ -66,10 +95,11 @@ OverlayLoadResult OverlayImages::load(OverlayKind kind, std::span<const std::uin
   const auto slot = slotFor(found->guestBase);
   const auto physical = found->guestBase & 0x1fffffffu;
   if (!slot || found->name.empty() || found->byteCount == 0 || (found->guestBase & 3u) != 0 ||
-      found->byteCount > sizeof(core_.ram) - physical || bytes.size() != found->byteCount) {
+      found->byteCount > sizeof(core_.ram) - physical ||
+      sectorTail.size() > sizeof(core_.ram) - physical - found->byteCount || bytes.size() != found->byteCount) {
     return {std::nullopt, std::string(found->name) + " has an invalid measured load range or byte count"};
   }
-  if (aliasesRam(core_, bytes)) {
+  if (aliasesRam(core_, bytes) || aliasesRam(core_, sectorTail)) {
     return {std::nullopt, std::string(found->name) + " input aliases destination RAM"};
   }
   const auto digest = lucent::content::sha256({reinterpret_cast<const std::byte *>(bytes.data()), bytes.size()});
@@ -79,18 +109,29 @@ OverlayLoadResult OverlayImages::load(OverlayKind kind, std::span<const std::uin
   if (core_.currentImageIdentity(found->guestBase) != active_[*slot]) {
     return {std::nullopt, std::string(found->name) + " slot residency changed outside its owner"};
   }
+  for (std::size_t offset = 0; offset < sectorTail.size(); ++offset) {
+    const auto identity =
+        core_.currentImageIdentity(found->guestBase + static_cast<std::uint32_t>(bytes.size() + offset));
+    if (identity && identity != active_[*slot]) {
+      return {std::nullopt, found->name + " final-sector range belongs to another image"};
+    }
+  }
 
   std::uint64_t contentIdentity = 0;
   for (unsigned index = 0; index < sizeof(contentIdentity); ++index) {
     contentIdentity |= static_cast<std::uint64_t>(digest[index]) << (index * 8);
   }
-  const GuestAddressRange range{physical, physical + static_cast<std::uint32_t>(bytes.size())};
+  const GuestAddressRange imageRange{physical, physical + static_cast<std::uint32_t>(bytes.size())};
+  const GuestAddressRange transferRange{physical, imageRange.end + static_cast<std::uint32_t>(sectorTail.size())};
   std::memcpy(core_.ram + physical, bytes.data(), bytes.size());
-  psx::cpu::notifyExecutableWrite(core_, range, psx::cpu::ExecutableWriteSource::ModuleLoad);
+  if (!sectorTail.empty()) {
+    std::memcpy(core_.ram + imageRange.end, sectorTail.data(), sectorTail.size());
+  }
+  psx::cpu::notifyExecutableWrite(core_, transferRange, psx::cpu::ExecutableWriteSource::ModuleLoad);
   if (active_[*slot]) {
     core_.imageCatalog().deactivate(*active_[*slot]);
   }
-  const auto identity = core_.imageCatalog().activate(found->name, range, contentIdentity);
+  const auto identity = core_.imageCatalog().activate(found->name, imageRange, contentIdentity);
   active_[*slot] = identity;
   return {identity, {}};
 }

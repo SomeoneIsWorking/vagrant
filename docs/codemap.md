@@ -35,7 +35,7 @@ verified retail inputs -> psxport runtime image mapping -> dynarec execution
 | Player launcher | Handle help and expose the one explicit unavailable-product boundary until the dynarec adapter exists | `run.sh`, `bootstrap.py`, `tools/run.py`, `tools/launcher/runtime_boundary.py` | `bootstrap.main`, `run.main`, `require_product` | `README.md` |
 | Retail input resolution | Apply explicit argument, environment, `.env`, then drop-in precedence and refuse missing/ambiguous assets | `tools/resolve_disc.py` | `resolve_disc` | `docs/references.md` |
 | Executable/overlay provisioning | Extract and identity-check the resident executable and reached overlay images | `tools/extract_exe.py`, `tools/extract_overlays.py`, `tools/discdump.py` | each tool's `main` | `docs/references.md` |
-| Dynarec title adapter | Compose authenticated resident/overlay images, typed exits, image generations, invalidation, and image-scoped native handlers against psxport | `game/core/vagrant_runtime.{h,cpp}` for resident admission; `game/core/overlay_images.{h,cpp}` for per-Core TITLE/BATTLE/INITBTL admission and replacement; `game/core/title_entry.{h,cpp}` for the resident-to-TITLE call gate; compose remaining execution owners beside them | `vagrant::VagrantRuntime::loadResidentImage`, `vagrant::OverlayImages::load`, `vagrant::enterTitle` | `CLAUDE.md` |
+| Dynarec title adapter | Compose authenticated resident/overlay images, typed exits, image generations, invalidation, and image-scoped native handlers against psxport | `game/core/vagrant_runtime.{h,cpp}` for resident admission; `game/core/overlay_images.{h,cpp}` for per-Core TITLE/BATTLE/INITBTL file and completed-sector admission; `game/core/title_entry.{h,cpp}` for the resident-to-TITLE call gate; compose remaining execution owners beside them | `vagrant::VagrantRuntime::loadResidentImage`, `vagrant::OverlayImages::load`, `vagrant::OverlayImages::loadTransfer`, `vagrant::enterTitle` | `CLAUDE.md` |
 | Process composition | Load typed configuration, construct the title adapter and peer owners, and enter the bounded product loop | boundary: `tools/launcher/runtime_boundary.py`; future C++ application owner beside the title adapter | target: `vagrant::Application` | `CLAUDE.md` |
 | Runtime composition | Hold cohesive per-Core title owners without absorbing their behavior | `game/core/vagrant_context.h` | `vagrant::VagrantContext` | `CLAUDE.md` |
 | CD/libds behavior | Classify the measured blocking control owners, establish the libds postcondition, and copy finite resident/TITLE extents from the real disc | `game/cd/cd_facts.h`, `game/cd/ds_control.cpp`, `game/cd/libds_field.{h,cpp}`, `game/cd/native_file.{h,cpp}` | `vagrant::cd::handleDsControlB`, `vagrant::cd::LibDsField`, `readNativeFile` | `docs/re-frontier.md` |
@@ -60,15 +60,15 @@ verified retail inputs -> psxport runtime image mapping -> dynarec execution
 ## Source tree
 
 ```text
-game/  —  2,674 lines, 50 files
+game/  —  2,721 lines, 50 files
 ├─ cd/     270 lines, 8 files
-├─ core/ 1,100 lines, 16 files
+├─ core/ 1,147 lines, 16 files
 ├─ input/   68 lines, 3 files
 ├─ render/ 675 lines, 14 files
 ├─ save/   362 lines, 6 files
 └─ sync/   199 lines, 3 files
 tools/ —  9,178 lines, 34 files
-tests/ —  1,381 lines, 11 files
+tests/ —  1,441 lines, 11 files
 ```
 
 Refresh this annotated tree with

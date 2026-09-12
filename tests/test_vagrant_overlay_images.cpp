@@ -1,10 +1,12 @@
 #include "core.h"
+#include "disc.h"
 #include "game.h"
 #include "lightrec_executor.h"
 #include "lucent/content.h"
 #include "overlay_images.h"
 #include "vagrant_runtime.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -48,38 +50,71 @@ std::vector<std::uint8_t> readFile(const std::filesystem::path &path) {
   return {std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
 }
 
-bool retailInputs(const std::filesystem::path &directory) {
+bool retailInputs(const std::filesystem::path &directory, bool discTransfer) {
   vagrant::VagrantRuntime runtime;
   psxport_install_game(runtime);
   auto game = std::make_unique<Game>();
   vagrant::OverlayImages overlays(game->core);
-  for (const auto [kind, name, entry] : {
-           std::tuple{OverlayKind::Title, "TITLE.BIN", 0x80071334u},
-           std::tuple{OverlayKind::Battle, "BATTLE.BIN", 0x800798A4u},
-           std::tuple{OverlayKind::InitBattle, "INITBTL.BIN", 0x800FA35Cu},
+  for (const auto [kind, stem, isoPath, entry] : {
+           std::tuple{OverlayKind::Title, "TITLE", "TITLE/TITLE.PRG", 0x80071334u},
+           std::tuple{OverlayKind::Battle, "BATTLE", "BATTLE/BATTLE.PRG", 0x800798A4u},
+           std::tuple{OverlayKind::InitBattle, "INITBTL", "BATTLE/INITBTL.PRG", 0x800FA35Cu},
        }) {
-    if (!require(std::filesystem::is_regular_file(directory / name), "retail overlay input is missing")) {
+    const auto path = directory / (std::string(stem) + (discTransfer ? ".PRG" : ".BIN"));
+    if (!require(std::filesystem::is_regular_file(path), "retail overlay input is missing")) {
       return false;
     }
-    const auto bytes = readFile(directory / name);
-    const auto loaded = overlays.load(kind, bytes);
+    const auto bytes = readFile(path);
+    vagrant::OverlayLoadResult loaded;
+    if (discTransfer) {
+      std::uint32_t lba = 0u;
+      std::uint32_t fileBytes = 0u;
+      if (!require(disc_find_file(&game->disc, isoPath, &lba, &fileBytes) && fileBytes == bytes.size(),
+                   "retail CD directory differs from the authenticated overlay file")) {
+        return false;
+      }
+      std::vector<std::uint8_t> sectors(((bytes.size() + 2047u) / 2048u) * 2048u);
+      for (std::size_t offset = 0; offset < sectors.size(); offset += 2048u) {
+        if (!require(disc_read_sector(
+                         &game->disc, lba + static_cast<std::uint32_t>(offset / 2048u), sectors.data() + offset),
+                     "retail CD sector read failed")) {
+          return false;
+        }
+      }
+      if (!require(std::equal(bytes.begin(), bytes.end(), sectors.begin()),
+                   "retail CD transfer differs from the authenticated overlay file")) {
+        return false;
+      }
+      auto changedTail = sectors;
+      changedTail.back() ^= 1u;
+      if (!require(!overlays.loadTransfer(kind, changedTail), "changed final-sector padding was admitted")) {
+        return false;
+      }
+      loaded = overlays.loadTransfer(kind, sectors);
+    } else {
+      loaded = overlays.load(kind, bytes);
+    }
     if (!require(static_cast<bool>(loaded), "authenticated retail overlay was refused") ||
         !require(game->core.currentImageIdentity(entry) == loaded.identity,
                  "retail overlay entry does not resolve to its image generation")) {
       return false;
     }
   }
-  auto altered = readFile(directory / "TITLE.BIN");
+  auto altered = readFile(directory / (discTransfer ? "TITLE.PRG" : "TITLE.BIN"));
   altered[0] ^= 1u;
   if (!require(!overlays.load(OverlayKind::Title, altered), "altered retail TITLE image was admitted")) {
     return false;
   }
-  std::printf("retail overlay admission: 3/3 exact images accepted; changed TITLE 1/1 refused\n");
+  std::printf("retail overlay admission: 3/3 exact images accepted; changed TITLE 1/1 refused; "
+              "disc transfer tails %s\n",
+              discTransfer ? "3/3 accepted and 3/3 changed refused" : "not requested");
   return true;
 }
 
 bool syntheticReplacement() {
   const auto title = guestReturn(7);
+  std::vector<std::uint8_t> titleTransfer(2048u, 0u);
+  std::copy(title.begin(), title.end(), titleTransfer.begin());
   auto battle = guestReturn(19);
   battle.resize(16, 0);
   const auto init = guestReturn(31);
@@ -101,8 +136,25 @@ bool syntheticReplacement() {
       !require(core.imageCatalog().deactivate(foreign), "foreign fixture could not be retired")) {
     return false;
   }
-  const auto first = overlays.load(OverlayKind::Title, title);
+  const auto foreignTail = core.imageCatalog().activate("foreign-tail", {0x6880Cu, 0x68810u}, 2u);
+  if (!require(!overlays.loadTransfer(OverlayKind::Title, titleTransfer),
+               "foreign final-sector residency was overwritten") ||
+      !require(core.currentImageIdentity(0x8006880Cu) == foreignTail, "foreign tail residency was changed") ||
+      !require(core.imageCatalog().deactivate(foreignTail), "foreign tail fixture could not be retired")) {
+    return false;
+  }
+  core.mem_w8(0x8006880Cu, 0xA5u);
+  core.mem_w8(0x80068FFFu, 0xA5u);
+  auto changedTail = titleTransfer;
+  changedTail.back() = 1u;
+  if (!require(!overlays.loadTransfer(OverlayKind::Title, changedTail), "changed sector tail was admitted") ||
+      !require(core.ram[0x6880Cu] == 0xA5u && core.ram[0x68FFFu] == 0xA5u, "refused sector transfer changed RAM")) {
+    return false;
+  }
+  const auto first = overlays.loadTransfer(OverlayKind::Title, titleTransfer);
   if (!require(static_cast<bool>(first), "synthetic TITLE image was refused") ||
+      !require(core.ram[0x6880Cu] == 0u && core.ram[0x68FFFu] == 0u, "completed sector tail was not copied into RAM") ||
+      !require(!core.currentImageIdentity(0x8006880Cu), "sector padding became an executable image") ||
       !require(core.pc == 0x8001F544u, "overlay load changed the resident PC") ||
       !require(core.currentImageIdentity(0x80068800u) == first.identity,
                "TITLE slot did not resolve to its first image generation")) {
@@ -167,7 +219,14 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (argc == 3 && std::string_view(argv[1]) == "--retail-input-dir") {
-    return retailInputs(argv[2]) ? 0 : 1;
+    return retailInputs(argv[2], false) ? 0 : 1;
   }
-  return require(argc == 1, "usage: vagrant_overlay_images [--retail-input-dir DIRECTORY]") ? 0 : 2;
+  if (argc == 3 && std::string_view(argv[1]) == "--retail-disc-input-dir") {
+    return retailInputs(argv[2], true) ? 0 : 1;
+  }
+  return require(argc == 1,
+                 "usage: vagrant_overlay_images [--retail-input-dir DIRECTORY | "
+                 "--retail-disc-input-dir DIRECTORY]")
+             ? 0
+             : 2;
 }

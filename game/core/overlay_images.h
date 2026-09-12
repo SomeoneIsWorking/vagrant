@@ -42,8 +42,14 @@ public:
   OverlayImages &operator=(const OverlayImages &) = delete;
 
   OverlayLoadResult load(OverlayKind kind, std::span<const std::uint8_t> bytes);
+  // Publish a completed whole-sector CD transfer. The final sector's bytes beyond the ISO file
+  // length are part of the guest RAM write, but not of the executable image identity.
+  OverlayLoadResult loadTransfer(OverlayKind kind, std::span<const std::uint8_t> sectors);
 
 private:
+  OverlayLoadResult
+  publish(OverlayKind kind, std::span<const std::uint8_t> imageBytes, std::span<const std::uint8_t> sectorTail);
+
   Core &core_;
   std::array<OverlaySpec, 3> specs_;
   std::array<std::optional<psx::cpu::ImageIdentity>, 2> active_{};

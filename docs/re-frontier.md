@@ -44,11 +44,17 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
 - evidence: `tools/re_overlay.py` verifies 20 non-empty PRGs by owned-byte self-consistency and
   SHA-bound independent metadata. BATTLE/TITLE/ENDING load at `0x80068800`;
   INITBTL/SCREFF2/MAINMENU at `0x800F9800`; MENU0-5,7-9,B-F at `0x80102800`; `MENUA.PRG` is empty.
+  The exact disc's last sectors match the authenticated BATTLE/INITBTL/TITLE file prefixes and have
+  respectively 1,756/1,156/440 zero bytes after EOF. Resident `_loadTitlePrg 0x80041F34` requests
+  271 whole sectors from LBA 256000, so its final 440 bytes write up to `0x800F0000`
+  (exclusive).
+  `OverlayImages::loadTransfer` checks those whole-sector extents, refuses changed padding, copies the
+  complete transfer to RAM, and invalidates the transfer while the image identity ends at file EOF.
+  The isolated real-disc check accepted all three transfers and refused all three changed tails.
 - where: `tools/re_overlay.py`, `tools/extract_overlays.py`, `tests/test_overlay_inputs.py`,
   `game/core/overlay_images.cpp`, `tests/test_vagrant_overlay_images.cpp`
-- gap: `game/core/overlay_images.cpp` now applies the measured bases and complete SHA-256 identity
-  for the three reached images, with synthetic generation replacement and cache-invalidation proof.
-  Wire its per-Core owner into the title adapter's real CD load route; later overlays remain open.
+- gap: The exact transfer publisher remains disconnected from the natural CD queue's Loaded
+  transition and the resident-to-TITLE guest continuation; later overlays remain open.
 
 ## Resident services
 
