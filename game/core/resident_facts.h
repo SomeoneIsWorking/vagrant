@@ -43,6 +43,8 @@ inline constexpr std::uint32_t kTitleOuterStack = 0x80050474u;
 inline constexpr std::uint32_t kTitlePrgLba = 0x0003E800u;
 inline constexpr std::uint32_t kTitlePrgSize = 0x00087800u;
 inline constexpr std::uint32_t kTitleOverlayBase = 0x80068800u;
+inline constexpr std::uint32_t kTitleCallSite = 0x80042BD8u;
+inline constexpr std::uint32_t kTitleCallDelayWord = 0x00000000u;
 inline constexpr std::uint32_t kTitleEntry = 0x80071334u;
 inline constexpr std::uint32_t kTitleStartState = 0x80050470u;
 

@@ -36,7 +36,8 @@ add_subdirectory("${PSXPORT_DIR}" framework EXCLUDE_FROM_ALL)
 
 add_library(vagrant_runtime STATIC
   game/core/vagrant_runtime.cpp
-  game/core/overlay_images.cpp)
+  game/core/overlay_images.cpp
+  game/core/title_entry.cpp)
 target_include_directories(vagrant_runtime PUBLIC game/core)
 target_link_libraries(vagrant_runtime PUBLIC psxport)
 
@@ -48,6 +49,10 @@ if(BUILD_TESTING)
   add_executable(vagrant_overlay_images tests/test_vagrant_overlay_images.cpp)
   target_link_libraries(vagrant_overlay_images PRIVATE vagrant_runtime)
   add_test(NAME vagrant_overlay_images COMMAND vagrant_overlay_images)
+
+  add_executable(vagrant_title_entry tests/test_vagrant_title_entry.cpp)
+  target_link_libraries(vagrant_title_entry PRIVATE vagrant_runtime)
+  add_test(NAME vagrant_title_entry COMMAND vagrant_title_entry)
 endif()
 
 # Break-first migration boundary: the generated-source product has been removed. The

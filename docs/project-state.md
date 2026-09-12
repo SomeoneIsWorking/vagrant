@@ -207,10 +207,10 @@ not verified.
 
 ### S015 — Dynarec-only gameplay execution
 
-Missing capability: there is no Vagrant Story title adapter for psxport's per-Core Lightrec executor,
-authenticated image generations, typed exits, invalidation, or image-scoped native overrides. The
-product must remain unavailable until that adapter executes real resident and `.PRG` blocks without
-linking or selecting an interpreter.
+Missing capability: there is no complete Vagrant Story title adapter that composes psxport's per-Core
+Lightrec executor, authenticated image generations, typed exits, invalidation, and image-scoped native
+overrides into a gameplay product. The product must remain unavailable until that adapter executes
+real resident and `.PRG` blocks without linking or selecting an interpreter.
 
 The first image boundary is owned by `vagrant::VagrantRuntime`: it checks the measured resident PS-X
 header and delegates publication to psxport's `loadPsxExeImage`. `vagrant::OverlayImages` adds exact
@@ -221,9 +221,14 @@ The focused synthetic test proves changed payload refusal is atomic, unknown slo
 refused, and TITLE→BATTLE replacement executes a newly translated block with zero fallback.
 The isolated real-input admission check accepted 3/3 exact TITLE/BATTLE/INITBTL files, resolved each
 measured entry to its new image generation, and refused 1/1 changed TITLE file. That check mapped
-retail bytes but did not execute them. This remains structural adapter coverage: no retail bytes
-have entered a current gameplay product, and no authenticated resident-to-overlay gameplay route
-is claimed.
+retail bytes but did not execute them. `vagrant::enterTitle` now admits the exact resident
+`0x80042BD8` direct call only when PC, call/delay words, and both resident/TITLE image generations
+agree. Its synthetic run executed the call, TITLE return, and resident continuation through 3
+translated blocks and 6 guest instructions with zero fallback; stale and altered call cases were
+refused before dispatch. A read-only admission of the exact retail resident and TITLE bytes accepted
+the call and refused a changed word without executing retail guest code. This remains structural
+adapter coverage: no retail bytes have entered a current gameplay product, and no authenticated
+resident-to-overlay gameplay route is claimed.
 
 ### S016 — Platform CI coverage
 

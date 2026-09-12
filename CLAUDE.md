@@ -25,8 +25,8 @@ CMake product now fail at one named boundary: Vagrant Story has no adapter to ps
 executor. The measured native owners and old execution evidence below remain migration inputs, not
 current dynarec status or a runnable fallback.
 
-Read `external/psxport/CLAUDE.md` for shared framework rules and
-`../../shared/jit-common/docs/migration.md` for the portfolio migration contract.
+Read `external/psxport/CLAUDE.md` for shared framework rules. The current Vagrant migration
+contract and capability gaps are recorded in `docs/project-goals.md` and `docs/project-state.md`.
 
 ## Project authorities
 

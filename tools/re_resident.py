@@ -298,7 +298,9 @@ def measure(img, verify_identity=True):
             f"vs_main_execTitle 0x{exec_title:08X}: measured _sysReinit edge drifted"
         )
     load_title = jal_target(exec_title + 0x24, img.r32(exec_title + 0x24))
-    title_entry = jal_target(exec_title + 0x2C, img.r32(exec_title + 0x2C))
+    title_call_site = exec_title + 0x2C
+    title_entry = jal_target(title_call_site, img.r32(title_call_site))
+    title_call_delay_word = img.r32(title_call_site + 4)
     if (
         img.r32(load_title) != 0x27BDFFD8
         or img.r32(load_title + 0x48) != 0x24020004
@@ -421,6 +423,8 @@ def measure(img, verify_identity=True):
         "title_size": title_size,
         "title_slot_pointer": title_slot_pointer,
         "title_base": title_base,
+        "title_call_site": title_call_site,
+        "title_call_delay_word": title_call_delay_word,
         "title_entry": title_entry,
         "title_start_state": title_start_state,
         "init_card": init_card,
@@ -478,6 +482,8 @@ def check_source(measured, sources=None):
         "kTitlePrgLba": measured["title_lba"],
         "kTitlePrgSize": measured["title_size"],
         "kTitleOverlayBase": measured["title_base"],
+        "kTitleCallSite": measured["title_call_site"],
+        "kTitleCallDelayWord": measured["title_call_delay_word"],
         "kTitleEntry": measured["title_entry"],
         "kTitleStartState": measured["title_start_state"],
         "kLoadingImageHeader": measured["loading_header"],

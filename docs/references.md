@@ -18,8 +18,8 @@ Vendored as `external/rood-reverse` (submodule, pinned; `f3072188` at the time o
 | kind | *matching* decomp: its source compiles to byte-identical objects | its own splat/objdiff pipeline + decomp.dev reporting |
 | progress | ~55-63% overall per its decomp.dev badges | **NOT measured here.** Its README renders live badges; no number in this file is ours |
 
-CC0 puts it on the same footing as Dusklight and `open-spyro`: **we may take code AND ideas freely**,
-citing as a courtesy. That is what makes this title different from every other port in this workspace.
+CC0 permits us to use its code and ideas, citing the source as a courtesy. The matching target also
+makes its symbols useful leads for this exact retail revision.
 
 ### MEASURED 2026-08-12: the decomp targets OUR bytes, 21 of 21 code images
 
@@ -48,9 +48,10 @@ SLUS_010.40 alone) is a map into the exact executable this repo extracts.
    borrowed address is a HYPOTHESIS until measured against these bytes; the workspace has already
    recorded wrong conclusions from reading an address out of the wrong image. RE-01 is the pattern to
    copy: `tools/re_crt0.py` EXECUTES crt0 on our extracted image and derives all eleven boot-group
-   values from what that execution did, and `game/core/game_config.cpp` carries the disassembly line
-   behind each one. The decomp's names for the same addresses (`__ra_temp`, `_ramsize`, `_stacksize`,
-   `__heapbase`, `__heapsize`, `InitHeap`, `vs_main_exec`, `__SN_ENTRY_POINT`) turned out to agree —
+   values from what that execution did, and the current `game/core/vagrant_runtime.cpp` retains the
+   measured resident bootstrap facts. The decomp's names for the same addresses (`__ra_temp`,
+   `_ramsize`, `_stacksize`, `__heapbase`, `__heapsize`, `InitHeap`, `vs_main_exec`,
+   `__SN_ENTRY_POINT`) turned out to agree —
    which is worth something as corroboration and nothing as evidence. Had they disagreed, the
    measurement would have won. RE-03 now applies the same rule to overlays; all other guest-address
    groups in that file remain zero.
@@ -65,8 +66,9 @@ SLUS_010.40 alone) is a map into the exact executable this repo extracts.
    absolute `jal` targets and entry offsets; M3 then requires that owned image's SHA-1 to match the
    corresponding config before comparing its independently stated `vram`. Result: 20/20 identity and
    address agreements, zero undecided/missing/extra. The three values also appear in four contiguous
-   resident words at `0x80010000..0x8001000C`. This closes the static mapping and gates the shipped
-   seed/config copies; observing a running loader still awaits a substrate.
+   resident words at `0x80010000..0x8001000C`. The current `OverlayImages` owner maps and
+   authenticates the first three reached overlays; observing the product's natural CD loader and
+   guest entry remains open.
 
 ### Why a matching decomp matters to the hybrid
 

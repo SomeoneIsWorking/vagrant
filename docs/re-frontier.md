@@ -122,10 +122,14 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
 - deps: RE-03
 - evidence: `TITLE.PRG` is 554,568 bytes, SHA-1
   `f74a76e6215edebf607d0c2af56481050edb139a`, loads at `0x80068800`, and enters at `0x80071334`.
+  The exact resident has `jal 0x80071334` at `0x80042BD8` with a zero delay slot; the title entry
+  gate validates those words and both live image generations before psxport dynarec continuation.
 - where: `tools/extract_overlays.py`, `tests/test_overlay_inputs.py`,
-  `game/core/overlay_images.cpp`, `tests/test_vagrant_overlay_images.cpp`
-- gap: The title-owned loader now admits and replaces TITLE with synthetic Lightrec invalidation
-  proof. Wire the authenticated retail load/entry through the product's CD and dynarec route.
+  `tools/re_resident.py`, `game/core/overlay_images.cpp`, `game/core/title_entry.cpp`,
+  `tests/test_vagrant_overlay_images.cpp`, `tests/test_vagrant_title_entry.cpp`
+- gap: The title-owned entry gate and synthetic direct-call execution are separate from the absent
+  product adapter. Wire the authenticated retail load and reached call through the product's CD and
+  dynarec route.
 
 ### RE-12 — TITLE publisher/developer splash producer
 - status: re-partial
