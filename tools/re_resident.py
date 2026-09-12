@@ -29,6 +29,7 @@ CD_FACTS = os.path.join(ROOT, "game", "cd", "cd_facts.h")
 PHASE = os.path.join(ROOT, "game", "core", "resident_phase.cpp")
 FRAME = os.path.join(ROOT, "game", "sync", "frame_loop.cpp")
 GPU_FACTS = os.path.join(ROOT, "game", "render", "gpu_sync_facts.h")
+TITLE_TRANSFER = os.path.join(ROOT, "game", "core", "title_transfer.cpp")
 
 
 def calls(img, owner, offsets):
@@ -453,7 +454,11 @@ def measure(img, verify_identity=True):
         "gpu_timeout_flag": gpu_timeout_flag,
         "sfx_data": sfx_data,
         "menu_loads": menu_loads,
-        "scanned": sys_scanned + loading_scanned + reinit_scanned + main_scanned + gpu_timeout_scanned,
+        "scanned": sys_scanned
+        + loading_scanned
+        + reinit_scanned
+        + main_scanned
+        + gpu_timeout_scanned,
     }
 
 
@@ -468,10 +473,11 @@ def check_source(measured, sources=None):
     if sources is None:
         sources = {
             path: Path(path).read_text(encoding="utf-8")
-            for path in (FACTS, CD_FACTS, PHASE, FRAME, GPU_FACTS)
+            for path in (FACTS, CD_FACTS, PHASE, FRAME, GPU_FACTS, TITLE_TRANSFER)
         }
-    facts, cd_facts, phase, frame, gpu_facts = (
-        sources[path] for path in (FACTS, CD_FACTS, PHASE, FRAME, GPU_FACTS)
+    facts, cd_facts, phase, frame, gpu_facts, title_transfer = (
+        sources[path]
+        for path in (FACTS, CD_FACTS, PHASE, FRAME, GPU_FACTS, TITLE_TRANSFER)
     )
     expected = {
         "kCxxMain": measured["cxx_main"],
@@ -542,7 +548,9 @@ def check_source(measured, sources=None):
     for name, want in gpu_expected.items():
         got = source_constant(gpu_facts, name)
         ok = got == want
-        print(f"  [{'ok' if ok else 'FAIL':>4}] {name}=0x{got:08X} measured=0x{want:08X}")
+        print(
+            f"  [{'ok' if ok else 'FAIL':>4}] {name}=0x{got:08X} measured=0x{want:08X}"
+        )
         if not ok:
             failures.append(name)
     wiring = {
@@ -563,9 +571,20 @@ def check_source(measured, sources=None):
             phase,
             r"advanceMenuLoad.*game_time::advance.*finishMenuLoad",
         ),
-        "TITLE native file owner": (
+        "TITLE native load owner": (
             phase,
-            r"finishTitleReinit.*kTitlePrgLba.*kTitlePrgSize.*kTitleOverlayBase.*TitleProgramLoadFieldWait",
+            (
+                r"finishTitleReinit.*readAndLoadTitle\(core,\s*overlays,\s*services_\.readSector\)"
+                r".*if\s*\(!admitted\).*TitleProgramLoadFieldWait"
+            ),
+        ),
+        "TITLE complete sector acquisition": (
+            title_transfer,
+            r"readNativeSectors\(core,\s*resident::kTitlePrgLba,\s*resident::kTitlePrgSize,\s*readSector\)",
+        ),
+        "TITLE authenticate before RAM publication": (
+            title_transfer,
+            r"if\s*\(!transfer\).*return\s+overlays\.loadTransfer\(OverlayKind::Title,\s*transfer\.sectors\)",
         ),
         "TITLE overlay entry after field": (
             phase,
@@ -611,7 +630,7 @@ def selftest(img, measured):
         img.data = original
     sources = {
         path: Path(path).read_text(encoding="utf-8")
-        for path in (FACTS, CD_FACTS, PHASE, FRAME, GPU_FACTS)
+        for path in (FACTS, CD_FACTS, PHASE, FRAME, GPU_FACTS, TITLE_TRANSFER)
     }
     sabotaged = dict(sources)
     old = f"kLoadMenuSound = 0x{measured['load_menu_sound']:08X}u"
@@ -634,6 +653,23 @@ def selftest(img, measured):
         raise AssertionError("+4 TITLE entry was accepted")
     except Refuse as error:
         print(f"  [ ok ] +4 TITLE entry refused: {error}")
+        checks += 1
+    sabotaged = dict(sources)
+    original_publish = (
+        "return overlays.loadTransfer(OverlayKind::Title, transfer.sectors);"
+    )
+    if original_publish not in sabotaged[TITLE_TRANSFER]:
+        raise AssertionError("TITLE publication mutation anchor did not fire")
+    sabotaged[TITLE_TRANSFER] = sabotaged[TITLE_TRANSFER].replace(
+        original_publish,
+        "return overlays.adoptTransfer(OverlayKind::Title, transfer.sectors);",
+        1,
+    )
+    try:
+        check_source(measured, sabotaged)
+        raise AssertionError("TITLE publication before authentication was accepted")
+    except Refuse as error:
+        print(f"  [ ok ] TITLE publication mutation refused: {error}")
         checks += 1
     sabotaged = dict(sources)
     changed_frame = sabotaged[FRAME]
@@ -665,7 +701,7 @@ def selftest(img, measured):
     except Refuse as error:
         print(f"  [ ok ] +4 GPU-timeout arm refused: {error}")
         checks += 1
-    print(f"re_resident selftest: {checks}/6 PASS")
+    print(f"re_resident selftest: {checks}/7 PASS")
 
 
 def main(argv):

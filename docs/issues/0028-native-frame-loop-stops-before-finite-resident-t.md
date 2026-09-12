@@ -1,12 +1,12 @@
 ---
 id: 28
-title: Native frame loop stops before finite resident/TITLE phase work exists
+title: Native frame loop lacks call-coherent resident-to-TITLE guest continuation
 status: investigating
-symptom: The native product owns finite fields and rejects guest VSync, but boot returns at vs_main_exec before _sysInit or TITLE work advances
+symptom: Finite resident work loads authenticated TITLE, but the product has no call-coherent guest continuation from vs_main_exec through TITLE
 tags: boot,frame-loop,vsync,title,battle,native-ownership
 state_items: S003, S004, S006, S013
 created: 2026-08-27
-updated: 2026-08-27
+updated: 2026-09-12
 ---
 
 ## Root cause
@@ -19,23 +19,27 @@ injecting the intact guest handler from a host turn.
 
 ## Current bounded slice
 
-`VagrantRuntime::bootInit` now returns at the measured `vs_main_exec` boundary instead of dispatching
-it. `VagrantFrameDriver` owns one finite field in the existing framework shell: host frame index,
-measured pad delivery, SPU/audio service, resident/TITLE/BATTLE completed-producer arbitration,
-exactly one presentation commit, and one field pace. Sony VSync `0x8001F6C4` is bound to psxport's
-mandatory fatal handler through a one-instruction measured HLE window. The guest VBlank override,
-host-turn registration, handler dispatch, and obsolete `0x8001FAD0` re-entry seed are removed.
+`VagrantRuntime::bootInit` still returns before the resident owner, and no process adapter connects
+`ResidentPhase` to `VagrantFrameDriver`. The finite phase can acquire all 271 native TITLE sectors and
+authenticate before publishing executable RAM; it then manually begins the splash after one host
+field. Its leaf dispatch services inherit r31 rather than reproducing each retail JAL's callsite PC
+and return address. The separate `enterTitle` synthetic contract checks the direct JAL and live image
+generations, but the finite phase does not call it. No product TITLE guest reach is established.
 
-This slice compiles with Clang and its hermetic runtime contract plus `tools/re_vblank.py` 5/5
-controlled negatives pass. It was not launched. It intentionally does not claim TITLE or BATTLE
-reach: the native loop currently presents the resident fallback field because no finite guest phase
-work has run to publish a completed producer.
+The authenticated resident at `SLUS_010.40` SHA-1 `fababcfd4325d42f350d95b3472874affeb0e48c`
+shows `vs_main_exec 0x80042C38` holding a 0x18-byte frame across `__main`, `_sysInit`, and the call to
+`vs_main_execTitle` at `0x80042C5C` (return `0x80042C64`). The latter holds its own 0x18-byte frame,
+sets s0 to `0x8005DFD0`, calls `OverlayGetSp(s0)`, `_sysReinit`, `_loadTitlePrg`, then JALs to TITLE
+`0x80071334` from `0x80042BD8` (return `0x80042BE0`). The finite phase currently omits those two
+outer frames and the second `OverlayGetSp`; adding only those stack effects would leave the guest
+return path wrong. `tools/re_resident.py --check-source --selftest` now follows the shipping
+`readAndLoadTitle` boundary and refuses a broken TITLE publication path.
 
 ## Next proof
 
-Port `_sysInit` as finite native-owned operations in exact retail order, replacing every internal
-VSync dependency with the enclosing host field boundary rather than skipping side effects. Then
-extract the first TITLE outer iteration so one `stepFrame` performs bounded game work and returns.
-The first product run must show either a completed TITLE producer and one commit in the same field or
-a precise fatal at the next guest VSync/coupled phase boundary. It must not restore a guest handler,
-fabricate counter `0x80032114`, or dispatch a non-returning outer owner.
+Recover the measured callsite PC, return address, saved-register, and live-frame contract across
+each finite guest leaf from `vs_main_exec` through `vs_main_execTitle`; compose it with the direct
+TITLE JAL and a finite native field yield. The synthetic shipping-path test must traverse that
+sequence with valid resident/TITLE generations and refuse a wrong return PC or stale identity. Only
+then connect the process adapter and use a real run to discriminate the next guest-owned wait. Do
+not dispatch a non-returning TITLE/VSync owner or substitute stack-only state for continuation.

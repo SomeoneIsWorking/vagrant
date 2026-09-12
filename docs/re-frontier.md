@@ -213,8 +213,15 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
 - evidence: `tools/re_resident.py`, typed facts, and `game/core/resident_phase.cpp` retain the finite
   owner boundaries recovered from the retail executable. The native synthetic contract exercises
   those phases through injected services; production leaves now call psxport's bounded guest executor.
+  The source check follows the current completed-sector TITLE acquisition and authenticated
+  publication through `readAndLoadTitle`, with a broken-publication negative.
 - where: `tools/re_resident.py`, `game/core/resident_phase.cpp`, `game/core/resident_facts.h`
-- gap: Connect only after the dynarec entry boundary exists; do not recreate a second runtime.
+- gap: The exact `vs_main_exec` and `vs_main_execTitle` calls still need title-owned continuation:
+  their live outer frames and saved registers, each leaf's measured callsite PC/return address, and
+  the direct TITLE JAL at `0x80042BD8` with RA `0x80042BE0`. `ResidentPhase` calls bounded leaves
+  using the inherited r31 and manually enters the splash after loading TITLE; the isolated
+  `enterTitle` guest-JAL test does not compose with this finite phase. Prove that call/return chain
+  and a finite field yield through the shipping adapter before claiming TITLE guest reach.
 
 ### RE-20 — native CD command and finite menu-sound loads
 - status: re-partial
