@@ -20,6 +20,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <string_view>
 
 namespace {
 
@@ -58,6 +59,16 @@ bool diesOnSignal(void (*body)()) {
 // 320x240 handed to the overlay publication: a 320x224 draw area and a 160-wide centre. These are
 // the values the title passes as ITS OWN arguments, so the fixture states them as arguments rather
 // than as a constant the owner could have memorised.
+//
+// The vertical centre is 112, and that is DELIBERATE and worth reading twice. BATTLE.PRG states TWO
+// different vertical centres: the overlay publication computes (height-16)/2 + 16 = 128 at 320x240
+// (0x800760E8 `addiu $s3, $a1, -0x10`, 0x80076108 `addiu $a1, $a1, 0x10`), while the field presenter
+// re-states the LITERAL (160, 112) every field (0x800762E0 `addiu $a0, $zero, 0xA0`,
+// 0x800762E4 `jal 0x80041540`). Both were read from the bytes. This fixture drives the leaf the way
+// the PRESENTER does, because the presenter's value is the one in force at the frame boundary, and
+// that is exactly why the owner sits on the leaf instead of on the overlay's call site. The owner's
+// contract is that it records whatever value the guest last stated — which is why
+// BattleProjectionPublication::centreY is recorded and never asserted.
 
 constexpr std::uint32_t kResidentLow = 0x80010000u;
 constexpr std::uint32_t kResidentHigh = 0x80070000u;
@@ -277,13 +288,73 @@ int main() {
   expect(vagrant::BattleProjectionOwner::isGuestRam(0x80100000u),
          "an address inside the two megabytes of main RAM is a record");
 
-  // 8. The projection distance is never widened, and the threshold that makes that necessary is a
-  //    named constant rather than a comment. This is the state hazard, asserted as a fact about the
+  // 8. The projection distance is never widened, and the thresholds that make that necessary are
+  //    named constants rather than comments. This is the state hazard, asserted as a fact about the
   //    shipped header: the owner has no API that changes it.
+  //
+  //    THREE thresholds, not one. The previous file recorded only 272, which is the decompilation's
+  //    figure. Reading BATTLE.PRG found a second pair of branches on the same word at 0x80074580
+  //    (`slti $v0, $v0, 0x110`, i.e. < 272) and 0x80074744 (`slti $v0, $v0, 0x111`, i.e. > 272
+  //    spelled `< 273`), plus a zoom step at 0x80078578 that adds 64 and clamps at 0x300 = 768. A
+  //    widening that "just nudged H" would have cleared 272 and hit 768. All three are asserted here
+  //    because the numbers are the enforcement: drop one and the owner stops protecting the word.
   expect(facts::kProjectionDistanceBranchThreshold == 272,
          "the gameplay threshold the projection-distance word is branched on must be recorded");
-  expect(!facts::wideningAvailable(), "this title must report itself unable to widen while the clip boundary stands");
+  expect(facts::kProjectionDistanceZoomClamp == 768,
+         "the zoom clamp on the same word must be recorded; it is a second gameplay threshold");
+  expect(facts::kProjectionDistanceZoomStep == 64, "the per-step growth of the projection distance must be recorded");
+  expect(facts::kProjectionDistanceZoomStep != 0 &&
+             facts::kProjectionDistanceZoomStep < facts::kProjectionDistanceBranchThreshold,
+         "the game must drive the projection distance across the branch threshold, or the hazard is not a hazard");
+
+  // 9. The two vertical centres, as measured facts rather than as a comment. This is the pair the
+  //    previous file asserted disagreed while naming only one of them, and the owner records
+  //    `centreY` without asserting it precisely because they do disagree.
+  expect(facts::kBattlePublicationCentreY == 128,
+         "the overlay publication's own vertical centre at 320x240 must be recorded as 128");
+  expect(facts::kBattlePresenterCentreY == 112,
+         "the presenter's per-field literal vertical centre must be recorded as 112");
+  expect(facts::kBattlePublicationCentreY != facts::kBattlePresenterCentreY,
+         "the two publication sites must be recorded as disagreeing, or the owner's reason for "
+         "sitting on the leaf is not a reason");
+  expect(facts::kBattlePresenterCentreX == 160 && facts::kBattlePublicationCentreY / 2 == 64,
+         "the presenter's centre must remain the half-width the publication itself states");
+
+  // 10. The CORRECTED call sites. The BATTLE.PRG call of the publication is 0x8008A288, not the
+  //     0x8008B0A4 this repository previously recorded — that address holds `and $t2, $t1, $t5`, a
+  //     mask in a CLUT-addressing loop, so the old constant pointed at a word that computes nothing
+  //     this owner cares about. Asserted because a wrong call site is the kind of error that only
+  //     shows up as a mystery later, never as a failure here.
+  expect(facts::kBattlePublicationCallSite == 0x8008A288u,
+         "the BATTLE.PRG call site of the publication must be 0x8008A288 as read from the bytes");
+  expect(facts::kInitBtlPublicationCallSite == 0x800FA69Cu,
+         "the INITBTL.PRG call site of the publication must be 0x800FA69C as read from the bytes");
+
+  // 11. The `screen` rect, and what it is NOT. The previous blocker said a 256-pixel clip this port
+  //     had not read from bytes stopped the widening. The bytes REFUTE that: 256 is a literal in the
+  //     DISPENV `screen` rect and the draw-area clip is zero, so there is no 256-pixel clip in the
+  //     draw path. These constants exist so the corrected reading is a fact in the tree rather than
+  //     a sentence in a doc, and the 4:3 identity below is what proves they are not silently used
+  //     to scale anything.
+  expect(facts::kPublicationScreenWidth == 256 && facts::kPublicationScreenHeight == 224,
+         "the publication's `screen` rect must be recorded as the 256x224 literals the bytes show");
+  expect(facts::kPublicationScreenWidth != facts::kPublicationScreenHeight,
+         "the `screen` rect is not square, so a reader cannot mistake one for the other");
+
+  // 12. The boundary, and that it names the DISPLAY RESOLUTION rather than the refuted clip story.
+  //     A test that only checked `wideningBlocker()` is non-empty would have passed on the wrong
+  //     reason, which is the failure this assertion exists to catch.
+  expect(!facts::wideningAvailable(), "this title must report itself unable to widen while the boundary stands");
   expect(!facts::wideningBlocker().empty(), "an unavailable widening must name the boundary that stops it");
+  {
+    const std::string_view blocker = facts::wideningBlocker();
+    expect(blocker.find("screen rect") == std::string_view::npos,
+           "the boundary must not claim the `screen` rect is an unread clip; the bytes refute that");
+    expect(blocker.find("SetDefDispEnv") != std::string_view::npos,
+           "the boundary must name the display resolution, which is what actually has to move");
+    expect(blocker.find("has not read from bytes") == std::string_view::npos,
+           "the boundary must not rest on an unread reconstruction; the bodies are read now");
+  }
 
   if (failures != 0) {
     std::fprintf(stderr, "battle projection contract: %d failure(s)\n", failures);

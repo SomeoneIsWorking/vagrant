@@ -30,6 +30,11 @@ NATIVE_TESTS = frozenset({
 SCRIPT_TESTS = frozenset({
     "vagrant_projection_census",
     "vagrant_projection_census_selftest",
+    # The BYTE census, and its selftest. Registered as REQUIRED rather than merely present: a
+    # measurement this port's widening decision rests on that is not in REQUIRED_TESTS is a
+    # measurement nothing fails on when it stops being true.
+    "vagrant_viewport_bytes",
+    "vagrant_viewport_bytes_selftest",
 })
 REQUIRED_TESTS = NATIVE_TESTS | SCRIPT_TESTS
 sys.path.insert(0, str(ROOT))

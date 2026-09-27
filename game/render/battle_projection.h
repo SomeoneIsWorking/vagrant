@@ -11,19 +11,27 @@
 //
 // WHY THE OWNER SITS ON THE LEAVES AND NOT ON THE OVERLAY CALL SITE. BATTLE's field presenter
 // re-states a LITERAL horizontal centre through SetGeomOffset on every single field, so an owner on
-// the overlay's viewport call would be overwritten 60 times a second. The resident leaf is one
-// address in one image, every caller's centre passes through it, and the leaf's argument is the
-// title's own value at that instant — never a value this owner wrote — which is what makes a
-// widening idempotent by construction instead of by a guard against accumulation.
+// the overlay's viewport call would be overwritten once per field. The resident leaf is one address
+// in one image, every caller's centre passes through it, and the leaf's argument is the title's own
+// value at that instant — never a value this owner wrote — which is what makes a widening idempotent
+// by construction instead of by a guard against accumulation. Read from BATTLE.PRG bytes: the two
+// literals are `addiu $a0, $zero, 0xA0` and `addiu $a1, $zero, 0x70` at 0x800762E0, immediately
+// before the call. They are IN THE INSTRUCTION STREAM, not loaded from anywhere.
 //
-// WHY IT REFUSES INSTEAD OF WIDENING. There is no authenticated image on this machine, so not one
-// instruction word of the four leaves has been read here, and the bodies are a reconstruction. Worse,
-// a centre-only widening would be wrong even if they had: the horizontal CLIP is published by the
-// same overlay call with a VRAM side-by-side layout and a screen rectangle that the reconstruction
-// reports as 256 against a 320-wide display area. Moving the centre without moving the clip crops
-// the left of every field instead of widening anything, so this owner measures the publication,
-// derives the widening, and refuses to apply it. `derive()` is the shipped arithmetic a future clip
-// owner will call; the refusals inside it are the tests.
+// WHY IT REFUSES INSTEAD OF WIDENING, AND WHY THE REASON IS NOT THE ONE THIS FILE PREVIOUSLY GAVE.
+// The bodies used to be a reconstruction, read from no image. They are not any more:
+// `tools/re_viewport.py` decodes them out of the SHA-bound image, and 24 of its 26 claims are
+// CONFIRMED with the settling words, one is REFUTED (the call site this repository recorded as
+// 0x8008B0A4 is 0x8008A288) and one is not determinable from the provisioned modules.
+//
+// The refusal also used to rest on the 256 in the display `screen` rect being a clip this port could
+// not interpret. The bytes REFUTE that: it is a literal in the DISPENV `screen` rect, and the
+// DRAW-AREA clip is written to zero by `SetDefDrawEnv` and never touched again, so the drawing area
+// is unclipped. The boundary is now a different and stronger one, stated in
+// `battle_projection_facts.h`: the centre is owned and the clip is owned, but a widening has to move
+// the guest's DISPLAY RESOLUTION through `SetDefDispEnv`, and that is presentation infrastructure
+// this port has not measured. `derive()` is shipped and correct either way; the refusals inside it
+// are the tests, and they do not depend on which of those two reasons is current.
 #pragma once
 
 #include "battle_projection_facts.h"
@@ -44,8 +52,12 @@ namespace vagrant {
 struct BattleProjectionPublication {
   int centreX = 0;        // CR24 / ProjParams::geomOfx, the horizontal centre
   int centreY = 0;        // CR25 / geomOfy. Recorded, never asserted: the two publication sites
-                          // disagree about it (the overlay's is height-derived and the presenter's
-                          // is a literal), so a single expected value would be a guess.
+                          // genuinely disagree and the BYTES show it. The overlay states
+                          // (width/2, (height-16)/2 + 16) = (160, 128) at a 320x240 call; the
+                          // presenter re-states the literal (160, 112) every field. Asserting either
+                          // one would be asserting that the other site is wrong, and the bytes do
+                          // not say that — they say the presenter's runs last, which is a fact about
+                          // ORDER and not about which number is correct.
   int screenDistance = 0; // CR26 / geomH, the GTE projection-plane distance H
   int drawWidth = 0;      // the width the title passed to its draw area, cross-checked against the
                           // guest's own rectangle
@@ -87,12 +99,19 @@ public:
   }
 
   // PURE. The wide publication a plan asks for, derived only from the MEASURED retail publication.
-  // Refuses — aborts naming the cause — on the two conditions under which a "widening" would not be
-  // one, because a wrong picture published under a wide claim is worse than no widening:
+  // Refuses — aborts naming the cause — on the conditions under which a "widening" would not be one,
+  // because a wrong picture published under a wide claim is worse than no widening:
+  //   * an incomplete publication, so there is nothing measured to act on;
   //   * a retail centre that is not the half-width the publication itself states, so moving the
-  //     centre to the plan's would be a translation rather than a widening; and
+  //     centre to the plan's would be a TRANSLATION rather than a widening; and
   //   * a plan whose clip is not widened in lockstep with its projection, so the newly visible
   //     geometry would fall outside the guest's own clip and the field would be cropped.
+  //
+  // The middle refusal is the substantive one and it is not a guess about the title. It is the
+  // statement that a widening is the PAIR (centre, clip): move one and you have translated the
+  // picture under a wide claim, which is the exact failure the framework's presentation contract
+  // names. The clip in question is the DISPENV `screen` rect the overlay publication installs, and
+  // `SetDefDispEnv` zeroes it, so those literals are the only clip in the field.
   static WideBattleProjection derive(const BattleProjectionPublication &retail, const GuestProjectionPlan &plan);
 
   // Is this a guest RAM address the owner may read? Public and pure because that bound is exactly

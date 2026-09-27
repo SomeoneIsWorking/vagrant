@@ -107,6 +107,17 @@ if(BUILD_TESTING)
                    --selftest)
   add_test(NAME vagrant_projection_census
            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_projection.py")
+
+  # The BYTE census, which needs the provisioned images and so REFUSES without them. Registered
+  # unconditionally on purpose: a tool that can only run on a provisioned machine must still be able
+  # to fail on a machine that has one, and its selftest runs everywhere because it builds its own
+  # mutated fixtures. The selftest is registered first because it is the one that must be green
+  # wherever the gate runs.
+  add_test(NAME vagrant_viewport_bytes_selftest
+           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_viewport.py"
+                   --selftest)
+  add_test(NAME vagrant_viewport_bytes
+           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_viewport.py")
 endif()
 
 # Break-first migration boundary: the generated-source product has been removed. The
