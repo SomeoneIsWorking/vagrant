@@ -50,9 +50,10 @@ verified retail inputs -> psxport runtime image mapping -> dynarec execution
 | TITLE movie presentation | Publish completed guest-decoded RGB24 frames from the measured MDEC callback boundary | `game/render/title_movie.h`, `game/render/title_movie.cpp` | `vagrant::TitleMovieProducer` | `docs/re-frontier.md` |
 | TITLE menu presentation | Publish each completed guest-built menu pass from the measured fence | `game/render/title_menu.h`, `game/render/title_menu.cpp` | `vagrant::TitleMenuProducer` | `docs/re-frontier.md` |
 | BATTLE field fence | Retain the measured BATTLE presenter and prepare its completed guest-translated field for the frame driver's single commit | `game/render/battle_frame.h`, `game/render/battle_frame.cpp` | `vagrant::BattleFrameProducer` | `docs/battle-rendering.md` |
+| BATTLE guest projection publication | Own the four measured resident SDK leaves the guest states its viewport through: measure the publication from the coprocessor, the framework's record and the guest's own rectangle, derive the wide publication, and refuse rather than publish a centre-only move that would crop the field | `game/render/battle_projection.{h,cpp}`, with the facts and the gated decompilation-symbol table in `game/render/battle_projection_facts.h` | `vagrant::BattleProjectionOwner::derive`, `vagrant::installBattleProjection` | `docs/issues/0037-no-widescreen-owner-and-the-projection-distance-is-gameplay-state.md` |
 | BATTLE semantic world production | Read named pre-GTE camera/object/material state and build faithful 4:3 native world geometry; own later widescreen and interpolation inputs | target: game/render/battle_world.{h,cpp}, with cohesive camera/object peers as their semantics are measured | target: `vagrant::BattleWorldProducer` | `docs/battle-rendering.md` |
 | Native game heap | Implement the measured readable game-heap behavior; the future title adapter owns image-scoped registration and original calls | `game/core/game_heap.h`, `game/core/game_heap.cpp` | `vagrant::heap::initHeap` | `docs/references.md` |
-| RE instruments | Measure shipping facts from SHA-bound executable/overlay bytes and gate every shipped constant/owner against its source | `tools/re_crt0.py`, `tools/re_overlay.py`, `tools/re_frame.py`, `tools/re_title_natural.py`, and peer `tools/re_*.py` | each tool's `measure` / `main` | `docs/re-frontier.md` |
+| RE instruments | Measure shipping facts from SHA-bound executable/overlay bytes and gate every shipped constant/owner against its source. `tools/re_projection.py` is the one that needs NO disc: it censuses the vendored decompilation, states that it is reading a reconstruction, and gates each declared address against the decompilation's own module map | `tools/re_crt0.py`, `tools/re_overlay.py`, `tools/re_frame.py`, `tools/re_projection.py`, `tools/re_title_natural.py`, and peer `tools/re_*.py` | each tool's `measure` / `main` | `docs/re-frontier.md` |
 | Verification | Build and run current C++ image and native-owner contracts, enforce compile coverage and C++ policy, and exercise launcher, provisioning, and structure contracts | `CMakeLists.txt`, `tests/`, `tools/verify.py`, `tools/quality/structure.py`, shared `external/psxport/tools/check_cpp_style.py` | `verify.main`, CTest and Python test mains | `README.md` |
 | Project registries | Query proof, instrument trust, atomic issues, and ordered RE dependencies | `tools/info.py`, `tools/catalog.py`, `tools/re_frontier.py`, `docs/info/`, `docs/issues/`, `docs/re-frontier.md` | each tool's `main` | — |
 | Framework platform layer | Own Lightrec execution, PSX hardware services, rendering backend, UI, configuration, and shared presentation mechanisms | `external/psxport/` | target per-Core executor API | `external/psxport/CLAUDE.md` |
@@ -60,19 +61,20 @@ verified retail inputs -> psxport runtime image mapping -> dynarec execution
 ## Source tree
 
 ```text
-game/  —  2,730 lines, 48 files
-├─ cd/     270 lines, 8 files
-├─ core/ 1,148 lines, 14 files
-├─ input/   68 lines, 3 files
-├─ render/ 682 lines, 14 files
-├─ save/   364 lines, 6 files
-└─ sync/   198 lines, 3 files
-tools/ —  9,299 lines, 34 files
-tests/ —  1,489 lines, 10 files
+game/  —  3,455 lines, 53 files
+├─ cd/     324 lines,  8 files
+├─ core/ 1,224 lines, 16 files
+├─ input/   68 lines,  3 files
+├─ render/ 1,277 lines, 17 files
+├─ save/   364 lines,  6 files
+└─ sync/   198 lines,  3 files
+tools/ —  9,789 lines, 30 files
+tests/ —  2,210 lines, 13 files
 ```
 
-Refresh this annotated tree with
-`codemap.py tree game tools tests --depth 2 --min-lines 1` when source ownership moves.
+Counted with `find <dir> -maxdepth 1 -type f \( -name '*.h' -o -name '*.cpp' -o -name '*.py' \)` and
+`wc -l`; refresh it in the change that moves ownership. The `codemap.py tree` invocation this
+note used to name does not exist in this repository, so the numbers were being carried by hand.
 
 ## Where does new work go?
 
@@ -86,8 +88,10 @@ Refresh this annotated tree with
   `VagrantContext`.
 - BATTLE world camera/projection/object production → the semantic BATTLE render owner described in
   `docs/battle-rendering.md`, never `BattleFrameProducer` or the legacy callback bag.
-- Widescreen policy → the BATTLE semantic world camera/projection owner; fixed 2D layers keep their
-  own policies.
+- Widescreen policy → the BATTLE guest projection publication owner for the horizontal centre and
+  clip; fixed 2D layers keep their own policies. `VagrantRuntime::guestWidescreenProjection()` stays
+  UNOVERRIDDEN until the clip is owned: that absence is what keeps the framework at 4:3, so a
+  centre-only move cannot reach the screen under a wide claim (issue 0037).
 - Interpolation → previous/current semantic snapshot ownership beside the BATTLE world producer;
   guest RAM and post-projection queue vertices are not interpolation sources.
 - Framework-generic behavior → the single writable psxport checkout, not this consumer tree.

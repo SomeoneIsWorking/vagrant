@@ -5,6 +5,7 @@
 #include "core/resident_phase.h"
 #include "input/pad_delivery.h"
 #include "render/battle_frame.h"
+#include "render/battle_projection.h"
 #include "render/title_menu.h"
 #include "render/title_movie.h"
 #include "render/title_splash.h"
@@ -29,6 +30,9 @@ struct VagrantContext {
   ResidentPhase residentPhase{};
   PadDelivery padDelivery{};
   BattleFrameProducer battleFrame{};
+  // The guest's own projection publication. Per-Core, because the measurement is: the title
+  // re-authors its viewport every field, so nothing here may be remembered between calls.
+  BattleProjectionOwner battleProjection{};
   TitleMenuProducer titleMenu{};
   TitleSplashPhase titleSplash{};
   TitleMemcardInit titleMemcardInit{};

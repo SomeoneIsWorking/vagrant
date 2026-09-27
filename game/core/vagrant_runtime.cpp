@@ -2,6 +2,7 @@
 
 #include "core.h"
 #include "game.h"
+#include "render/battle_projection.h"
 #include "vagrant_context.h"
 
 #include <iomanip>
@@ -80,7 +81,21 @@ VagrantRuntime::loadResidentImage(Core &core, std::span<const std::uint8_t> byte
   if (!matchesResidentHeader(parsed.image.value())) {
     return {std::nullopt, {}, headerMismatch(parsed.image.value())};
   }
-  return psx::cpu::loadPsxExeImage(core, bytes, imageName);
+  const auto loaded = psx::cpu::loadPsxExeImage(core, bytes, imageName);
+  if (!loaded) {
+    return loaded;
+  }
+  // The resident image is the only image that publishes the four viewport leaves, so their overrides
+  // become installable exactly here and at no other boundary: `registerOverrides` runs at boot,
+  // before any image exists, and the overlays reuse this image's load range. A refused install is
+  // reported by the owner and is not fatal here, because an unowned projection is a missing
+  // measurement rather than a wrong one.
+  if (!installBattleProjection(core, loaded.identity.value())) {
+    lucent::warn("vagrant-proj",
+                 "the BATTLE projection publication leaves were not owned on this Core, so no guest "
+                 "viewport will be measured until that boundary is satisfied");
+  }
+  return loaded;
 }
 
 } // namespace vagrant

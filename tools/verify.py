@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "build" / "verify"
 NATIVE_TESTS = frozenset({
+    "vagrant_battle_projection",
     "vagrant_ds_control_contract",
     "vagrant_game_heap",
     "vagrant_image_contract",
@@ -22,6 +23,15 @@ NATIVE_TESTS = frozenset({
     "vagrant_title_transfer",
     "vagrant_title_startup_recipe",
 })
+# CTest names that must be present but are NOT build targets. The two projection-census entries run a
+# Python instrument through `add_test`, so naming them in NATIVE_TESTS would ask ninja for a target
+# that does not exist. They still run — the final `ctest` below executes every registered test — but
+# a missing registration would otherwise go unnoticed, so they are required here.
+SCRIPT_TESTS = frozenset({
+    "vagrant_projection_census",
+    "vagrant_projection_census_selftest",
+})
+REQUIRED_TESTS = NATIVE_TESTS | SCRIPT_TESTS
 sys.path.insert(0, str(ROOT))
 
 from tools.quality.structure import check_repository
@@ -107,10 +117,13 @@ def verify_native(framework: Path) -> bool:
     except (KeyError, TypeError, ValueError) as error:
         print(f"[verify] REFUSED: unreadable CTest inventory: {error}", file=sys.stderr)
         return False
-    if not NATIVE_TESTS.issubset(names):
-        print(f"[verify] REFUSED: missing native contracts: {sorted(NATIVE_TESTS - names)}", file=sys.stderr)
+    if not REQUIRED_TESTS.issubset(names):
+        print(f"[verify] REFUSED: missing required contracts: {sorted(REQUIRED_TESTS - names)}", file=sys.stderr)
         return False
-    print(f"[verify] discovered {len(NATIVE_TESTS)} of {len(NATIVE_TESTS)} required native contracts")
+    print(
+        f"[verify] discovered {len(REQUIRED_TESTS)} of {len(REQUIRED_TESTS)} required contracts "
+        f"({len(NATIVE_TESTS)} build targets, {len(SCRIPT_TESTS)} script registrations)"
+    )
     return run("ctest", "--test-dir", BUILD, "--output-on-failure", "--no-tests=error").returncode == 0
 
 

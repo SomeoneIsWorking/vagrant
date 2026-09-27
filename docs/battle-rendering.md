@@ -29,11 +29,20 @@ owner, and it does not recreate scene geometry semantically.
 The framework has generic widescreen and `Fps60` machinery, but Vagrant does not currently satisfy
 their game-owned inputs:
 
-- `VagrantRuntime` does not publish a `GuestWidescreenProjection`. The generic guest-projection plan
-  therefore has no Vagrant aspect policy, and that plan is GTE-path-only in any case.
+- `VagrantRuntime` does not publish a `GuestWidescreenProjection`, and the absence is now DELIBERATE
+  rather than a gap. `vagrant::BattleProjectionOwner` (`game/render/battle_projection.{h,cpp}`) owns the
+  four measured resident SDK leaves this viewport is stated through, measures the publication, and
+  derives the wide one — but publishes no aspect, because a centre-only move would crop the field
+  rather than widen it. With no title policy the framework resolves the guest projection at
+  `Standard4x3`, which is the enforcement. `tools/re_projection.py` and issue 0037 carry the detail.
 - The title adapter does not yet launch BATTLE, so the framework's aspect toggle has no verified
-  Vagrant world pass to widen. BATTLE's presenter restores OFX=160 itself; generic 2D widening
-  heuristics cannot stand in for a widened world projection.
+  Vagrant world pass to widen. BATTLE's presenter restores OFX=160 itself, every field — which is why
+  the owner sits on the resident `SetGeomOffset` leaf rather than on the overlay's viewport call, and
+  why generic 2D widening heuristics cannot stand in for a widened world projection.
+- The projection distance must NOT be raised. `vs_main_projectionDistance` (`0x8005E248`) is branched
+  on by two BATTLE functions against 272 and scales the GTE fog, and retail's resting value is 256 —
+  below the threshold. Widening the canvas instead leaves that word alone. Read from the
+  reconstruction by `tools/re_projection.py`; see issue 0037.
 - `VagrantRuntime` currently declares direct rendering. Vagrant supplies no semantic BATTLE world
   producer or interpolation snapshots, so an `fps60=1` checkout preference is refused rather than
   evidence of interpolated fields.

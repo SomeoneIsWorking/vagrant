@@ -42,6 +42,16 @@ public:
   bool guestVramIsPicture(const Game &game) const override;
   const char *discEnvVar() const override;
 
+  // DELIBERATELY NOT OVERRIDDEN, and the absence is the enforcement rather than an omission.
+  // `guestWidescreenProjection()` is how a title advertises an aspect, and returning no policy makes
+  // the framework resolve the guest projection at Standard4x3. Vagrant Story's owner
+  // (`vagrant::BattleProjectionOwner`, game/render/battle_projection.h) measures the guest's
+  // viewport publication and derives its widening, but applies none: the horizontal clip is published
+  // by an overlay call whose VRAM layout this port has not read from bytes, so advertising a wide
+  // aspect here would put a cropped frame on screen under a wide claim. Adding this override is the
+  // last step of S010, not a wiring convenience — read
+  // `vagrant::battle_projection::wideningBlocker()` first.
+
   // Authenticate the title-specific PS-X header, then delegate publication to psxport. The caller
   // authenticates the complete file identity before this boundary; this method additionally refuses
   // a different executable shape so a valid PS-X file from another title cannot be mapped as Vagrant.

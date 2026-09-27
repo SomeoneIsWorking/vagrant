@@ -53,6 +53,7 @@ add_library(vagrant_native STATIC
   game/core/title_transfer.cpp
   game/input/pad_delivery.cpp
   game/render/battle_frame.cpp
+  game/render/battle_projection.cpp
   game/render/title_menu.cpp
   game/render/title_movie.cpp
   game/render/title_splash.cpp
@@ -96,6 +97,16 @@ if(BUILD_TESTING)
   add_executable(vagrant_title_transfer tests/test_vagrant_title_transfer.cpp)
   target_link_libraries(vagrant_title_transfer PRIVATE vagrant_native)
   add_test(NAME vagrant_title_transfer COMMAND vagrant_title_transfer)
+
+  add_executable(vagrant_battle_projection tests/test_battle_projection.cpp)
+  target_link_libraries(vagrant_battle_projection PRIVATE vagrant_native)
+  add_test(NAME vagrant_battle_projection COMMAND vagrant_battle_projection)
+
+  add_test(NAME vagrant_projection_census_selftest
+           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_projection.py"
+                   --selftest)
+  add_test(NAME vagrant_projection_census
+           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_projection.py")
 endif()
 
 # Break-first migration boundary: the generated-source product has been removed. The
