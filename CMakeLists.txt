@@ -118,6 +118,19 @@ if(BUILD_TESTING)
                    --selftest)
   add_test(NAME vagrant_viewport_bytes
            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_viewport.py")
+
+  # The field-cadence census. It answers whether this 30 fps-title presents 30 or 60 fps, which
+  # is what decides whether an interpolated 60 fps path is IN scope for it. Both the selftest
+  # and the census need the provisioned images and all three overlays, so both REFUSE (exit 2)
+  # without them rather than reporting a rate: a cadence tool that cannot see the image must
+  # say "not measured", never a number. The selftest is registered first and must be green
+  # wherever the gate runs; it builds its own mutated fixtures in memory, so it needs no
+  # writable scratch and no second copy of the image.
+  add_test(NAME vagrant_cadence_selftest
+           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_cadence.py"
+                   --selftest)
+  add_test(NAME vagrant_cadence
+           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_cadence.py")
 endif()
 
 # Break-first migration boundary: the generated-source product has been removed. The

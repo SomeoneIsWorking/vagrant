@@ -178,10 +178,19 @@ retail layout. `docs/battle-rendering.md` records the measured boundary.
 
 ### S011 — Interpolated presentation
 
-Missing capability: there are no owned previous/current semantic camera and object snapshots, no
-world re-render at a presentation-time interpolation parameter, and no cut/reset policy. The current
-neutral field commits bypass the framework temporal decorator, so a local `fps60=1` preference is not
-interpolation evidence.
+**The field rate is MEASURED, so this item's scope is settled: it is IN scope.**
+`docs/issues/0039` measures 2 fields per game frame (30 fps) or 4 (15 fps) from the image, with
+`vs_gametime_tickspeed` (`0x8005E24C`) as the rate-bearing argument and a setter that admits
+**only 2 and 4** — so 60 fps is structurally impossible and this title is never out of scope. The
+2-vs-4 choice is a **presentation** decision: every consumer scales its per-step increment by the
+same value that scales the field wait, so the game clock keeps real time while the picture is
+presented half as often. Interpolation is therefore over the same source geometry, not over a
+slowed simulation. Instrument: `tools/re_cadence.py`, CTest `vagrant_cadence{,_selftest}`, 8/8.
+
+Missing capability, unchanged: there are no owned previous/current semantic camera and object
+snapshots, no world re-render at a presentation-time interpolation parameter, and no
+cut/reset policy. The current neutral field commits bypass the framework temporal decorator, so a
+local `fps60=1` preference is not interpolation evidence.
 
 ### S012 — Default launcher contract
 
