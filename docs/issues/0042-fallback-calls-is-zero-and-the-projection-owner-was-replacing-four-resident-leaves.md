@@ -359,7 +359,7 @@ responsibilities is a file whose halves stop agreeing. So:
 
 | tool | subject | gate |
 |---|---|---|
-| `tools/re_viewport.py` | the BATTLE OVERLAY publication, plus the MIPS-I field decoder and the SHA-bound image loaders both other tools import | `vagrant_viewport_bytes_selftest` 6/6, `vagrant_viewport_bytes` 25 claims |
+| `tools/re_viewport.py` | the BATTLE OVERLAY publication, plus the MIPS-I field decoder and the SHA-bound image loaders both other tools import | `vagrant_viewport_bytes_selftest` 6/6, `vagrant_viewport_bytes` 26 verdicts: 25 CONFIRMED, 1 REFUTED (the stale `0x8008B0A4` call site it exists to refute), 1 NOT DETERMINABLE (retail's resting projection distance) |
 | `tools/re_display_area.py` | the RESIDENT display-area publication, and which word IS one horizontal extent | `vagrant_display_area_selftest` 4/4, `vagrant_display_area` 7 claims |
 | `tools/re_vsync_sites.py` | every `jal VSync` site and the field count its argument holds | `vagrant_vsync_sites_selftest` 3/3, `vagrant_vsync_sites` |
 
