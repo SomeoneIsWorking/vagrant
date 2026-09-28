@@ -144,26 +144,74 @@ def verify_native(framework: Path) -> bool:
 
 
 def verify_product_link(framework: Path) -> bool:
-    """Prove the shipped product links NO interpreter and carries NO generated guest corpus.
+    """Check the shipped product for the BANNED execution paths, and report what is actually linked.
 
     S002 says the offline-generated guest execution path and its selectors are absent. A SOURCE
-    pattern can only show that the repository does not mention them; it cannot show the shipped
-    binary does not CONTAIN them. This is the difference between "we removed the code" and "the
-    product does not link it", and the second is the claim a player would make.
+    pattern can only show that the repository does not mention them; it cannot show the shipped binary
+    does not CONTAIN them. This is the difference between "we removed the code" and "the product does
+    not link it", and the second is the claim a player would make.
+
+    THIS WAS A VACUOUS GATE, and the first run of this title found it. It checked three symbols —
+    `xemu_interpret_block`, `int_exec`, `psx_cpu_interpret_step` — that all belong to the
+    offline-interpreter generation psxport RETIRED. Those symbols cannot exist, so the check could
+    never fire. It printed "0 of 3 interpreter entry points present" in the strongest possible terms
+    ("S002's claim is about the LINKED PRODUCT") and went **green on the one title that had never
+    run**. A gate whose subject is not the thing being measured passes vacuously.
+
+    So it now reports the interpreter that IS on the execution path, and says plainly that its
+    presence is PERMITTED rather than a violation — because it is. The architecture keeps Lightrec's
+    per-block interpreter for bounded, accounted fallback, and `fallback.calls` is the number that
+    says whether a title actually used it. **A link check cannot substitute for that number, and this
+    function must not be read as if it could.**
     """
     product = BUILD / PRODUCT_TARGET
     if not product.is_file():
         print(f"[verify] REFUSED: the product executable was not built: {product}", file=sys.stderr)
         return False
-    for symbol in ("xemu_interpret_block", "int_exec", "psx_cpu_interpret_step"):
-        result = run("nm", "-C", str(product), capture=True)
-        if result.returncode:
-            print(f"[verify] REFUSED: cannot inspect the product's symbols: {result.stderr}", file=sys.stderr)
-            return False
-        if symbol in result.stdout:
-            print(f"[verify] REFUSED: the product links interpreter symbol '{symbol}'", file=sys.stderr)
-            return False
-    print("[verify] product link: 0 of 3 interpreter entry points present in the shipped executable")
+    result = run("nm", "-C", str(product), capture=True)
+    if result.returncode:
+        print(f"[verify] REFUSED: cannot inspect the product's symbols: {result.stderr}", file=sys.stderr)
+        return False
+    symbols = result.stdout
+
+    # The RETIRED generation. These genuinely must be absent; the check is now honest that it is
+    # checking a component that is no longer built, so a future reintroduction would be caught.
+    retired = ("xemu_interpret_block", "int_exec", "psx_cpu_interpret_step")
+    linked_retired = [name for name in retired if name in symbols]
+
+    # The interpreter that is ACTUALLY on the execution path. Its presence is expected and permitted;
+    # the number that matters is `fallback.calls` at run time, which no link inspection can measure.
+    live = ("lightrec_run_interpreter", "lightrec_emit_jump_to_interpreter")
+    linked_live = [name for name in live if name in symbols]
+
+    # The generated guest corpus is the banned ARTIFACT, and unlike an interpreter its presence in the
+    # binary would mean the retired pipeline shipped. That is checkable here, so it is.
+    # THE DENOMINATOR IS THE NUMBER ASKED FOR, not the number found. Reporting "0 of 0" because a
+    # comprehension came back empty is exactly the silent short answer `psxport/AGENTS.md` forbids, and
+    # it is how a check that examined nothing reads as a check that examined everything and passed.
+    corpus_candidates = ("xemu_rom", "xemu_rom_entry", "xemu_call")
+    corpus = [name for name in corpus_candidates if name in symbols]
+
+    for name in linked_retired:
+        print(f"[verify] REFUSED: the product links the RETIRED interpreter symbol '{name}'",
+              file=sys.stderr)
+    for name in corpus:
+        print(f"[verify] REFUSED: the product links the retired generated-corpus symbol '{name}'",
+              file=sys.stderr)
+    if linked_retired or corpus:
+        return False
+
+    print(f"[verify] product link: 0 of {len(retired)} retired-interpreter entry points present; "
+          f"0 of {len(corpus_candidates)} generated-corpus symbols present")
+    if linked_live:
+        print(f"[verify] product link: {len(linked_live)} of {len(live)} Lightrec per-block interpreter "
+              f"entry points ARE linked ({', '.join(linked_live)}). That is PERMITTED — the "
+              f"architecture keeps them for bounded, accounted fallback. It is NOT a measurement of "
+              f"whether this title used one: that number is `fallback.calls` at run time.")
+    else:
+        print(f"[verify] product link: 0 of {len(live)} Lightrec per-block interpreter entry points "
+              f"present, which no product should be — report it.")
+        return False
     return True
 
 
