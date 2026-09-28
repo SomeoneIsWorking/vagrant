@@ -21,8 +21,7 @@ void initHeapOverride(Core *core) {
   contextOf(*core).executionTelemetry.recordOverrideHit("vs_main_initHeap");
   heap::initHeap(core);
   if (image) {
-    psx::cpu::ExecutionResult result =
-        dynarec::callOriginal(*core, psx::cpu::NativeKey{*image, heap::kInitHeap});
+    psx::cpu::ExecutionResult result = dynarec::callOriginal(*core, psx::cpu::NativeKey{*image, heap::kInitHeap});
     if (result.reason == psx::cpu::ExecutionExitReason::GuestReturn) {
       return;
     }
@@ -30,9 +29,11 @@ void initHeapOverride(Core *core) {
     // is resumed rather than abandoned. The framework's resume rule is that a function needing more
     // than one host turn is an ordinary bounded exit (see native_dispatch.h).
     while (result.reason == psx::cpu::ExecutionExitReason::BudgetExhausted) {
-      result = psx::cpu::resumeOriginal(
-          *core, psx::cpu::NativeKey{*image, heap::kInitHeap}, result.guestPc, core->r[31],
-          psx::cpu::ExecutionBudget::currentTurn(*core));
+      result = psx::cpu::resumeOriginal(*core,
+                                        psx::cpu::NativeKey{*image, heap::kInitHeap},
+                                        result.guestPc,
+                                        core->r[31],
+                                        psx::cpu::ExecutionBudget::currentTurn(*core));
     }
     if (result.reason == psx::cpu::ExecutionExitReason::GuestReturn) {
       return;

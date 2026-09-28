@@ -2,9 +2,7 @@
 
 #include "config.h"
 #include "core.h"
-#include "core/resident_image.h"
 #include "core/dynarec_dispatch.h"
-#include "core/native_owners.h"
 #include "core/resident_image.h"
 #include "core/vagrant_context.h"
 #include "frame_loop_shell.h"
@@ -48,6 +46,20 @@ PlatformHlePlan measuredPlatformPlan() {
   return plan;
 }
 
+// THE ONE INSTALLED RUNTIME, and it is a namespace-scope object with internal linkage rather than a
+// function-local static so its lifetime is stated here instead of being implied by where it is
+// spelled. `Core::Core()` SNAPSHOTS `psxport_game_runtime()` exactly once and calls that runtime's
+// `createContext`, so a `Game` constructed before the title installs its runtime has
+// `runtime == nullptr` AND `gameCtx == nullptr` — every per-Core title product absent, and every
+// later dereference of `core.runtime` undefined. Installation is therefore part of the ORDER the
+// machine becomes a product, which is why it lives in the composition owner and not in a caller.
+//
+// Its destruction order is the other half: static destructors run after `runApplication` has
+// returned, so the `Core` inside the local `Game` is already destroyed and
+// `VagrantRuntime::destroyContext` has already run. A runtime destroyed BEFORE its Core would be a
+// use-after-free, and that is why this is an object and not a local returned by value.
+VagrantRuntime titleRuntime;
+
 } // namespace
 
 Application::Application() = default;
@@ -70,6 +82,11 @@ bool Application::start(Game &game, const std::string &residentImagePath) {
   if (!image) {
     return false;
   }
+  // The publication boundary, and the ONLY place this title registers its image-scoped native
+  // leaves. It already ran them by the time it returns a usable image, and it refuses the load
+  // itself when any leaf was refused — so this composition owner neither re-registers the table
+  // (a duplicate key by construction, which psxport's dispatcher refuses) nor duplicates the
+  // all-or-nothing check the boundary owns.
   auto &runtime = dynamic_cast<VagrantRuntime &>(*core.runtime);
   const auto published = runtime.loadResidentImage(core, image->bytes, kResidentImageName);
   if (!published) {
@@ -80,7 +97,16 @@ bool Application::start(Game &game, const std::string &residentImagePath) {
     return false;
   }
   psx::cpu::applyPsxExeTopLevelRegisters(core, published.image);
-  residentImage_ = published.identity.value();
+  // The generation this Core published. Every image-scoped native leaf in this title is registered
+  // and looked up against it, so a product that started without one would own nothing — refused here
+  // rather than defaulted to an identity of zero that answers every lookup.
+  residentImage_ = published.identity.value_or(psx::cpu::ImageIdentity{});
+  if (residentImage_ == psx::cpu::ImageIdentity{}) {
+    lucent::error("vagrant-boot",
+                  "the authenticated resident image published no generation identity, so no "
+                  "image-scoped native leaf can be registered against it; refusing to start");
+    return false;
+  }
   started_ = true;
 
   lucent::info("vagrant-boot",
@@ -109,15 +135,6 @@ bool Application::start(Game &game, const std::string &residentImagePath) {
   game.gpu.gpu_native_init();
   game.pad.overridesInit();
   game.disc.env_key = "PSXPORT_VAGRANT_DISC";
-
-  const auto registration = installResidentNativeOwners(core, residentImage_);
-  if (!registration) {
-    lucent::error("vagrant-boot",
-                  "the resident generation published but its native leaves were not fully registered; "
-                  "a partially owned image is a wrong measurement rather than a missing one, so the "
-                  "product does not start");
-    return false;
-  }
 
   // The framework's platform sync preflight. This is where a title with no measured VSync address is
   // refused, and it must happen BEFORE boot, so a product without a host frame boundary cannot enter
@@ -202,7 +219,7 @@ int runApplication(int argc, char **argv) {
       return EXIT_SUCCESS;
     }
   }
-  std::string residentImage{ kResidentImagePath };
+  std::string residentImage{kResidentImagePath};
   for (int index = 1; index < argc; ++index) {
     if (std::strcmp(argv[index], "--resident") == 0 && index + 1 < argc) {
       residentImage = argv[++index];
@@ -212,7 +229,18 @@ int runApplication(int argc, char **argv) {
     return 2;
   }
 
+  // FIRST, before the `Game` — see `titleRuntime`. `Core::Core()` reads the installed runtime once
+  // and creates the per-Core title context through it, so this line and the `Game` below are an
+  // ordered pair, and reading them in the other order produces a Core with no runtime at all.
+  psxport_install_game(titleRuntime);
+
   auto game = std::make_unique<Game>();
+  if (game->core.runtime == nullptr || game->core.gameCtx == nullptr) {
+    lucent::error("vagrant-boot",
+                  "the installed GameRuntime produced no per-Core context, so no title product exists "
+                  "for this Core; refusing before any guest state is touched");
+    return 2;
+  }
   if (!game->core.lightrecExecutor().available()) {
     lucent::error("vagrant-boot",
                   "psxport was built without its Lightrec dynarec backend. There is no interpreter "

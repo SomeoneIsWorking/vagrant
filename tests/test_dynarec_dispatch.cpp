@@ -153,7 +153,7 @@ void reportsTypedExitOnBudgetExhaustion() {
   // budget and the typed reason, not image admission.
   auto bytes = residentFixture(1u);
   const auto entryOffset = 0x800u + vagrant::kResidentHeader.entry - vagrant::kResidentHeader.textAddress;
-  writeWord(bytes, entryOffset, 0x1000FFFFu); // beq $zero,$zero,-1 : branch to itself
+  writeWord(bytes, entryOffset, 0x1000FFFFu);      // beq $zero,$zero,-1 : branch to itself
   writeWord(bytes, entryOffset + 4u, 0x00000000u); // delay slot: nop
   auto machine = makeMachine(bytes);
   Core &core = machine->core();
@@ -163,7 +163,8 @@ void reportsTypedExitOnBudgetExhaustion() {
     return;
   }
   const auto result = vagrant::dynarec::executeTurn(core, vagrant::kResidentHeader.entry);
-  require(result.reason == psx::cpu::ExecutionExitReason::BudgetExhausted, "typed-exit",
+  require(result.reason == psx::cpu::ExecutionExitReason::BudgetExhausted,
+          "typed-exit",
           "an unbounded guest loop did not end in BudgetExhausted");
   // The exit PC must be INSIDE the loop the caller asked to bound. Asserting equality with the
   // entry would be wrong: Lightrec exits at a translated block boundary, so the reported PC is a
@@ -171,7 +172,8 @@ void reportsTypedExitOnBudgetExhaustion() {
   // was running", and a PC anywhere else — including the entry, coincidentally — would be the
   // distinction this cannot make.
   require(result.guestPc >= vagrant::kResidentHeader.entry && result.guestPc < vagrant::kResidentHeader.entry + 0x10u,
-          "typed-exit", "the reported exit PC is not inside the loop the caller asked to bound");
+          "typed-exit",
+          "the reported exit PC is not inside the loop the caller asked to bound");
   require(result.cycles > 0u, "typed-exit", "an exhausted budget reported zero consumed cycles");
 }
 
@@ -187,12 +189,13 @@ void refusesUnscopedAndStaleGenerations() {
 
   // (a) Before any image is published there is no image to attribute a leaf to.
   const std::uint64_t attemptsBeforeUnscoped = telemetry.overrideInstalls().attempts;
-  const bool unscoped =
-      vagrant::dynarec::installNativeOverride(core, 0x80010200u, "unscoped owner", nativeLeaf);
+  const bool unscoped = vagrant::dynarec::installNativeOverride(core, 0x80010200u, "unscoped owner", nativeLeaf);
   require(!unscoped, "generation", "an override was installed with no active image at the address");
-  require(telemetry.overrideInstalls().attempts == attemptsBeforeUnscoped + 1u, "generation",
+  require(telemetry.overrideInstalls().attempts == attemptsBeforeUnscoped + 1u,
+          "generation",
           "the refused install was not counted as an attempt");
-  require(telemetry.overrideInstalls().refusedNoActiveImage == 1u, "generation",
+  require(telemetry.overrideInstalls().refusedNoActiveImage == 1u,
+          "generation",
           "the no-image refusal was not attributed to its own reason");
 
   const auto loaded = machine->runtime->loadResidentImage(core, bytes, vagrant::kResidentImageName);
@@ -206,21 +209,27 @@ void refusesUnscopedAndStaleGenerations() {
   const auto wrongGeneration = psx::cpu::ImageIdentity{resident.id, resident.generation + 1u};
   const std::uint64_t acceptedBefore = telemetry.overrideInstalls().accepted;
   require(!vagrant::dynarec::installNativeOverride(core, 0x80010100u, "stale owner", nativeLeaf, wrongGeneration),
-          "generation", "an override was installed against a generation the caller did not publish");
-  require(telemetry.overrideInstalls().accepted == acceptedBefore, "generation",
+          "generation",
+          "an override was installed against a generation the caller did not publish");
+  require(telemetry.overrideInstalls().accepted == acceptedBefore,
+          "generation",
           "the generation refusal was counted as an accepted install");
 
   // (c) The matching generation installs, and the leaf is then REACHABLE through that key.
   const std::uint32_t owned = 0x80010100u;
-  require(vagrant::dynarec::installNativeOverride(core, owned, "owned owner", observeHits, resident), "generation",
+  require(vagrant::dynarec::installNativeOverride(core, owned, "owned owner", observeHits, resident),
+          "generation",
           "the correctly scoped override was refused");
-  require(vagrant::dynarec::hasNativeOverride(core, resident, owned), "generation",
+  require(vagrant::dynarec::hasNativeOverride(core, resident, owned),
+          "generation",
           "the installed override is not reachable through its own key");
-  require(!vagrant::dynarec::hasNativeOverride(core, wrongGeneration, owned), "generation",
+  require(!vagrant::dynarec::hasNativeOverride(core, wrongGeneration, owned),
+          "generation",
           "a retired generation reached an override it never owned");
 
   // (d) A null handler is refused rather than installed as a callable key.
-  require(!vagrant::dynarec::installNativeOverride(core, 0x80010104u, "null owner", nullptr, resident), "generation",
+  require(!vagrant::dynarec::installNativeOverride(core, 0x80010104u, "null owner", nullptr, resident),
+          "generation",
           "an override with no handler was installed");
 
   // (e) A SECOND registration of the same key must be refused BY THE DISPATCHER, and that refusal must
@@ -231,12 +240,16 @@ void refusesUnscopedAndStaleGenerations() {
   const std::uint64_t dispatcherRefusalsBefore = telemetry.overrideInstalls().refusedDispatcher;
   const std::uint64_t acceptedBeforeDuplicate = telemetry.overrideInstalls().accepted;
   require(!vagrant::dynarec::installNativeOverride(core, owned, "duplicate owner", observeHits, resident),
-          "generation", "a duplicate registration of the same key was accepted");
-  require(telemetry.overrideInstalls().refusedDispatcher == dispatcherRefusalsBefore + 1u, "generation",
+          "generation",
+          "a duplicate registration of the same key was accepted");
+  require(telemetry.overrideInstalls().refusedDispatcher == dispatcherRefusalsBefore + 1u,
+          "generation",
           "the dispatcher's refusal was not counted as a dispatcher refusal");
-  require(telemetry.overrideInstalls().accepted == acceptedBeforeDuplicate, "generation",
+  require(telemetry.overrideInstalls().accepted == acceptedBeforeDuplicate,
+          "generation",
           "a refused duplicate registration was counted as accepted");
-  require(vagrant::dynarec::hasNativeOverride(core, resident, owned), "generation",
+  require(vagrant::dynarec::hasNativeOverride(core, resident, owned),
+          "generation",
           "the refused duplicate registration displaced the original owner");
 }
 
@@ -259,7 +272,8 @@ void originalCallReachesTheGuestBody() {
   // The leaf's own body is the fixture's second function. Installing the override here, then
   // re-entering the original, must land on the GUEST value, not on the native handler.
   require(vagrant::dynarec::installNativeOverride(core, kLeaf, "original-suppressed owner", nativeLeaf, resident),
-          "original", "the scoped override was refused");
+          "original",
+          "the scoped override was refused");
   auto &telemetry = vagrant::contextOf(core).executionTelemetry;
   const std::uint64_t originalCallsBefore = telemetry.originalCalls().attempts;
 
@@ -270,23 +284,26 @@ void originalCallReachesTheGuestBody() {
     const std::string which = byKey ? "NativeKey" : "address";
     core.r[31] = 0x80010200u;
     core.r[2] = 0u;
-    const auto result =
-        byKey ? vagrant::dynarec::callOriginal(core, psx::cpu::NativeKey{resident, kLeaf})
-              : vagrant::dynarec::callOriginal(core, kLeaf);
-    require(result.reason == psx::cpu::ExecutionExitReason::GuestReturn, "original",
+    const auto result = byKey ? vagrant::dynarec::callOriginal(core, psx::cpu::NativeKey{resident, kLeaf})
+                              : vagrant::dynarec::callOriginal(core, kLeaf);
+    require(result.reason == psx::cpu::ExecutionExitReason::GuestReturn,
+            "original",
             (std::string("the original call by ") + which + " did not return through the guest body").c_str());
-    require(core.r[2] == kLeafResult, "original",
+    require(core.r[2] == kLeafResult,
+            "original",
             (std::string("the original call by ") + which +
              " returned a value the guest body does not produce, so suppression did not work")
                 .c_str());
   }
-  require(telemetry.originalCalls().attempts == originalCallsBefore + 2u, "original",
+  require(telemetry.originalCalls().attempts == originalCallsBefore + 2u,
+          "original",
           "the original-call attempts were not counted, so a suppressed call would read as a normal one");
 
   // The native handler must NOT have run: it is a no-op, so running it would leave v0 at 0 rather
   // than the guest's own result. That is asserted above by VALUE, not by a separate flag, so a
   // native handler that happened to write v0 could not pass by coincidence.
-  require(core.lightrecExecutor().counters().executedBlocks > 0u, "original",
+  require(core.lightrecExecutor().counters().executedBlocks > 0u,
+          "original",
           "the original call executed no translated block");
 }
 
@@ -307,7 +324,8 @@ void telemetryDenominatorsClose() {
   require(installs.accepted == 1u, "telemetry", "the accepted install was not counted");
   require(installs.refusedNoActiveImage == 1u, "telemetry", "the no-image refusal was misattributed");
   require(installs.refusedDispatcher == 1u, "telemetry", "the dispatcher refusal was misattributed");
-  require(installs.accepted + installs.refused() == installs.attempts, "telemetry",
+  require(installs.accepted + installs.refused() == installs.attempts,
+          "telemetry",
           "the install census does not close: accepted + refused != attempts");
 
   telemetry.recordOverrideHit("a");
@@ -321,15 +339,18 @@ void telemetryDenominatorsClose() {
   for (std::size_t index = 0; index < vagrant::ExecutionTelemetry::OverrideHits::kCapacity + 4u; ++index) {
     telemetry.recordOverrideHit("filler" + std::to_string(index));
   }
-  require(telemetry.overrideHits().entryCount == vagrant::ExecutionTelemetry::OverrideHits::kCapacity, "telemetry",
+  require(telemetry.overrideHits().entryCount == vagrant::ExecutionTelemetry::OverrideHits::kCapacity,
+          "telemetry",
           "the override census grew past its declared capacity");
-  require(telemetry.overrideHits().uncounted > 0u, "telemetry",
+  require(telemetry.overrideHits().uncounted > 0u,
+          "telemetry",
           "invocations past the census capacity were dropped without saying so");
 
   telemetry.recordExecutableWrite(0x87800u, 0x87800u);
   telemetry.recordExecutableWrite(0x100u, 0u);
   require(telemetry.executableWrites().candidates == 2u, "telemetry", "the write candidates were not counted");
-  require(telemetry.executableWrites().residencyOverlaps == 1u, "telemetry",
+  require(telemetry.executableWrites().residencyOverlaps == 1u,
+          "telemetry",
           "a write that overlapped a prior generation was not counted as one");
   require(telemetry.executableWrites().candidateBytes == 0x87900u, "telemetry", "the candidate byte total is wrong");
 
@@ -345,11 +366,14 @@ void telemetryDenominatorsClose() {
     return telemetry.dispatches().exitsFor(reason);
   };
   require(telemetry.dispatches().calls == 2u, "telemetry", "the dispatch calls were not counted");
-  require(exitsFor(psx::cpu::ExecutionExitReason::GuestReturn) == 1u, "telemetry",
+  require(exitsFor(psx::cpu::ExecutionExitReason::GuestReturn) == 1u,
+          "telemetry",
           "the guest-return exit was not attributed to its own reason");
-  require(exitsFor(psx::cpu::ExecutionExitReason::Fault) == 1u, "telemetry",
+  require(exitsFor(psx::cpu::ExecutionExitReason::Fault) == 1u,
+          "telemetry",
           "the fault exit was not attributed to its own reason");
-  require(exitsFor(psx::cpu::ExecutionExitReason::BudgetExhausted) == 0u, "telemetry",
+  require(exitsFor(psx::cpu::ExecutionExitReason::BudgetExhausted) == 0u,
+          "telemetry",
           "a reason with no exits reported one, so the census cannot be read as scanned");
 }
 
@@ -366,10 +390,12 @@ void registersTheMeasuredHeapLeaf() {
     return;
   }
   const psx::cpu::ImageIdentity resident = loaded.identity.value();
-  require(vagrant::dynarec::hasNativeOverride(core, resident, vagrant::heap::kInitHeap), "heap-leaf",
+  require(vagrant::dynarec::hasNativeOverride(core, resident, vagrant::heap::kInitHeap),
+          "heap-leaf",
           "vs_main_initHeap is not owned on the resident generation the load published");
   require(!vagrant::dynarec::hasNativeOverride(core, {resident.id, resident.generation + 1u}, vagrant::heap::kInitHeap),
-          "heap-leaf", "vs_main_initHeap is reachable through a generation that was never published");
+          "heap-leaf",
+          "vs_main_initHeap is reachable through a generation that was never published");
 }
 
 // 7. Overlay-to-overlay generation replacement must retire the previous generation's override keys.
@@ -389,7 +415,8 @@ void overlayReplacementRetiresThePriorGenerationsKeys() {
     return;
   }
   const psx::cpu::ImageIdentity resident = loaded.identity.value();
-  require(vagrant::dynarec::hasNativeOverride(core, resident, vagrant::heap::kInitHeap), "overlay-retire",
+  require(vagrant::dynarec::hasNativeOverride(core, resident, vagrant::heap::kInitHeap),
+          "overlay-retire",
           "the resident heap leaf was not owned before the overlay load");
 
   const auto titleBytes = overlayFixture();
@@ -418,8 +445,10 @@ void overlayReplacementRetiresThePriorGenerationsKeys() {
   constexpr std::uint32_t kOverlayEntry = vagrant::resident::kTitleOverlayBase;
   require(vagrant::dynarec::installNativeOverride(
               core, kOverlayEntry, "TITLE-owned leaf", nativeLeaf, title.identity.value()),
-          "overlay-retire", "a leaf scoped to the TITLE generation was refused");
-  require(vagrant::dynarec::hasNativeOverride(core, title.identity.value(), kOverlayEntry), "overlay-retire",
+          "overlay-retire",
+          "a leaf scoped to the TITLE generation was refused");
+  require(vagrant::dynarec::hasNativeOverride(core, title.identity.value(), kOverlayEntry),
+          "overlay-retire",
           "the TITLE-scoped leaf is not reachable through its own generation");
 
   const auto battle = overlays.load(vagrant::OverlayKind::Battle, battleBytes);
@@ -427,11 +456,14 @@ void overlayReplacementRetiresThePriorGenerationsKeys() {
   if (!battle) {
     return;
   }
-  require(ownedBy(core, kOverlayEntry, battle.identity.value()), "overlay-retire",
+  require(ownedBy(core, kOverlayEntry, battle.identity.value()),
+          "overlay-retire",
           "the BATTLE publication did not become the active generation at 0x80068800");
-  require(!vagrant::dynarec::hasNativeOverride(core, title.identity.value(), kOverlayEntry), "overlay-retire",
+  require(!vagrant::dynarec::hasNativeOverride(core, title.identity.value(), kOverlayEntry),
+          "overlay-retire",
           "a TITLE-generation override survived the BATTLE publication that reused its address slot");
-  require(vagrant::dynarec::hasNativeOverride(core, resident, vagrant::heap::kInitHeap), "overlay-retire",
+  require(vagrant::dynarec::hasNativeOverride(core, resident, vagrant::heap::kInitHeap),
+          "overlay-retire",
           "the resident generation's own leaf was retired by an overlay load, but the resident text ends "
           "at 0x80062000 and the overlay base is 0x80068800, so those ranges are disjoint");
 }

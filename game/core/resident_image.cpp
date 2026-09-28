@@ -35,8 +35,8 @@ std::optional<ResidentImage> readResidentImage(const std::filesystem::path &path
     lucent::error("vagrant-boot", "{} changed size or could not be read completely", path.string());
     return std::nullopt;
   }
-  image.sha256 = lucent::content::sha256_hex(lucent::content::sha256(
-      {reinterpret_cast<const std::byte *>(image.bytes.data()), image.bytes.size()}));
+  image.sha256 = lucent::content::sha256_hex(
+      lucent::content::sha256({reinterpret_cast<const std::byte *>(image.bytes.data()), image.bytes.size()}));
   return image;
 }
 

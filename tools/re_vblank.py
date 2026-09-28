@@ -279,6 +279,18 @@ def check_source(measured, sources):
     if not ok:
         failures.append("kVSync")
 
+    # The field counter the SAME body polls. Gated for the reason it is declared: psxport refuses a
+    # negative VSync query when this is unset, so an unchecked constant here is a value the product
+    # returns to the guest as a field count on the strength of one person's typing.
+    shipped_counter = source_constant(FACTS, facts, "kVSyncQueryCounter")
+    counter_ok = shipped_counter == measured["counter"]
+    print(
+        f"  [{'ok' if counter_ok else 'FAIL':>4}] kVSyncQueryCounter "
+        f"shipped=0x{shipped_counter:08X} measured=0x{measured['counter']:08X}"
+    )
+    if not counter_ok:
+        failures.append("kVSyncQueryCounter")
+
     wiring = {
         "input field service": r"\.input\s*=\s*serviceInput\b",
         "audio field service": r"\.audio\s*=\s*serviceAudio\b",
@@ -353,7 +365,22 @@ def selftest(img, measured):
         print(f"  [ ok ] +4 shipping VSync refused: {error}")
         checks += 1
 
-    print(f"re_vblank selftest: {checks}/3 PASS")
+    counter_old = f"kVSyncQueryCounter = 0x{measured['counter']:08X}"
+    counter_changed = sources[FACTS].replace(counter_old, f"kVSyncQueryCounter = 0x{measured['counter'] + 4:08X}", 1)
+    if counter_changed == sources[FACTS]:
+        raise AssertionError("shipping counter mutation anchor did not fire")
+    counter_sabotaged = dict(sources)
+    counter_sabotaged[FACTS] = counter_changed
+    try:
+        check_source(measured, counter_sabotaged)
+        raise AssertionError("+4 shipping VSync counter was accepted")
+    except Refuse as error:
+        if "kVSyncQueryCounter" not in str(error):
+            raise AssertionError(f"counter negative did not name field: {error}")
+        print(f"  [ ok ] +4 shipping VSync counter refused: {error}")
+        checks += 1
+
+    print(f"re_vblank selftest: {checks}/4 PASS")
 
 
 def main(argv):

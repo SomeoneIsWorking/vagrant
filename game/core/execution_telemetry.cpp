@@ -37,11 +37,11 @@ void ExecutionTelemetry::recordOverrideInstall(bool hadActiveImage, bool accepte
 }
 
 void ExecutionTelemetry::recordOverrideHit(std::string_view name) {
-  const auto found = std::find_if(
-      overrideHits_.entries.begin(), overrideHits_.entries.begin() + static_cast<std::ptrdiff_t>(overrideHits_.entryCount),
-      [name](const OverrideHits::Entry &entry) {
-        return entry.name == name;
-      });
+  const auto found = std::find_if(overrideHits_.entries.begin(),
+                                  overrideHits_.entries.begin() + static_cast<std::ptrdiff_t>(overrideHits_.entryCount),
+                                  [name](const OverrideHits::Entry &entry) {
+                                    return entry.name == name;
+                                  });
   if (found != overrideHits_.entries.begin() + static_cast<std::ptrdiff_t>(overrideHits_.entryCount)) {
     ++found->calls;
     return;
@@ -90,7 +90,9 @@ void ExecutionTelemetry::report(std::string_view owner) const {
                overrideInstalls_.refusedDispatcher,
                overrideHits_.total());
   for (std::size_t index = 0; index < overrideHits_.entryCount; ++index) {
-    lucent::info(owner, "  native override '{}' was invoked {} time(s)", overrideHits_.entries[index].name,
+    lucent::info(owner,
+                 "  native override '{}' was invoked {} time(s)",
+                 overrideHits_.entries[index].name,
                  overrideHits_.entries[index].calls);
   }
   lucent::info(owner,
