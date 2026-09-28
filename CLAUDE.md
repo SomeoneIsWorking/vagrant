@@ -20,18 +20,36 @@ those docs are not Lightrec gameplay evidence.
   override identity. Overlay loads, guest writes, DMA, savestate restore, and override changes
   invalidate affected execution decisions. psxport owns Lightrec integration, CPU/device sync,
   executable memory, and cache mechanics; this repository owns image identity and title behavior.
-- `VagrantRuntime` composes `VagrantFrameDriver`, resident and TITLE phases, CD owners, pad delivery,
-  title producers, native heap behavior, and BATTLE peers. It must not absorb their implementations.
-  `VagrantFrameDriver` owns finite fields; guest VSync `0x8001F6C4` is fatal outside that boundary.
+- `VagrantRuntime` supplies the measured `GuestProgramImage`, the measured VSync `PlatformHlePlan`,
+  the per-Core `VagrantFrameDriver`, and the resident publication boundary. It must not absorb their
+  implementations. `vagrant::Application` is the process composition owner and the only place that
+  knows the ORDER the machine becomes a product; it composes and does not implement.
+- `vagrant::dynarec` (`game/core/dynarec_dispatch.{h,cpp}`) is the ONLY module here that resolves an
+  image identity, spells an `ExecutionBudget`, or chooses a dispatch form. Add nothing that does any
+  of those three elsewhere. `vagrant::installResidentNativeOwners` decides WHICH leaves the title owns
+  and is reached from the image publication boundary, never from `registerOverrides` — which runs
+  before any image exists and therefore cannot resolve an address to a generation.
 - Native CD work must preserve retail command postconditions where the synchronous host CD model
   cannot deliver required asynchronous callbacks. Do not bypass a wait by writing its timer or
   phase. `NativeFile` owns authenticated extents; title memcard transfers preserve their measured
   allocation, image, upload, reset, and event lifecycle.
+- A new execution counter belongs in `game/core/execution_telemetry.{h,cpp}` with the denominator it
+  is read against. A counter whose zero cannot be distinguished from "the instrument never ran" does
+  not belong there. psxport's executor counters are read from the executor, never restated.
+- The overlays reuse EACH OTHER's bases, not the resident's: resident text ends at `0x80062000` and
+  TITLE/BATTLE/ENDING load at `0x80068800`. An override retirement claim that says otherwise is
+  refuted by `tools/re_overlay.py`, and one such claim was already written and withdrawn.
 - Guest-rendered 4:3 is the fidelity baseline. Native BATTLE world rendering must derive from named
   pre-GTE camera, object, material, animation, and model state. Packet or OT replay cannot establish
   semantic widescreen or interpolation. Those enhancements have separate gates.
 
 ## Verification and inputs
+
+The adapter exists and the product builds and launches, but NO authenticated-overlay run has happened,
+so S015 is `missing` and every dependent item is still `missing`. Do not read the adapter's presence,
+a green gate, a boot log, or a clean trace as a run: `docs/issues/0040` separates the two explicitly.
+The workspace product slot is a single shared resource — check `$PSX/coord/claims/product-slot/claim.md`
+before any run, and never run a second product instance alongside another.
 
 The first migration discriminator is 1,000/1,000 host-owned TITLE fields from the exact image with
 nonzero Lightrec execution, a reached native CD override, reached resident and TITLE overrides,

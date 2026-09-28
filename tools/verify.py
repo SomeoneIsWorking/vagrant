@@ -15,6 +15,7 @@ BUILD = ROOT / "build" / "verify"
 NATIVE_TESTS = frozenset({
     "vagrant_battle_projection",
     "vagrant_ds_control_contract",
+    "vagrant_dynarec_dispatch",
     "vagrant_game_heap",
     "vagrant_image_contract",
     "vagrant_native_runtime",
@@ -23,6 +24,10 @@ NATIVE_TESTS = frozenset({
     "vagrant_title_transfer",
     "vagrant_title_startup_recipe",
 })
+# The shipping product itself. It is built here for the same reason the other targets are: a
+# product that compiles only on a player's machine is not a product, and the failure this replaces
+# was a repository whose build rules refused to produce any executable at all.
+PRODUCT_TARGET = "vagrant_port"
 # CTest names that must be present but are NOT build targets. The two projection-census entries run a
 # Python instrument through `add_test`, so naming them in NATIVE_TESTS would ask ninja for a target
 # that does not exist. They still run — the final `ctest` below executes every registered test — but
@@ -109,9 +114,14 @@ def verify_native(framework: Path) -> bool:
         return False
     if not verify_compile_coverage():
         return False
-    built = run("cmake", "--build", BUILD, "--target", *sorted(NATIVE_TESTS))
+    built = run("cmake", "--build", BUILD, "--target", *sorted(NATIVE_TESTS), PRODUCT_TARGET)
     if built.returncode:
         return False
+
+    # The product link is inspected BEFORE ctest, and independently of its result. Running it only on
+    # a green ctest would mean one unrelated failure suppresses the evidence that the shipped binary
+    # links no interpreter — and a suppressed check is an absent one.
+    product_ok = verify_product_link(framework)
 
     discovered = run("ctest", "--test-dir", BUILD, "--show-only=json-v1", capture=True)
     if discovered.returncode:
@@ -129,7 +139,32 @@ def verify_native(framework: Path) -> bool:
         f"[verify] discovered {len(REQUIRED_TESTS)} of {len(REQUIRED_TESTS)} required contracts "
         f"({len(NATIVE_TESTS)} build targets, {len(SCRIPT_TESTS)} script registrations)"
     )
-    return run("ctest", "--test-dir", BUILD, "--output-on-failure", "--no-tests=error").returncode == 0
+    contracts_ok = run("ctest", "--test-dir", BUILD, "--output-on-failure", "--no-tests=error").returncode == 0
+    return contracts_ok and product_ok
+
+
+def verify_product_link(framework: Path) -> bool:
+    """Prove the shipped product links NO interpreter and carries NO generated guest corpus.
+
+    S002 says the offline-generated guest execution path and its selectors are absent. A SOURCE
+    pattern can only show that the repository does not mention them; it cannot show the shipped
+    binary does not CONTAIN them. This is the difference between "we removed the code" and "the
+    product does not link it", and the second is the claim a player would make.
+    """
+    product = BUILD / PRODUCT_TARGET
+    if not product.is_file():
+        print(f"[verify] REFUSED: the product executable was not built: {product}", file=sys.stderr)
+        return False
+    for symbol in ("xemu_interpret_block", "int_exec", "psx_cpu_interpret_step"):
+        result = run("nm", "-C", str(product), capture=True)
+        if result.returncode:
+            print(f"[verify] REFUSED: cannot inspect the product's symbols: {result.stderr}", file=sys.stderr)
+            return False
+        if symbol in result.stdout:
+            print(f"[verify] REFUSED: the product links interpreter symbol '{symbol}'", file=sys.stderr)
+            return False
+    print("[verify] product link: 0 of 3 interpreter entry points present in the shipped executable")
+    return True
 
 
 def verify_python() -> bool:
@@ -156,7 +191,7 @@ def main() -> int:
         ).returncode == 0
     python_ok = verify_python()
     if native_ok and style_ok and python_ok:
-        print("[verify] PASS: native contracts, C++ policy, Python tests, and structure")
+        print("[verify] PASS: native contracts, C++ policy, product link, Python tests, and structure")
         return 0
     print("[verify] FAIL: one or more required checks failed", file=sys.stderr)
     return 1

@@ -13,9 +13,9 @@ Framework platform services stay under `external/psxport`; this repo owns Vagran
 title composition, RE instruments, and native game behavior.
 
 ```text
-run.sh -> bootstrap.py -> tools/run.py -> missing title/dynarec adapter boundary
-
-target: title adapter -> psxport dynarec executor -> VagrantContext
+run.sh -> bootstrap.py -> tools/run.py -> tools/launcher/runtime_boundary.py
+       -> vagrant_port (game/main.cpp) -> vagrant::Application
+       -> vagrant::dynarec -> psxport dynarec executor -> VagrantContext
                                                     |
                                                     +-- VagrantFrameDriver
                                                     +-- PadDelivery
@@ -32,12 +32,16 @@ verified retail inputs -> psxport runtime image mapping -> dynarec execution
 
 | Subsystem | Responsibility | Current / target location | Entry point | Deep doc |
 |---|---|---|---|---|
-| Player launcher | Handle help and expose the one explicit unavailable-product boundary until the dynarec adapter exists | `run.sh`, `bootstrap.py`, `tools/run.py`, `tools/launcher/runtime_boundary.py` | `bootstrap.main`, `run.main`, `require_product` | `README.md` |
+| Player launcher | Interpret arguments, resolve the framework, provision the authenticated measured inputs, configure, build the one shipping executable, launch it, and refuse with the STAGE that failed | `run.sh`, `bootstrap.py`, `tools/run.py`, `tools/launcher/runtime_boundary.py` | `bootstrap.main`, `run.main`, `provision_build_and_launch` | `README.md` |
 | Retail input resolution | Apply explicit argument, environment, `.env`, then drop-in precedence and refuse missing/ambiguous assets | `tools/resolve_disc.py` | `resolve_disc` | `docs/references.md` |
 | Executable/overlay provisioning | Extract and identity-check the resident executable and reached overlay images | `tools/extract_exe.py`, `tools/extract_overlays.py`, `tools/discdump.py` | each tool's `main` | `docs/references.md` |
-| Dynarec title adapter | Compose authenticated resident/overlay images, typed exits, image generations, invalidation, and image-scoped native handlers against psxport | `game/core/vagrant_runtime.{h,cpp}` for resident admission and per-Core context lifetime; `game/core/overlay_images.{h,cpp}` for overlay residency; `game/core/title_transfer.{h,cpp}` for completed resident-sector publication; `game/core/title_entry.{h,cpp}` for the resident-to-TITLE call gate; compose remaining execution owners beside them | `vagrant::VagrantRuntime::loadResidentImage`, `vagrant::VagrantRuntime::createContext`, `vagrant::readAndLoadTitle`, `vagrant::OverlayImages::loadTransfer`, `vagrant::enterTitle` | `CLAUDE.md` |
-| Process composition | Load typed configuration, construct the title adapter and peer owners, and enter the bounded product loop | boundary: `tools/launcher/runtime_boundary.py`; future C++ application owner beside the title adapter | target: `vagrant::Application` | `CLAUDE.md` |
-| Runtime composition | Hold cohesive per-Core title owners and the image-residency owner without absorbing their behavior | `game/core/vagrant_context.h` | `vagrant::VagrantContext` | `CLAUDE.md` |
+| Dynarec title adapter | THE adapter surface over psxport's per-`Core` executor: image-scoped override installation, finite call, bounded turn, original call, and a named fatal on a call that did not return. Nothing else in this repository resolves an image identity, spells a budget, or chooses a dispatch form, so there is one answer to each | `game/core/dynarec_dispatch.{h,cpp}` | `vagrant::dynarec::installNativeOverride`, `callGuest`, `executeTurn`, `callOriginal` | `docs/info/claims/030` |
+| Image-scoped native leaves | WHICH leaves the title owns and the all-or-nothing registration that binds them to the generation that published them. Reached from the resident publication boundary, because `registerOverrides` runs before any image exists | `game/core/native_owners.{h,cpp}` | `vagrant::installResidentNativeOwners` | `docs/info/claims/030` |
+| Execution census | The boundaries this title itself crosses — override installs with their refusal reasons, override invocations by name, executable-write candidates with the ranges they overlapped, original calls, and dispatches by typed exit reason — each with the denominator that makes its zero readable. psxport's own executor counters are read from the executor, never restated | `game/core/execution_telemetry.{h,cpp}` | `vagrant::ExecutionTelemetry::report` | `docs/issues/0040` |
+| Resident image admission | Read the provisioned file whole, refuse any size other than the measured one, and digest exactly the bytes about to be mapped. It deliberately does NOT re-derive the file's SHA-1: that is `tools/extract_exe.py`'s rule, and a second hash would be a second answer | `game/core/resident_image.{h,cpp}` | `vagrant::readResidentImage` | `docs/issues/0040` |
+| Process composition | The one place that knows the ORDER the machine becomes a product: construct, publish the resident image, bind peripherals, register leaves, preflight the platform sync boundary, run the measured boot phase, step finite fields, report the run-end census | `game/core/application.{h,cpp}`, entered by `game/main.cpp` | `vagrant::Application::start`, `run`, `reportRunEnd` | `docs/issues/0040` |
+| Image residency and entry gates | Compose authenticated resident/overlay images, typed exits, image generations, and invalidation | `game/core/vagrant_runtime.{h,cpp}` for resident admission and per-Core context lifetime; `game/core/overlay_images.{h,cpp}` for overlay residency; `game/core/title_transfer.{h,cpp}` for completed resident-sector publication; `game/core/title_entry.{h,cpp}` for the resident-to-TITLE call gate | `vagrant::VagrantRuntime::loadResidentImage`, `vagrant::VagrantRuntime::createContext`, `vagrant::readAndLoadTitle`, `vagrant::OverlayImages::loadTransfer`, `vagrant::enterTitle` | `CLAUDE.md` |
+| Runtime composition | Hold cohesive per-Core title owners, the image-residency owner, and the per-Core execution census without absorbing their behavior. `vagrant::contextOf(Core&)` is the ONE accessor for a Core's title products | `game/core/vagrant_context.{h,cpp}` | `vagrant::VagrantContext`, `vagrant::contextOf` | `CLAUDE.md` |
 | CD/libds behavior | Classify the measured blocking control owners, establish the libds postcondition, and copy finite resident/TITLE extents from the real disc | `game/cd/cd_facts.h`, `game/cd/ds_control.cpp`, `game/cd/libds_field.{h,cpp}`, `game/cd/native_file.{h,cpp}` | `vagrant::cd::handleDsControlB`, `vagrant::cd::LibDsField`, `readNativeFile` | `docs/re-frontier.md` |
 | GPU/libgpu synchronization | Retain the measured hardware-timeout facts whose host GPU operation completes synchronously; keep guest VSync fatal | `game/render/gpu_sync_facts.h` | future title-adapter binding | `docs/re-frontier.md` |
 | Resident/TITLE finite phase | Reproduce resident leaf/state order, native-own InitCARD/loading/CD waits and TITLE.PRG entry, then compose cohesive splash and save-phase owners | `game/core/resident_facts.h`, `game/core/resident_phase.{h,cpp}`, `game/render/title_splash.{h,cpp}`, `game/render/title_splash_facts.h` | `ResidentPhase::advanceAfterField`, `TitleSplashPhase::advanceAfterField` | `docs/re-frontier.md` |
@@ -62,15 +66,16 @@ verified retail inputs -> psxport runtime image mapping -> dynarec execution
 ## Source tree
 
 ```text
-game/  —  3,455 lines, 53 files
+game/  —  4,631 lines, 69 files
 ├─ cd/     324 lines,  8 files
-├─ core/ 1,224 lines, 16 files
+├─ core/ 2,222 lines, 27 files
 ├─ input/   68 lines,  3 files
-├─ render/ 1,277 lines, 17 files
+├─ render/ 1,447 lines, 17 files
 ├─ save/   364 lines,  6 files
-└─ sync/   198 lines,  3 files
-tools/ —  9,789 lines, 30 files
-tests/ —  2,210 lines, 13 files
+├─ sync/   198 lines,  3 files
+└─ main.cpp
+tools/ — 11,513 lines, 32 files
+tests/ —  2,920 lines, 14 files
 ```
 
 Counted with `find <dir> -maxdepth 1 -type f \( -name '*.h' -o -name '*.cpp' -o -name '*.py' \)` and
@@ -81,10 +86,16 @@ note used to name does not exist in this repository, so the numbers were being c
 
 - Boot, overlay, ABI, camera, or render constants measured from retail bytes → the narrow matching
   `tools/re_*.py` instrument first, then the owning typed module.
-- New runtime orchestration → keep it in a dedicated title-adapter module beside
-  `game/core/vagrant_runtime.{h,cpp}`; image residency belongs to `game/core/overlay_images.{h,cpp}`
-  resident-to-TITLE call admission belongs to `game/core/title_entry.{h,cpp}`, and other
-  implementation stays in its cohesive peer subsystem.
+- Execution-boundary mechanism (install a leaf, call a guest, re-enter the original) →
+  `game/core/dynarec_dispatch.{h,cpp}`. Never spell an `ExecutionBudget` or resolve an image
+  identity anywhere else; `vagrant::dynarec` is the only place that may.
+- WHICH leaves the title owns, and binding them to a generation → `game/core/native_owners.{h,cpp}`,
+  entered from the image publication boundary rather than from `registerOverrides`.
+- A new execution counter → `game/core/execution_telemetry.{h,cpp}`, with the denominator it is read
+  against. A counter whose zero cannot be distinguished from "never ran" does not belong there.
+- Order of operations for the product → `game/core/application.{h,cpp}`. It composes; it does not
+  implement. Image residency belongs to `game/core/overlay_images.{h,cpp}`, resident-to-TITLE call
+  admission to `game/core/title_entry.{h,cpp}`, and everything else to its cohesive peer subsystem.
 - Per-Core product state → its owner under `game/input/`, `game/render/`, `game/save/`, or `game/sync/`, composed by
   `VagrantContext`.
 - BATTLE world camera/projection/object production → the semantic BATTLE render owner described in

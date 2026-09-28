@@ -1,6 +1,7 @@
 #include "sync/frame_loop.h"
 
 #include "core.h"
+#include "core/vagrant_context.h"
 #include "frame_pacer.h"
 #include "game.h"
 #include "render/battle_frame.h"
@@ -14,12 +15,11 @@
 
 namespace {
 
+// The one accessor for this Core's title products. It lives in vagrant_context.h because every owner
+// needs it, and a second copy of the cast here would be a second place that could disagree about
+// what a missing context means.
 vagrant::VagrantContext &context(Core &core) {
-  if (!core.gameCtx) {
-    lucent::error("vagrant-frame", "native frame reached without a VagrantContext");
-    std::abort();
-  }
-  return *static_cast<vagrant::VagrantContext *>(core.gameCtx);
+  return vagrant::contextOf(core);
 }
 
 void serviceInput(Core &core) {

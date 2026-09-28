@@ -44,6 +44,12 @@ target_link_libraries(vagrant_runtime PUBLIC psxport)
 # synthetic contracts against the same library the eventual title composition will consume.
 add_library(vagrant_native STATIC
   game/core/vagrant_runtime.cpp
+  game/core/application.cpp
+  game/core/dynarec_dispatch.cpp
+  game/core/execution_telemetry.cpp
+  game/core/native_owners.cpp
+  game/core/resident_image.cpp
+  game/core/vagrant_context.cpp
   game/cd/ds_control.cpp
   game/cd/libds_field.cpp
   game/cd/native_file.cpp
@@ -102,6 +108,10 @@ if(BUILD_TESTING)
   target_link_libraries(vagrant_battle_projection PRIVATE vagrant_native)
   add_test(NAME vagrant_battle_projection COMMAND vagrant_battle_projection)
 
+  add_executable(vagrant_dynarec_dispatch tests/test_dynarec_dispatch.cpp)
+  target_link_libraries(vagrant_dynarec_dispatch PRIVATE vagrant_native)
+  add_test(NAME vagrant_dynarec_dispatch COMMAND vagrant_dynarec_dispatch)
+
   add_test(NAME vagrant_projection_census_selftest
            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_projection.py"
                    --selftest)
@@ -133,14 +143,11 @@ if(BUILD_TESTING)
            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_cadence.py")
 endif()
 
-# Break-first migration boundary: the generated-source product has been removed. The
-# gameplay target remains unavailable until Vagrant Story is composed against
-# psxport's dynarec-only executor and image-scoped native override API.
-add_custom_target(vagrant_port
-  COMMAND ${CMAKE_COMMAND} -E echo
-          "Vagrant Story product unavailable: the title adapter to psxport's dynarec-only executor has not been implemented"
-  COMMAND ${CMAKE_COMMAND} -E false
-  VERBATIM)
+# THE SHIPPING PRODUCT. One executable over the title adapter and psxport's dynarec-only executor.
+# There is deliberately no second target, no engine selector, and no build rule that can produce
+# guest code as a host object: the product is this binary or it does not exist.
+add_executable(vagrant_port game/main.cpp)
+target_link_libraries(vagrant_port PRIVATE vagrant_native)
 
 # THE LIVE PIN CHECK. Not a selftest: this runs the real function against this repository's real
 # psxport.pin and the real build receipt, so it can fail when the pin is actually wrong.

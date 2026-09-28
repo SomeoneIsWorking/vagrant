@@ -1,6 +1,7 @@
 #include "battle_projection.h"
 
 #include "core.h"
+#include "core/dynarec_dispatch.h"
 #include "execution_exit.h"
 #include "game.h"
 #include "native_dispatch.h"
@@ -321,9 +322,10 @@ bool installBattleProjection(Core &core, psx::cpu::ImageIdentity residentImage) 
     }
   }
 
+  // Installation goes through the title's one override seam so the run-end census counts these four
+  // attempts alongside every other leaf, rather than a second table of "leaves this owner installed".
   for (const Binding &binding : bindings) {
-    if (!core.nativeDispatcher().install({{residentImage, binding.address}, binding.owner, binding.function})) {
-      lucent::error("vagrant-proj", "the dispatcher refused {} at 0x{:08X}", binding.owner, binding.address);
+    if (!dynarec::installNativeOverride(core, binding.address, binding.owner, binding.function, residentImage)) {
       return false;
     }
   }

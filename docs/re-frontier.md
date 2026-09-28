@@ -34,9 +34,14 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
   whose measured resident header differs, then delegates the accepted image to psxport's central
   `loadPsxExeImage` publication and image catalog. `vagrant_image_contract` proves the positive
   entry/range/catalog path and the changed-entry refusal with a synthetic PS-X shape.
-- where: `game/core/vagrant_runtime.{h,cpp}`, `tests/test_vagrant_image_contract.cpp`
-- gap: Authenticate the complete retail file before this boundary, enter `0x8001F544` in the actual
-  title adapter, and prove all gameplay guest execution is dynarec-only.
+- where: `game/core/vagrant_runtime.{h,cpp}`, `game/core/resident_image.{h,cpp}`,
+  `game/core/application.{h,cpp}`, `tests/test_vagrant_image_contract.cpp`,
+  `docs/info/claims/030`
+- gap: The measured resident header is now admitted in a process that reads the file whole and
+  refuses any other size, and `vagrant::Application` enters the title's boot phase. What is NOT
+  done: `0x8001F544` is never entered as a guest entry in a run, and no run has shown the resident
+  leaf order translating on Lightrec. The file's SHA-1 stays `tools/extract_exe.py`'s rule; this
+  repository deliberately does not re-derive it.
 
 ### RE-03 — load bases for all PRG images
 - status: re-verified
@@ -100,8 +105,13 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
   splash/movie/menu completion, battle presentation, heap initialization, save checks, and card
   initialization. Their guest-address facts are independently measured.
 - where: `game/cd/`, `game/core/`, `game/input/`, `game/render/`, `game/save/`, `game/sync/`
-- gap: Register each owner through one image-scoped psxport native-override adapter and prove its
-  ordinary dynarec path as the comparison oracle.
+- gap: The one image-scoped psxport native-override adapter EXISTS and is exercised
+  (`vagrant::dynarec`, `vagrant::installResidentNativeOwners`, CTest `vagrant_dynarec_dispatch`:
+  7/7 groups, every one a negative as well as a positive). The first leaf it made reachable is
+  S007's allocator, which now runs natively and re-enters the original guest body. What is NOT
+  done: the other retained owners are still called as finite guest leaves rather than registered as
+  overrides, so no run has compared a native owner against its ordinary dynarec path, and no
+  original-call depth has been observed on a real image.
 
 ### RE-08 — platform/HLE leaf inventory
 - status: re-partial

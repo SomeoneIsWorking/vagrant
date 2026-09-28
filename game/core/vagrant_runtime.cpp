@@ -1,8 +1,10 @@
 #include "vagrant_runtime.h"
 
 #include "core.h"
+#include "core/native_owners.h"
 #include "game.h"
-#include "render/battle_projection.h"
+#include "sync/frame_loop.h"
+#include "sync/vsync_facts.h"
 #include "vagrant_context.h"
 
 #include <iomanip>
@@ -25,6 +27,18 @@ std::string headerMismatch(const psx::cpu::PsxExeImage &image) {
 }
 
 } // namespace
+
+// The measured libetc VSync body and its one-instruction admission window. `sync::kVSync` and
+// `sync::kVSyncWindowEnd` come from the VBlank instrument's own derivation over the authenticated
+// executable (RE-10); this is the mapping from that measurement to the framework's one typed field,
+// and it is deliberately the only address admitted.
+const PlatformHlePlan VagrantRuntime::platformPlan_ = [] {
+  PlatformHlePlan plan{};
+  plan.vsyncAddress = sync::kVSync;
+  plan.windowLo[0] = sync::kVSync;
+  plan.windowHi[0] = sync::kVSyncWindowEnd;
+  return plan;
+}();
 
 const GuestProgramImage VagrantRuntime::programImage_{
     .bss = {0x80033678u, 0x800401A8u},
@@ -51,9 +65,18 @@ void VagrantRuntime::destroyContext(void *context) {
 }
 
 void VagrantRuntime::registerOverrides(Game &) {
+  // Deliberately empty, and the emptiness is load-bearing. psxport calls this during product boot,
+  // BEFORE any authenticated image exists, so `core.currentImageIdentity(address)` cannot resolve
+  // anything here — and an address alone cannot identify PSX code in this title, because BATTLE,
+  // TITLE and ENDING all load at 0x80068800. Image-scoped leaves are registered from the resident
+  // publication boundary in `loadResidentImage` instead. See `game/core/native_owners.h`.
 }
 
-void VagrantRuntime::bootInit(Core &) {
+void VagrantRuntime::bootInit(Core &core) {
+  // The measured resident bootstrap: the real finite leaf order, with every measured guest field wait
+  // turned into an explicit host state the title's frame driver services. Owned by ResidentPhase;
+  // this override is the single composition point that starts it.
+  contextOf(core).residentPhase.begin(core);
 }
 
 const GuestProgramImage *VagrantRuntime::guestProgramImage() const {
@@ -72,6 +95,14 @@ const char *VagrantRuntime::discEnvVar() const {
   return "PSXPORT_VAGRANT_DISC";
 }
 
+const PlatformHlePlan *VagrantRuntime::platformHlePlan() const {
+  return &platformPlan_;
+}
+
+std::unique_ptr<FrameDriver> VagrantRuntime::createFrameDriver(Game &) {
+  return std::make_unique<VagrantFrameDriver>();
+}
+
 psx::cpu::PsxExeLoadResult
 VagrantRuntime::loadResidentImage(Core &core, std::span<const std::uint8_t> bytes, std::string_view imageName) const {
   const auto parsed = psx::cpu::parsePsxExeImage(bytes);
@@ -85,16 +116,12 @@ VagrantRuntime::loadResidentImage(Core &core, std::span<const std::uint8_t> byte
   if (!loaded) {
     return loaded;
   }
-  // The resident image is the only image that publishes the four viewport leaves, so their overrides
-  // become installable exactly here and at no other boundary: `registerOverrides` runs at boot,
-  // before any image exists, and the overlays reuse this image's load range. A refused install is
-  // reported by the owner and is not fatal here, because an unowned projection is a missing
-  // measurement rather than a wrong one.
-  if (!installBattleProjection(core, loaded.identity.value())) {
-    lucent::warn("vagrant-proj",
-                 "the BATTLE projection publication leaves were not owned on this Core, so no guest "
-                 "viewport will be measured until that boundary is satisfied");
-  }
+  // The resident generation is the only image that publishes the game's allocator initialiser and
+  // the four viewport leaves, so their overrides become installable exactly here and at no other
+  // boundary: `registerOverrides` runs at boot, before any image exists. A refusal is reported by
+  // the owner and is not fatal here, because an unowned leaf is a missing measurement rather than a
+  // wrong one.
+  installResidentNativeOwners(core, loaded.identity.value());
   return loaded;
 }
 

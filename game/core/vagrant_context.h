@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cd/libds_field.h"
+#include "core/execution_telemetry.h"
 #include "core/overlay_images.h"
 #include "core/resident_phase.h"
 #include "input/pad_delivery.h"
@@ -39,6 +40,14 @@ struct VagrantContext {
   TitleSaveCheck titleSaveCheck{};
   TitleStartupProducer titleStartup{};
   TitleMovieProducer titleMovie{};
+  // Per-Core, like every other member: nothing here may be shared between two Cores, because the
+  // counters it holds are per-execution-boundary facts.
+  ExecutionTelemetry executionTelemetry{};
 };
+
+// THE accessor for a Core's title products. `Core::gameCtx` is the framework's one void* slot and
+// every title owner needs it, so the cast, the missing-context refusal, and its diagnostic live here
+// instead of being re-derived at each call site.
+VagrantContext &contextOf(Core &core);
 
 } // namespace vagrant

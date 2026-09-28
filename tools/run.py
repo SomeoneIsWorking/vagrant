@@ -1,13 +1,32 @@
 #!/usr/bin/env python3
-"""Player entry point during the break-first dynarec migration."""
+"""Launch the Vagrant Story native/Lightrec product.
+
+The zero-argument route provisions the measured inputs, builds the one shipping executable, and
+launches it through psxport's dynarec-only executor. Every stage is named, and every refusal says
+which one failed.
+"""
 
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence
+import os
+import sys
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import TextIO
+
+ROOT = Path(__file__).resolve().parents[1]
+BUILD = Path("build/player")
+
+sys.path.insert(0, str(ROOT))
 
 from tools.launcher.logging_config import configure_logging
-from tools.launcher.runtime_boundary import ProductUnavailable, require_product
+from tools.launcher.runtime_boundary import (
+    ProductUnavailable,
+    cpu_jobs,
+    provision_build_and_launch,
+    product_stage_names,
+)
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -19,20 +38,64 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         nargs="?",
         help="Vagrant Story (USA) CHD; otherwise use env/.env/drop-in discovery",
     )
+    parser.add_argument(
+        "--prepare-only",
+        action="store_true",
+        help="provision and build the product without launching it",
+    )
     return parser.parse_args(list(argv))
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    import sys
-
-    args = parse_args(sys.argv[1:] if argv is None else argv)
-    logger = configure_logging()
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    environ: Mapping[str, str] | None = None,
+    root: Path = ROOT,
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
+) -> int:
+    # Resolved here rather than bound as a default argument. A `TextIO = sys.stderr` default is
+    # captured at definition time, so it keeps writing to the ORIGINAL stream and a caller (or a
+    # test) that redirects stderr sees nothing — which is exactly how a launcher refusal can go
+    # unobserved.
+    out: TextIO = sys.stdout if stdout is None else stdout
+    err: TextIO = sys.stderr if stderr is None else stderr
+    environment = dict(os.environ if environ is None else environ)
     try:
-        require_product(args.disc)
+        options = parse_args(sys.argv[1:] if argv is None else argv)
+        if options.prepare_only:
+            # Everything the product route does except the final launch, which is the one step that
+            # opens a window and plays audio and therefore belongs to the player, not to a check.
+            from tools.launcher.runtime_boundary import (
+                build_product,
+                configured_build,
+                framework_checkout,
+                missing_inputs,
+                provision_inputs,
+            )
+            import subprocess
+
+            framework = framework_checkout(environment, root)
+            provision_inputs(root, environment, options.disc)
+            missing = missing_inputs()
+            if missing:
+                raise ProductUnavailable(
+                    "provisioning finished but these measured inputs are still absent: "
+                    + ", ".join(str(path) for path in missing)
+                )
+            subprocess.run(
+                configured_build(BUILD, framework, environment), cwd=root, env=environment, check=False
+            )
+            build_product(BUILD, environment, cpu_jobs())
+            print(f"[run] {', '.join(product_stage_names()[:-1])}: done. Product is built.", file=out)
+            return 0
+        code = provision_build_and_launch(
+            options.disc, build=BUILD, root=root, environment=environment, jobs=cpu_jobs()
+        )
     except ProductUnavailable as error:
-        logger.error("%s", error)
+        print(f"[run] error: {error}", file=err)
         return 2
-    return 0
+    return code
 
 
 if __name__ == "__main__":

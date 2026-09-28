@@ -17,7 +17,7 @@ This is the factual capability inventory. Epic intent is in `docs/project-goals.
 | S009 | BATTLE world geometry is produced natively from semantic game state | missing | S008 | G002 |
 | S010 | BATTLE world rendering supports true widescreen | missing | S009 | G003 |
 | S011 | Native world presentation interpolates semantic camera/object state | missing | S009 | G004 |
-| S012 | The zero-argument launcher provisions, builds, and launches the intended product | blocked | S001, S015 | G001 |
+| S012 | The zero-argument launcher provisions, builds, and launches the intended product | partial | S001, S015 | G001 |
 | S013 | Vagrant Story is playable through the complete game | missing | S003, S004, S006, S009 | G001 |
 | S014 | Streaming CD/XA and audio behavior is owned beyond the verified intro path | partial | S003 | G001 |
 | S015 | The gameplay product executes authenticated guest images through psxport's dynarec-only runtime | missing | S001, S002 | G001 |
@@ -25,11 +25,23 @@ This is the factual capability inventory. Epic intent is in `docs/project-goals.
 
 ## Current focus
 
-S015 is the current focus. The static product has been removed first, and the repository now stops at
-one explicit missing boundary: a Vagrant Story adapter to psxport's dynarec-only executor. The
-preserved native route previously crossed TITLE `ClearImage`, `_diskReset`, all four menu-sound reads,
-TITLE.PRG, both publisher/developer loops, the complete save-check `gametimeUpdate` caller, and finite
-`_initMemcard`; those owners are migration inputs and not a currently runnable product.
+S015 is still the current focus, and it is still `missing` — the adapter now exists, which is not the
+same statement. `vagrant::dynarec` is written, the product executable `vagrant_port` builds, the
+launcher no longer refuses at a boundary, and every claim in
+`docs/info/claims/030-the-title-adapter-exists-and-is-gate-covered.md` is a claim about the adapter
+and its gates.
+
+**No authenticated-overlay run has happened**, so nothing about the real images, a real boot, a
+presented frame, or a real `fallback.calls` count is established. The coordinate product slot was
+HELD by a Spyro agent until 2026-09-29T12:00, and the brief for this work is explicit that a second
+product instance must not run alongside another. `docs/issues/0040` states exactly what a run would
+settle, in order, and what each remaining step is.
+
+The preserved native route previously crossed TITLE `ClearImage`, `_diskReset`, all four menu-sound
+reads, TITLE.PRG, both publisher/developer loops, the complete save-check `gametimeUpdate` caller,
+and finite `_initMemcard` — under the RETIRED static-recomp product. Those owners are wired into the
+composition chain now, so they are reachable, but reachability through a composition chain is not a
+run.
 
 ## Capability details
 
@@ -194,12 +206,22 @@ local `fps60=1` preference is not interpolation evidence.
 
 ### S012 — Default launcher contract
 
-Blocked by S015. `run.sh` remains a slim frozen-uv shim into `bootstrap.py`/`tools/run.py`, and help
-is available before product construction. Its zero-argument route now refuses with the one exact
-missing dynarec-adapter boundary; it does not provision or launch the removed product and cannot yet
-satisfy the player launcher outcome.
+Partial. `run.sh` remains a slim frozen-uv shim into `bootstrap.py`/`tools/run.py`, and help is
+available before provisioning. The zero-argument route now resolves the framework, provisions the
+authenticated measured inputs through `tools/extract_exe.py` and `tools/extract_overlays.py`,
+configures, builds `vagrant_port`, and launches it. The refusal that named "the one explicit
+unavailable-product boundary" is gone, and each refusal that replaced it names the STAGE and the
+tool rather than a missing boundary.
 
-Blocker: S015 has no title adapter to psxport's dynarec-only executor.
+Evidence: `tests/test_launcher.py` 16/16 with the process boundary injected. It asserts the route
+provisions, configures, builds `vagrant_port`, and launches; that it refuses BEFORE configuring when
+provisioning fails; that a configure or build failure refuses before the next stage; that
+`--prepare-only` builds without launching; and — through the repository's own retired-pattern table
+rather than a second list — that no retired selector is reachable from the launcher.
+
+Gap: the route has never been executed end to end on this machine, because the product slot was held.
+`run.sh` opens a window and plays audio, so it is a player command and not an agent check; the
+gate-covered claim is about the route's composition and its refusals, not about a completed launch.
 
 ### S013 — Complete playable game
 
@@ -216,10 +238,51 @@ not verified.
 
 ### S015 — Dynarec-only gameplay execution
 
-Missing capability: there is no complete Vagrant Story title adapter that composes psxport's per-Core
-Lightrec executor, authenticated image generations, typed exits, invalidation, and image-scoped native
-overrides into a gameplay product. The product must remain unavailable until that adapter executes
-real resident and `.PRG` blocks without linking or selecting an interpreter.
+**STILL `missing`, and the reason is now the run rather than the absence.** The capability's wording is
+that the title EXECUTES authenticated guest images; that is a statement about a run, and no run has
+happened. The adapter this item was blocked on is written and gate-covered.
+
+What exists. `game/core/dynarec_dispatch.{h,cpp}` is the whole title/dynarec boundary in five
+operations — image-scoped install, finite call, bounded turn, original call, and a named fatal on a
+call that did not return — and it is the only module in this repository that resolves an image
+identity, spells an `ExecutionBudget`, or chooses a dispatch form, so there is one answer to each
+rather than two. `game/core/native_owners.{h,cpp}` is the all-or-nothing registry of image-scoped
+leaves, reached from the resident publication boundary because `registerOverrides` runs before any
+image exists. `game/core/application.{h,cpp}` composes the machine into a product. `game/main.cpp` is
+a one-call entry point, and the `vagrant_port` target went from `COMMAND false` to a real
+`add_executable`. `VagrantRuntime::platformHlePlan` binds the measured guest VSync `0x8001F6C4`, so a
+guest VSync is a named refusal rather than a hang and a title with no measured address is refused
+before boot.
+
+What is established, with denominators. `vagrant_dynarec_dispatch` passes 7 groups through the
+SHIPPING seam: a real translated block executes and returns the guest's own result register with
+`fallback.calls == 0`; an infinite `b .` ends in `BudgetExhausted` with a PC inside the loop and
+non-zero cycles; an install with no active image and an install against a generation the caller did
+not publish are BOTH refused AND counted with their own reasons; a null handler is refused; a
+TITLE-generation leaf becomes unreachable after BATTLE publishes into `0x80068800` while the resident
+leaf survives (their ranges are disjoint — resident text ends at `0x80062000`); `callOriginal` returns
+the value only the GUEST body produces, which is what proves suppression rather than recursion; and
+the census closes (`accepted + refused == attempts`, per-reason attribution, capacity overflow
+counted rather than dropped). `tools/verify.py::verify_product_link` finds 0 of 3 interpreter entry
+points in `nm -C` of the shipped binary — S002's claim about the LINKED PRODUCT rather than about
+repository text — and it runs before `ctest` and independently of its result, so one unrelated
+failure cannot suppress it. Full gate: 38 of 38 first-party units compile-backed, 17 of 18 CTests
+pass, and the single failure is `vagrant_psxport_pin_live`, which is the pin guard working.
+
+What is NOT established. No authenticated-overlay run. The coordinate product slot was HELD by a
+Spyro agent until 2026-09-29T12:00, so: the resident leaf order has not been shown to translate on
+Lightrec, no presented frame exists, no guest state has been read back through the loopback surface,
+`fallback.calls` has not been observed at run time (the framework permits bounded per-reason
+fallback, so a boot that looks fine could still be interpreting), and the heap leaf's seeded free
+list has not been compared against the real guest body's own writes. `docs/issues/0040` names each of
+these in order with what it would settle.
+
+The adapter and the registry that this item was blocked on are now shipped and gate-covered
+(`docs/info/claims/030`). `vagrant::readResidentImage` reads the provisioned file whole and refuses
+any size other than the measured `0x800 + 0x52000`; it deliberately does NOT re-derive the file's
+SHA-1, because that rule belongs to `tools/extract_exe.py` against the decompilation's own target and
+a second hash over the same bytes would be a second answer to "are these this title's bytes". It
+digests the bytes it is about to map so a run's log names the file it executed.
 
 The first image boundary is owned by `vagrant::VagrantRuntime`: it checks the measured resident PS-X
 header and delegates publication to psxport's `loadPsxExeImage`. `vagrant::OverlayImages` adds exact

@@ -1,10 +1,14 @@
 #pragma once
 
 #include "game_runtime.h"
+#include "platform_hle.h"
 #include "psx_exe_image.h"
 
+#include <memory>
 #include <span>
 #include <string_view>
+
+struct PlatformHlePlan;
 
 namespace vagrant {
 
@@ -41,6 +45,13 @@ public:
   RenderCapabilities renderCapabilities() const override;
   bool guestVramIsPicture(const Game &game) const override;
   const char *discEnvVar() const override;
+  // The measured libetc VSync body, and nothing else. psxport's product preflight REFUSES a title
+  // with no measured VSync address before boot, because a guest busy-wait with no host frame
+  // boundary reports a misleading timeout instead of the real defect.
+  const PlatformHlePlan *platformHlePlan() const override;
+  // The title-owned finite field. It is a non-null driver or the framework refuses the product loop
+  // rather than dispatching a non-returning guest frame loop.
+  std::unique_ptr<FrameDriver> createFrameDriver(Game &game) override;
 
   // DELIBERATELY NOT OVERRIDDEN, and the absence is the enforcement rather than an omission.
   // `guestWidescreenProjection()` is how a title advertises an aspect, and returning no policy makes
@@ -60,6 +71,7 @@ public:
 
 private:
   static const GuestProgramImage programImage_;
+  static const PlatformHlePlan platformPlan_;
 };
 
 } // namespace vagrant
