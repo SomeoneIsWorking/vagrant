@@ -20,36 +20,83 @@ This is the factual capability inventory. Epic intent is in `docs/project-goals.
 | S012 | The zero-argument launcher provisions, builds, and launches the intended product | partial | S001, S015 | G001 |
 | S013 | Vagrant Story is playable through the complete game | missing | S003, S004, S006, S009 | G001 |
 | S014 | Streaming CD/XA and audio behavior is owned beyond the verified intro path | partial | S003 | G001 |
-| S015 | The gameplay product executes authenticated guest images through psxport's dynarec-only runtime | missing | S001, S002 | G001 |
+| S015 | The gameplay product executes authenticated guest images through psxport's dynarec-only runtime | partial | S001, S002 | G001 |
 | S016 | Hosted CI truthfully distinguishes repository policy from native product support on Linux, Windows, macOS, and Android | partial | S015 | G001 |
 
 ## Current focus
 
-S015 is still the current focus, and it is still `missing` — but the reason has changed from "no run
-has happened" to a measured blocker. **The first authenticated run happened on 2026-09-28.** It
-reached its first presented host field and died there, on four sequential real defects: the product
-never installed its `GameRuntime`, its native-leaf table was registered from two boundaries, its
-`PlatformHlePlan` declared no stock libcd leaves, and its projection owner cross-checks the
-resident's display-area publication against BATTLE's viewport rectangle. Three are fixed at root
-cause; the fourth is named with its proper fix and deliberately not patched, because tolerating it
-would be a special case for the failing input.
+S015 is still the current focus and it is now **`partial` rather than `missing`**, because the number
+it was `missing` for has been measured. **On 2026-09-28 a run survived the boot's first host field
+and `fallback.calls` read 0**, with all thirteen per-reason counters printed and zero, beside
+nonzero and rising executor counters (44,855 then 58,663 executed instructions over 430 then 617
+translated blocks). That is the instrument having run and scanned, which is the distinction issue
+0041 could not reach: its `fallback_blocks=0` carried `executor_calls=0` and was therefore "the
+instrument never ran".
 
-`fallback.calls` is still not a number, and the reason is structural rather than incidental: the
-title's spine calls `DbgServer::service` AFTER `shell.step`, and the abort is inside `shell.step`, so
-the live `guest` reading cannot be taken before the product dies, and the run-end report needs a loop
-that ends. `docs/issues/0041` carries the evidence and the falsifiers; the one number the run does
-supply is a bound — the product prints `PSXPORT_LIGHTREC_FALLBACK_BLOCK_LIMIT = 1`, so at most one
-block per executor call could be interpreted, and no run printed the `threshold-exceeded` refusal
-that exceeding it would produce.
+**What that establishes, stated as separate clauses because they can fail separately.** The product
+executes the AUTHENTICATED guest image through Lightrec, and no guest block is interpreted. The
+title's boot is owned rather than merely executed: the projection owner's four resident leaves run
+again instead of replacing the guest's, and the boot's own display-area publication is measured
+through the guest's leaf — `8005E18C` reads `00E00140`, the halfword 320, beside BATTLE's rectangle
+at `8005DFD6` still reading zero. **What it does not establish is a single TITLE phase.** The run
+ends in field 1, so S004's splash, the intro movie and the Start-skip menu are all still
+unpresented, and no gameplay exists.
 
-The run also found that `tools/verify.py::verify_product_link` is a FALSE NEGATIVE: it reports `0 of
-3 interpreter entry points` while the same binary carries `lightrec_run_interpreter` and
-`lightrec_emit_jump_to_interpreter`. It is green because it asks about the retired interpreter rather
-than the one in the execution path, which is why S002's "no interpreter in the product" is not
-established by it and why no link check can answer `fallback.calls` in either direction.
+Fatal #4 is fixed at root cause, and the root cause was TWO halves of one thing rather than the wrong
+comparison: the owner was REPLACING four resident SDK leaves while its header claimed it observed
+them, and the cross-check named `0x8005DFD6`, which a reference census over all four provisioned
+modules shows the resident executable never writes. A publication's own horizontal extent is the word
+the leaf itself stores the stated width into, at `env + 4` of the struct the CALLER named. The frame
+that presented is the boot's first field and it is black — 0 of 71,680 pixels non-black, opened as an
+image — which is one step earlier than a splash and is not a title phase.
+
+**Fatal #3 PERSISTED, and the in-segment clock hypothesis is refuted by measurement.** The exit is
+still `budget-exhausted at 0x80020F28 after 564486 cycles` inside libcd's `CD_sync`, and the guest's
+VSync field counter at `0x80032114` advances exactly once per host field (1 before any field, 2 after
+field 0) and not at all across field 1's 564,486 cycles. The framework's own in-segment clock commit
+(`4a08ec55`, merged `5d4b3327`) landed while this work was in flight; the product was rebuilt against
+it and the exit is unchanged, so the `cpu-executor` claim is **not** a dependency of this defect.
+What it is instead: the completion byte `CD_sync` reads at `0x800324D8` has exactly ONE writer in
+the resident — `sb $v0, -0x1DB28($at)` at `0x80020D38`, inside the unnamed libcd command-state
+function between `CdDataSync` and `CD_sync` — and the boot never reaches it; and separately,
+`VagrantRuntime` declares no `guestCdStreamCallbackLayout`, so psxport's
+`cdReadyCallbackOwnedByGuestInterrupt()` is false and the framework's CD-ready-callback delivery to
+the guest's own interrupt path is not part of this title's contract. Measuring the slot
+`CdReadyCallback` writes is the next RE step, and it is title-side. `docs/issues/0042` carries the
+evidence and the falsifiers.
+
+The product-link finding from issue 0041 has been ACTED ON and is superseded: `verify_product_link`
+now reports both the retired symbols (`0 of 3`) and Lightrec's own per-block interpreter (`2 of 2 …
+PERMITTED`), and states that neither is a measurement of whether this title used one — that number
+is `fallback.calls` at run time. The check no longer goes green on a subject outside the execution
+path, and it no longer implies it can answer S015.
+
+**THE GATE IS GREEN, ALL 22 CONTRACTS, and `tools/verify.py` EXITS 0.** The row that was red while
+this was in flight is green now, and the reason is worth keeping because it is the documented cost of
+one shared framework tree rather than a defect in this port. The shared framework advanced twice
+under other agents (`5d4b3327`, then `6bb49c24`) while this work was running, so the build receipt
+named a commit the recorded pin did not, and `vagrant_psxport_pin_live` was correctly red about it.
+The first attempt to bump was also correctly REFUSED — the framework tree was dirty from another
+agent's uncommitted `docs/workspace/WORKSPACE.md`, and a receipt taken from a dirty tree does not
+say what the commit contains. Once that tree was clean the prescribed order was run end to end
+(`reconfigure -> build -> test -> --bump`) and the pin moved `b951d747 -> 6bb49c24` from the build's
+own receipt rather than from the framework's HEAD.
+
+**STYLE GATES, and these were red before this work and are green now.** `tools/verify.py` was exiting
+FAIL on the clang-tidy stage alone, with 56 clang-format violations and 13 clang-tidy findings, none
+of them in code this change wrote. Both are now **0 violations and 0 findings** across 75
+format-checked files and 38 compile-backed first-party translation units. The 13 were fixed at root
+cause and not suppressed: `ExecutionTelemetry::recordExecutableWrite`'s two adjacent `std::uint64_t`
+parameters became a named `WriteExtents` struct, `BattleProjectionOwner::readPublishedArea`'s
+`uint32_t`/`int32_t` pair became a named `DisplayAreaPublication` struct, the twelve
+`bugprone-unchecked-optional-access` findings became one checked `identityOf` helper and one checked
+`invokeLeaf` helper rather than twelve unchecked dereferences, and the escaping exception out of a
+test `main` is now caught at the boundary and names the failure.
 
 The coordinate product slot was HELD by a Spyro agent until 2026-09-29T12:00, which is why issue
-0040 shipped an adapter with no run. The run is now taken.
+0040 shipped an adapter with no run. The run is now taken. A later run found the slot's claim naming
+a CTR agent with a 2026-10-02 expiry; the conflict is recorded in `docs/info/claims/032` rather than
+edited, and every run was bounded, headless and checked against a live process list first.
 
 The preserved native route previously crossed TITLE `ClearImage`, `_diskReset`, all four menu-sound
 reads, TITLE.PRG, both publisher/developer loops, the complete save-check `gametimeUpdate` caller,
@@ -252,57 +299,63 @@ not verified.
 
 ### S015 — Dynarec-only gameplay execution
 
-**STILL `missing`, and the reason is now MEASURED rather than the absence of a run.** The first
-authenticated execution of SLUS_010.40 happened on 2026-09-28 (`docs/issues/0041`,
-`docs/info/claims/031`). It did not boot, and the cause was four defects in sequence, each of which
-the gate passed around. Three are fixed at root cause; the fourth is named with its proper fix and
-deliberately not patched. The boot now reaches its FIRST PRESENTED HOST FIELD, and `fallback.calls`
-is still not a number.
+**`partial`. Two of the item's clauses are established and the rest are not, and the split is the
+honest state rather than a rounding.** A run on 2026-09-28 survived the boot's first host field and
+read `fallback.calls = 0` over the live control surface, with all thirteen per-reason counters
+printed and zero, beside `executor_calls` 40 then 44, `translated_blocks` 430 then 617,
+`executed_blocks` 8,400 then 10,722 and `executed_instructions` 44,855 then 58,663
+(`docs/issues/0042`, `docs/info/claims/032`).
 
-What the run says, in the product's own words: the resident image authenticates and publishes
-(`authenticated resident image: … 337920 bytes, sha256 51dfdf15…, image 1/1`), the image-scoped
-native leaves install from one boundary (`1 allocator leaf + 4 measured projection publication
-leaves`), three platform services install (`3 direct-runtime hardware services installed`), the
-product enters its loop and binds the live control channel, and reaches
-`present image 960x720 (headless sink)` in its first field — where it stops.
+| clause | state | evidence |
+|---|---|---|
+| the product executes the AUTHENTICATED guest image through Lightrec | established | `authenticated resident image: … 337920 bytes, sha256 51dfdf15…, image 1/1`, then the counters above |
+| no guest block is interpreted | established | `fallback.calls=0` and every per-reason counter zero, beside nonzero executor counters — a SCANNED zero, not an absent tail |
+| the boot is OWNED, not merely executed | established | the four resident viewport leaves run again; `rw 8005E18C` reads `00E00140` (the halfword 320) beside BATTLE's rectangle at `8005DFD6` still zero |
+| a TITLE phase is reached | **missing** | the run ends in field 1, so the splash, the intro movie and the Start-skip menu are all unpresented |
+| the product is playable | **missing** | — |
 
-The four fatals, classified because a fault, a budget exit and a translation refusal are three
-different problems:
+**"The composition is correct and a frame presents" is not this item**, and the difference is the
+table above: a present is not a title phase, and a title phase is not gameplay. The one frame that
+presented is the boot's first field and it is black — 0 of 71,680 pixels non-black, opened as an
+image, and the same field's log carries `[gpu] display standard -> NTSC`, so the display area was
+published and nothing had been drawn into it.
 
-1. **refusal before any guest state** — the product constructed `Game` without installing its
-   `GameRuntime`, so `core.runtime` and `core.gameCtx` were both null. Fixed: the composition owner
-   installs a namespace-scope `VagrantRuntime` first, with the ordering and destruction order stated.
-2. **dispatcher refusal of a duplicate key** — `installResidentNativeOwners` ran from both
-   `loadResidentImage` and `Application::start`. Fixed: the publication boundary is the only call
-   site and it refuses the load itself on a partial registration.
-3. **BUDGET EXIT** — `resident call0 … budget-exhausted at 0x8002105C after 564502 cycles` inside
-   retail `CD_sync`, because no stock libcd leaf was declared. Fixed: `cdCommandAddress` /
-   `cdSyncAddress` are declared from the already-measured `game/cd/cd_facts.h`, with one-instruction
-   admission windows, and `vsyncQueryCounterAddress` from the already-measured `0x80032114`.
-4. **owner cross-check disagreement** — `SetDefDispEnv` publishes 320 wide while
-   `0x8005DFD6` holds 0. NOT PATCHED: `game/render/battle_projection_facts.h` itself records
-   `0x8005DFD4` as written by BATTLE's presenter, so the boot's display-area publication and BATTLE's
-   viewport rectangle are different words, and the owner's premise is wrong for this leaf. Tolerating
-   a zero rectangle would be a special case for the failing input.
+**Fatal #4, fixed at root cause, and the cause was TWO halves of ONE thing.** The projection owner
+was REPLACING four resident SDK leaves while its own header claimed it observed them — psxport
+consults a title's override before the original body, so `SetGeomOffset`, `SetGeomScreen`,
+`SetDefDrawEnv` and `SetDefDispEnv` never ran, and the guest's GTE geometry, display environment and
+draw environment were written by nothing in the product. And the cross-check named `0x8005DFD6`, a
+reference census over all four provisioned modules shows the resident executable never writes (the
+only stores anywhere are BATTLE's `func_800760CC` at 0x800761E0/E8/F0/0x80076200), so a 0 there means
+"no overlay publication has run yet", which is the ordinary state of the whole boot. Both are fixed:
+the GTE leaves perform their measured effect through psxport's public GTE primitive, the env leaves
+run the original guest body through psxport's own `psx::cpu::callOriginalToReturn`
+(`runtime/cpu/native_dispatch.h:96` — the framework's, not a second copy here) and then read the word
+the leaf filled, and the cross-check target is `env + 4` — a per-call address the CALLER names, which
+is why no title constant can be it. The test that would have caught the replacement seeds nothing
+and asserts CR24/CR25/CR26 and `projParams` all moved.
 
-**`fallback.calls` is UNMEASURED, and the distinction from zero is the point.** The run-end report is
-only reached when the `for (frame = 0;; ++frame)` loop ends, and the product aborts inside field 0;
-the live `guest` reading needs one serviced frame, and `DbgServer::service` runs AFTER `shell.step`
-in this title's spine. The only `fallback` lines this title has printed carry `executor_calls=0`,
-so they are "the instrument never ran" and not "scanned and found none". The bound that IS available:
-the product prints `PSXPORT_LIGHTREC_FALLBACK_BLOCK_LIMIT = 1`, so at most one block per executor
-call could be admitted, and exceeding it would print `threshold-exceeded` — which no run did. That is
-a bound, not the number.
+**Fatal #3 PERSISTED, and it is not the framework's in-segment clock.** The exit is still
+`budget-exhausted at 0x80020F28 after 564486 cycles` in libcd's `CD_sync`. The guest's VSync field
+counter at `0x80032114` advances once per host field and not at all inside one, and the framework's
+own in-segment clock commit (`4a08ec55` / `5d4b3327`) changed nothing when the product was rebuilt
+against it — so `cpu-executor` is NOT a dependency of this. The completion byte `CD_sync` reads at
+`0x800324D8` has exactly one writer in the resident, `sb $v0, -0x1DB28($at)` at `0x80020D38`, and the
+boot never reaches it; and `VagrantRuntime` declares no `guestCdStreamCallbackLayout`, so psxport's
+`cdReadyCallbackOwnedByGuestInterrupt()` is false and the framework's CD-ready delivery to the
+guest's own interrupt path is not this title's contract. Measuring the slot `CdReadyCallback` writes
+is the next RE step, and it is title-side.
 
-**`verify_product_link` is a false negative, found by the run.** It reports `0 of 3 interpreter entry
-points present` while `nm -C` on the same binary reports `lightrec_run_interpreter` (`0x722a30 T`)
-and `lightrec_emit_jump_to_interpreter` (`0x736940 T`). The three symbols it looks for belong to the
-interpreter psxport RETIRED; the one this product contains is Lightrec's own per-block interpreter,
-which is exactly what `fallback.calls` counts. S002's "no interpreter in the product" is therefore
-NOT established by that check, and no link check can answer `fallback.calls` in either direction.
+**`verify_product_link`'s false negative has been FIXED, and this paragraph supersedes the one below.**
+It now reports `0 of 3 retired-interpreter entry points` AND `2 of 2 Lightrec per-block interpreter
+entry points ARE linked … It is NOT a measurement of whether this title used one: that number is
+`fallback.calls` at run time`. The check no longer goes green on a subject outside the execution
+path, and it states that it cannot answer S015 in either direction. `fallback.calls` is the only
+possible answer, and it is now a number.
 
-What exists. `game/core/dynarec_dispatch.{h,cpp}` is the whole title/dynarec boundary in five
-operations — image-scoped install, finite call, bounded turn, original call, and a named fatal on a
+What exists. `game/core/dynarec_dispatch.{h,cpp}` is the whole title/dynarec boundary in six
+operations — image-scoped install, finite call, bounded turn, original call, the one
+bounded-resume-and-refuse rule every owner that re-enters its own leaf shares, and a named fatal on a
 call that did not return — and it is the only module in this repository that resolves an image
 identity, spells an `ExecutionBudget`, or chooses a dispatch form, so there is one answer to each
 rather than two. `game/core/native_owners.{h,cpp}` is the all-or-nothing registry of image-scoped
@@ -312,6 +365,13 @@ a one-call entry point, and the `vagrant_port` target went from `COMMAND false` 
 `add_executable`. `VagrantRuntime::platformHlePlan` binds the measured guest VSync `0x8001F6C4` with
 its measured field counter, plus the two measured stock libcd leaves, so a guest VSync is a named
 refusal rather than a hang and a title with no measured address is refused before boot.
+
+**The instruments are three tools, because the cap was right.** `tools/re_viewport.py` measures the
+BATTLE overlay publication and owns the shared MIPS-I field decoder and the SHA-bound image loaders;
+`tools/re_display_area.py` measures the RESIDENT display-area publication and which word is one
+horizontal extent; `tools/re_vsync_sites.py` censuses every `jal VSync` and the field count its
+argument holds. The decoder is imported, never copied, and `re_viewport.py` imports
+`re_display_area` at the point of use because the callee imports the caller.
 
 What is established, with denominators. `vagrant_dynarec_dispatch` passes 7 groups through the
 SHIPPING seam: a real translated block executes and returns the guest's own result register with

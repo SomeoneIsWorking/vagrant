@@ -45,11 +45,15 @@ those docs are not Lightrec gameplay evidence.
 
 ## Verification and inputs
 
-The adapter exists and the product builds and launches, but NO authenticated-overlay run has happened,
-so S015 is `missing` and every dependent item is still `missing`. Do not read the adapter's presence,
-a green gate, a boot log, or a clean trace as a run: `docs/issues/0040` separates the two explicitly.
-The workspace product slot is a single shared resource — check `$PSX/coord/claims/product-slot/claim.md`
-before any run, and never run a second product instance alongside another.
+AUTHENTICATED RUNS HAVE HAPPENED, and they are still not a title phase. On 2026-09-28 a run
+authenticated the resident image, executed it through Lightrec, and read `fallback.calls = 0` with
+every per-reason counter zero beside nonzero executor counters — so S015 is `partial` on the two
+clauses that establishes and `missing` on the rest. The run presents the BOOT's first field, which is
+black, and then ends in field 1 inside libcd's `CD_sync`. **A boot field, a logo, a menu, an FMV and
+a clean trace do not establish gameplay conformance**, and `docs/issues/0040` separates an adapter
+from a run while `docs/issues/0042` separates a boot field from a title phase. The workspace product
+slot is a single shared resource — check `$PSX/coord/claims/product-slot/claim.md` before any run,
+never edit another agent's claim, and never run a second product instance alongside another.
 
 The first migration discriminator is 1,000/1,000 host-owned TITLE fields from the exact image with
 nonzero Lightrec execution, a reached native CD override, reached resident and TITLE overrides,

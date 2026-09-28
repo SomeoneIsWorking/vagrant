@@ -30,6 +30,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <exception>
 #include <memory>
 #include <span>
 #include <string>
@@ -45,6 +46,32 @@ void require(bool condition, const char *subject, const char *message) {
   }
   ++g_failures;
   std::fprintf(stderr, "FAIL [%s] %s\n", subject, message);
+}
+
+// The image generation one COMPLETED load published, checked rather than assumed.
+//
+// Every caller below has already established that its load succeeded — each one calls `require` on
+// the result and returns early when it has not — and then dereferences `identity` anyway. That is
+// exactly the unchecked optional access `bugprone-unchecked-optional-access` refuses, and the
+// refusal is right: `loadResidentImage` returning success while publishing no generation is a real
+// state this repository has to be able to NAME, and an unchecked `.value()` on it is undefined
+// behaviour instead of a report. One helper, so the check exists once for all seven call sites
+// rather than seven times in seven slightly different spellings.
+psx::cpu::ImageIdentity identityOf(const psx::cpu::PsxExeLoadResult &loaded, const char *subject) {
+  if (!loaded.identity) {
+    std::fprintf(stderr, "FAIL [%s] a completed load published no image generation\n", subject);
+    ++g_failures;
+  }
+  return loaded.identity.value_or(psx::cpu::ImageIdentity{});
+}
+
+// A completed overlay load's generation, for the same reason.
+psx::cpu::ImageIdentity identityOf(const vagrant::OverlayLoadResult &loaded, const char *subject) {
+  if (!loaded.identity) {
+    std::fprintf(stderr, "FAIL [%s] a completed overlay load published no image generation\n", subject);
+    ++g_failures;
+  }
+  return loaded.identity.value_or(psx::cpu::ImageIdentity{});
 }
 
 void writeWord(std::vector<std::uint8_t> &bytes, std::size_t offset, std::uint32_t value) {
@@ -203,7 +230,7 @@ void refusesUnscopedAndStaleGenerations() {
   if (!loaded) {
     return;
   }
-  const psx::cpu::ImageIdentity resident = loaded.identity.value();
+  const psx::cpu::ImageIdentity resident = identityOf(loaded, "generation");
 
   // (b) A caller that names the wrong generation must be refused even though the address resolves.
   const auto wrongGeneration = psx::cpu::ImageIdentity{resident.id, resident.generation + 1u};
@@ -265,7 +292,7 @@ void originalCallReachesTheGuestBody() {
   if (!loaded) {
     return;
   }
-  const psx::cpu::ImageIdentity resident = loaded.identity.value();
+  const psx::cpu::ImageIdentity resident = identityOf(loaded, "original");
   constexpr std::uint32_t kLeaf = 0x80010100u;
   constexpr std::uint32_t kLeafResult = 0x11u ^ 0x5A5Au;
 
@@ -346,8 +373,8 @@ void telemetryDenominatorsClose() {
           "telemetry",
           "invocations past the census capacity were dropped without saying so");
 
-  telemetry.recordExecutableWrite(0x87800u, 0x87800u);
-  telemetry.recordExecutableWrite(0x100u, 0u);
+  telemetry.recordExecutableWrite({.bytes = 0x87800u, .overlappedBytes = 0x87800u});
+  telemetry.recordExecutableWrite({.bytes = 0x100u, .overlappedBytes = 0u});
   require(telemetry.executableWrites().candidates == 2u, "telemetry", "the write candidates were not counted");
   require(telemetry.executableWrites().residencyOverlaps == 1u,
           "telemetry",
@@ -389,7 +416,7 @@ void registersTheMeasuredHeapLeaf() {
   if (!loaded) {
     return;
   }
-  const psx::cpu::ImageIdentity resident = loaded.identity.value();
+  const psx::cpu::ImageIdentity resident = identityOf(loaded, "heap-leaf");
   require(vagrant::dynarec::hasNativeOverride(core, resident, vagrant::heap::kInitHeap),
           "heap-leaf",
           "vs_main_initHeap is not owned on the resident generation the load published");
@@ -414,7 +441,7 @@ void overlayReplacementRetiresThePriorGenerationsKeys() {
   if (!loaded) {
     return;
   }
-  const psx::cpu::ImageIdentity resident = loaded.identity.value();
+  const psx::cpu::ImageIdentity resident = identityOf(loaded, "overlay-retire");
   require(vagrant::dynarec::hasNativeOverride(core, resident, vagrant::heap::kInitHeap),
           "overlay-retire",
           "the resident heap leaf was not owned before the overlay load");
@@ -444,10 +471,10 @@ void overlayReplacementRetiresThePriorGenerationsKeys() {
   }
   constexpr std::uint32_t kOverlayEntry = vagrant::resident::kTitleOverlayBase;
   require(vagrant::dynarec::installNativeOverride(
-              core, kOverlayEntry, "TITLE-owned leaf", nativeLeaf, title.identity.value()),
+              core, kOverlayEntry, "TITLE-owned leaf", nativeLeaf, identityOf(title, "overlay-retire")),
           "overlay-retire",
           "a leaf scoped to the TITLE generation was refused");
-  require(vagrant::dynarec::hasNativeOverride(core, title.identity.value(), kOverlayEntry),
+  require(vagrant::dynarec::hasNativeOverride(core, identityOf(title, "overlay-retire"), kOverlayEntry),
           "overlay-retire",
           "the TITLE-scoped leaf is not reachable through its own generation");
 
@@ -456,10 +483,10 @@ void overlayReplacementRetiresThePriorGenerationsKeys() {
   if (!battle) {
     return;
   }
-  require(ownedBy(core, kOverlayEntry, battle.identity.value()),
+  require(ownedBy(core, kOverlayEntry, identityOf(battle, "overlay-retire")),
           "overlay-retire",
           "the BATTLE publication did not become the active generation at 0x80068800");
-  require(!vagrant::dynarec::hasNativeOverride(core, title.identity.value(), kOverlayEntry),
+  require(!vagrant::dynarec::hasNativeOverride(core, identityOf(title, "overlay-retire"), kOverlayEntry),
           "overlay-retire",
           "a TITLE-generation override survived the BATTLE publication that reused its address slot");
   require(vagrant::dynarec::hasNativeOverride(core, resident, vagrant::heap::kInitHeap),
@@ -468,9 +495,14 @@ void overlayReplacementRetiresThePriorGenerationsKeys() {
           "at 0x80062000 and the overlay base is 0x80068800, so those ranges are disjoint");
 }
 
-} // namespace
-
-int main() {
+// The cases, in one place, so `main` below is only a boundary.
+//
+// They are collected here rather than called from `main` directly because `main` must not let an
+// exception escape, and the seven of them build fixtures out of `std::vector` and `std::string` —
+// so the call chain can throw, and an escaping exception out of a test entry point is a
+// `std::terminate` that prints nothing about which of the seven groups was running. Here the
+// boundary can name the failure.
+void runEveryGroup() {
   executesRealGuestCode();
   reportsTypedExitOnBudgetExhaustion();
   refusesUnscopedAndStaleGenerations();
@@ -478,6 +510,20 @@ int main() {
   telemetryDenominatorsClose();
   registersTheMeasuredHeapLeaf();
   overlayReplacementRetiresThePriorGenerationsKeys();
+}
+
+} // namespace
+
+int main() {
+  try {
+    runEveryGroup();
+  } catch (const std::exception &error) {
+    std::fprintf(stderr, "dynarec dispatch contract: an exception escaped a group: %s\n", error.what());
+    return 1;
+  } catch (...) {
+    std::fprintf(stderr, "dynarec dispatch contract: a non-std exception escaped a group\n");
+    return 1;
+  }
   if (g_failures != 0) {
     std::fprintf(stderr, "dynarec dispatch contract: %d failure(s)\n", g_failures);
     return 1;

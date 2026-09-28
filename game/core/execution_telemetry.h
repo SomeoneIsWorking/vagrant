@@ -60,6 +60,18 @@ public:
     std::uint64_t overlapBytes = 0;
   };
 
+  // One executable-write report's two extents, as ONE value rather than two adjacent integers.
+  //
+  // This was `recordExecutableWrite(std::uint64_t bytes, std::uint64_t overlappedBytes)`, and two
+  // adjacent `std::uint64_t` parameters that mean "everything this write touched" and "the part of
+  // it that collided with a previous image" are the pair a caller gets backwards without noticing:
+  // the call still compiles, still runs, and reports a real-looking number. Naming the two roles
+  // makes the swap unrepresentable, which is the whole point of the type.
+  struct WriteExtents {
+    std::uint64_t bytes = 0;           // the whole normalized range the write made visible
+    std::uint64_t overlappedBytes = 0; // the subset that overlapped a PREVIOUS authenticated image
+  };
+
   struct OriginalCalls {
     std::uint64_t attempts = 0;
     std::uint64_t returned = 0;
@@ -80,7 +92,7 @@ public:
 
   void recordOverrideInstall(bool hadActiveImage, bool accepted);
   void recordOverrideHit(std::string_view name);
-  void recordExecutableWrite(std::uint64_t bytes, std::uint64_t overlappedBytes);
+  void recordExecutableWrite(WriteExtents extents);
   void recordOriginalCall(psx::cpu::ExecutionExitReason reason);
   void recordDispatch(psx::cpu::ExecutionExitReason reason);
 

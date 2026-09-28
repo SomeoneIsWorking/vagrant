@@ -135,30 +135,62 @@ inline constexpr std::uint32_t kBattleNearClipSetter = 0x8007CCCCu;
 // anything, and the owner must not claim otherwise.
 inline constexpr std::uint32_t kBattleNearClipConsumer = 0x80098160u;
 
-// Resident BSS words. Both are in the RESIDENT module (`config/SLUS_010.40/symbol_addrs.txt`), not in
-// an overlay, so both stay valid across a BATTLE load. kViewportRectWord is the first of four
-// adjacent shorts written as a rectangle in the order x, y, w, h.
+// The RESIDENT viewport rectangle. BOTH halves of this statement were measured on 2026-09-28 and the
+// second is the one the first run got wrong.
 //
-// THAT ORDER IS CONFIRMED FROM THE WORDS, and it is worth stating precisely because the owner
-// cross-checks two of them. The publication's four stores, read from BATTLE.PRG, are:
+// 0x8005DFD4..0x8005DFDA are four adjacent shorts written as a rectangle. BATTLE.PRG's publication
+// writes them, in the order x (0x8005DFD4), y (0x8005DFD8), w (0x8005DFD6), h (0x8005DFDA) — so the
+// STORE order is x, y, w, h while the ADDRESSES are x, w, y, h, and kViewportWidthWord and
+// kViewportHeightWord are +2 and +6 and NOT +4 and +6. A reader who assumed the store order equalled
+// the memory order would put the width 2 bytes off.
 //
-//     0x800761E0  sh $zero, 0x8005DFD4($v0)      ; x = 0
-//     0x800761E8  sh $zero, 0x8005DFD8($v0)      ; y = 0
-//     0x800761F0  sh $s2,   0x8005DFD6($v0)      ; w = the width argument
-//     0x80076200  sh $s3,   0x8005DFDA($v0)      ; h = height - 16
-//
-// all four through `lui $v0, 0x8006` plus a negative displacement, which `re_viewport.py` checks as
-// the SUM of page and offset rather than either half — this title names 0x8005DFD6 as
-// `lui 0x8006` + (-0x202A), so comparing the page alone would accept a page from a different word.
-// Note the store ORDER in the instruction stream is x, y, w, h but the ADDRESSES are x, w, y, h, so
-// kViewportWidthWord and kViewportHeightWord are +2 and +6 and NOT +4 and +6. A reader who assumed
-// the store order equalled the memory order would put the width 2 bytes off.
+// THESE ARE THE OVERLAY PUBLICATION'S RECTANGLE AND NOT THE BOOT'S, and `tools/re_viewport.py`
+// decides that from a reference census over all four provisioned modules: the resident executable
+// names NONE of the four halfwords, and the only stores anywhere are the overlay publication's own
+// four at 0x800761E0/0x800761E8/0x800761F0/0x80076200. So the word is still zero BSS while the
+// resident boot runs, and an owner that cross-checks a RESIDENT display-area publication against it
+// compares a live 320 against a word nothing has written. That is exactly the disagreement the first
+// run aborted on, and it is why these constants are BATTLE/ENDING state rather than a second
+// statement of whatever the boot just published.
 inline constexpr std::uint32_t kProjectionDistanceWord = 0x8005E248u;
 inline constexpr std::uint32_t kNearClipWord = 0x8005E0C8u;
 inline constexpr std::uint32_t kViewportRectWord = 0x8005DFD4u;
 // The width half of that rectangle, published by the same call that publishes the height.
 inline constexpr std::uint32_t kViewportWidthWord = kViewportRectWord + 2u;
 inline constexpr std::uint32_t kViewportHeightWord = kViewportRectWord + 6u;
+
+// THE WORD THAT IS A DISPLAY-AREA PUBLICATION'S OWN HORIZONTAL EXTENT, and it is not a constant.
+//
+// Both env leaves store the width the CALLER stated into the struct that caller named, at +4 of it,
+// and the height at +6. Read from the leaves' own words, by `re_viewport.py`:
+//
+//     0x8002B434  SetDefDispEnv  addu $v0, $a0, $zero ; lw  $v1, 16($sp)   ; the fifth argument
+//     0x8002B43C                 sh   $a1, 0($v0)     ; +0 x
+//     0x8002B440                 sh   $a2, 2($v0)     ; +2 y
+//     0x8002B444                 sh   $a3, 4($v0)     ; +4 w   <- the stated width
+//     0x8002B46C  (delay slot)   sh   $v1, 6($v0)     ; +6 h
+//
+//     0x8002B374  SetDefDrawEnv  addu $s1, $a0, $zero ; lw  $s2, 56($sp)  ; the fifth argument
+//     0x8002B3A4  (delay slot)   addu $s0, $a3, $zero
+//     0x8002B3B4                 sh   $s0, 4($s1)     ; +4 w   <- the stated width
+//     0x8002B3DC  (delay slot)   sh   $s2, 6($s1)     ; +6 h
+//
+// So the cross-check the owner owes is between the register the guest stated and the word the LEAF
+// stored it in, and the second of those is at `env + 4` for a per-call `env` the caller names. A
+// publication's own horizontal extent is therefore NOT a title constant, and writing one down as if
+// it were is what produced the abort.
+//
+// THE RESIDENT'S DISPLAY ENVIRONMENT, so the boot's per-call value is a number rather than a
+// derivation: `vs_main_dispEnv` is named 0x8005E188 by the decompilation's own
+// `config/SLUS_010.40/symbol_addrs.txt` (line 790) and is built in the resident body at 0x80042060
+// as `lui $s0, 0x8006` + `addiu $s0, $s0, -7800`, so the boot's width word is 0x8005E18C and its
+// height word 0x8005E18A. Those two are recorded for the boot's OWN publication, which `re_viewport`
+// confirms is `_initScreen` at 0x80042054 handing the leaf a width of 320 from its own `$a0`; they
+// are documentation of one caller, not the cross-check target, because the overlays publish through
+// their own copies of the same globals.
+inline constexpr std::uint32_t kResidentDispEnv = 0x8005E188u;
+inline constexpr std::uint32_t kLeafEnvWidthOffset = 4u;
+inline constexpr std::uint32_t kLeafEnvHeightOffset = 6u;
 
 // The GTE control-register numbers, named once so the meaning lives with the number.
 //
@@ -168,15 +200,23 @@ inline constexpr std::uint32_t kViewportHeightWord = kViewportRectWord + 6u;
 //
 //     0x80041540  sll  $a0, $a0, 16
 //     0x80041544  sll  $a1, $a1, 16
-//     0x80041548  mtc2/mfc2 $a0, CR24
-//     0x8004154C  mtc2/mfc2 $a1, CR25
+//     0x80041548  cop2 register move, CR24
+//     0x8004154C  cop2 register move, CR25
 //     0x80041550  jr $ra
-//     0x80041534  mtc2/mfc2 $a0, CR26
+//     0x80041534  cop2 register move, CR26
 //     0x80041538  jr $ra
 //
 // This is what psxport's `proj_params.h` already documents for libgte ("CR24 = ofx << 16;
 // CR25 = ofy << 16 and CR26 = h"), so the two independent sources agree — and the agreement is now
 // on the INSTRUCTIONS rather than on a reconstruction of them.
+//
+// THE TRANSFER DIRECTION IS DELIBERATELY NOT STATED HERE, and that is a correction rather than an
+// omission. `tools/re_viewport.py` used to name every one of these `mtc2` or `mfc2` from bit 25
+// alone, so it labelled a WRITE as a READ on every GTE register move it printed, and the previous
+// revision of this header hedged the same hedge (`mtc2/mfc2`) because the tool's label was not
+// trustworthy. Naming a direction needs the R3000A COP2 transfer encoding, which is a reference and
+// not a field extraction; the tool now reports the register number and the raw selector and names no
+// direction, which is what a field extractor can actually establish.
 inline constexpr std::uint32_t kGteControlOfx = 24u;
 inline constexpr std::uint32_t kGteControlOfy = 25u;
 inline constexpr std::uint32_t kGteControlH = 26u;

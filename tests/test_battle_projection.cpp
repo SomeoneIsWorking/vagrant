@@ -75,7 +75,11 @@ constexpr std::uint32_t kResidentHigh = 0x80070000u;
 constexpr std::int32_t kRetailWidth = 320;
 constexpr std::int32_t kRetailHeight = 224;
 constexpr std::int32_t kRetailCentreX = 160;
+constexpr std::int32_t kPresenterCentreY = 112;
 constexpr std::int32_t kRetailScreenDistance = 256;
+// The test double described at `Fixture`: the smallest finite body, `jr $ra` and its delay slot.
+constexpr std::uint32_t kReturnNow = 0x03E00008u;
+constexpr std::uint32_t kDelaySlot = 0x00000000u;
 
 // A Game carries a Core with two megabytes of guest RAM and the GTE register file the leaves write
 // through, so it is heap-allocated here: a `Game` by value in a test's frame is a stack overflow,
@@ -96,50 +100,75 @@ struct Fixture {
     if (activateImage) {
       resident = core.imageCatalog().activate(
           "synthetic SLUS_010.40 resident fixture", {kResidentLow & 0x1FFFFFFFu, (kResidentHigh & 0x1FFFFFFFu)}, 1u);
+      // A TEST DOUBLE for the two env leaves, and stated as one: the display-area owner RUNS THE
+      // ORIGINAL GUEST BODY and then reads the word the leaf filled, so it needs a body to run.
+      // There is no game image here, and the real 14-word body is not a fixture this repository may
+      // carry. What is staged is the smallest finite body that RETURNS — `jr $ra` and a delay slot —
+      // and the four halfwords the reader checks are staged by the test below, not produced here.
+      // So this double establishes that the original ran and the read happened afterwards; it does
+      // not assert what retail's leaf writes, which is `tools/re_viewport.py`'s claim instead.
+      for (std::uint32_t leaf : {facts::kSetDefDispEnv, facts::kSetDefDrawEnv}) {
+        core.mem_w32(leaf, kReturnNow);
+        core.mem_w32(leaf + 4, kDelaySlot);
+      }
     }
   }
 };
 
-// The three leaves' retail effects, applied through the framework's own setters so the coprocessor
-// and the per-Core record are moved the way a real leaf moves them. No value is written into the GTE
-// by hand, because a hand-written register would make the owner's read-back untestable.
+// The two GTE leaves are PERFORMED by the owner, so the fixture states only the arguments and the
+// assertions below read back the coprocessor and the port's own record. No value is written into the
+// GTE by hand, because a hand-written register would make the owner's read-back untestable — and,
+// more to the point, a pre-seeded register would pass even if the override never did the work,
+// which is the defect this test exists to catch.
 void stateCentre(Core &core, std::int32_t ofx, std::int32_t ofy) {
   core.r[4] = static_cast<std::uint32_t>(ofx);
   core.r[5] = static_cast<std::uint32_t>(ofy);
-  libgte_set_geom_offset(&core, ofx, ofy);
 }
 
 void stateScreenDistance(Core &core, std::int32_t h) {
   core.r[4] = static_cast<std::uint32_t>(h);
-  libgte_set_geom_screen(&core, h);
 }
 
-void stateDrawArea(Core &core, std::int32_t width) {
+// The display-area publication: the caller's `$a0` and `$a3`, plus what the leaf stores at +4/+6 of
+// the struct it was handed. The struct is the resident's own `vs_main_dispEnv` — the boot's
+// publication — so this fixture drives the publication the first run actually reached.
+void stateDisplayArea(Core &core, std::int32_t width, std::int32_t height) {
+  core.r[4] = facts::kResidentDispEnv;
   core.r[7] = static_cast<std::uint32_t>(width);
-  core.mem_w16(facts::kViewportRectWord, 0u);
-  core.mem_w16(facts::kViewportWidthWord, static_cast<std::uint16_t>(width));
-  core.mem_w16(facts::kViewportHeightWord, static_cast<std::uint16_t>(kRetailHeight));
+  core.mem_w16(facts::kResidentDispEnv + facts::kLeafEnvWidthOffset, static_cast<std::uint16_t>(width));
+  core.mem_w16(facts::kResidentDispEnv + facts::kLeafEnvHeightOffset, static_cast<std::uint16_t>(height));
 }
 
 // Drive the INSTALLED override body, not a copy of it. `NativeDispatcher::invoke` is the same entry
 // the guest dispatch path uses, so a change to the owner is exercised here without being restated.
+//
+// The image identity is CHECKED, not assumed: the three `run*` drivers below all need one, and
+// `bugprone-unchecked-optional-access` is right that dereferencing it unchecked is a latent
+// undefined read. The check names the leaf, because "the fixture did not activate an image" and
+// "the wrong leaf did not resolve" are different failures and a reader should be able to tell them
+// apart from the abort.
+void invokeLeaf(Core &core, std::uint32_t leaf, const char *what) {
+  const auto image = core.currentImageIdentity(leaf);
+  if (!image) {
+    std::fprintf(stderr, "FAIL [%s] 0x%08X resolves to no active image, so no override ran\n", what, leaf);
+    std::exit(1);
+  }
+  (void)core.nativeDispatcher().invoke({*image, leaf});
+}
+
 void runCentre(Fixture &fixture) {
-  stateCentre(fixture.core, kRetailCentreX, 112);
-  const auto image = fixture.core.currentImageIdentity(facts::kSetGeomOffset);
-  expect(image.has_value(), "the centre leaf must resolve to the activated resident image");
-  (void)fixture.core.nativeDispatcher().invoke({*image, facts::kSetGeomOffset});
+  stateCentre(fixture.core, kRetailCentreX, kPresenterCentreY);
+  invokeLeaf(fixture.core, facts::kSetGeomOffset, "centre");
 }
 
 void runScreenDistance(Fixture &fixture) {
   stateScreenDistance(fixture.core, kRetailScreenDistance);
-  const auto image = fixture.core.currentImageIdentity(facts::kSetGeomScreen);
-  (void)fixture.core.nativeDispatcher().invoke({*image, facts::kSetGeomScreen});
+  invokeLeaf(fixture.core, facts::kSetGeomScreen, "screen distance");
 }
 
-void runDrawArea(Fixture &fixture) {
-  stateDrawArea(fixture.core, kRetailWidth);
-  const auto image = fixture.core.currentImageIdentity(facts::kSetDefDrawEnv);
-  (void)fixture.core.nativeDispatcher().invoke({*image, facts::kSetDefDrawEnv});
+void runDisplayArea(Fixture &fixture) {
+  stateDisplayArea(fixture.core, kRetailWidth, kRetailHeight);
+  invokeLeaf(fixture.core, facts::kSetDefDispEnv, "display area");
 }
 
 vagrant::BattleProjectionPublication measure() {
@@ -148,7 +177,7 @@ vagrant::BattleProjectionPublication measure() {
          "installing the four measured leaves on a Core that published the resident image must succeed");
   runCentre(fixture);
   runScreenDistance(fixture);
-  runDrawArea(fixture);
+  runDisplayArea(fixture);
   // Through the owner's own checked downcast rather than a `static_cast` beside it: a test that
   // reaches the owner by a different route than production does is a test of a different code path.
   return vagrant::BattleProjectionOwner::from(fixture.core).retail();
@@ -168,7 +197,7 @@ GuestProjectionPlan planFor(PresentationAspect aspect) {
 }
 
 vagrant::BattleProjectionPublication completePublication() {
-  return {kRetailCentreX, 112, kRetailScreenDistance, kRetailWidth, kRetailHeight};
+  return {kRetailCentreX, kPresenterCentreY, kRetailScreenDistance, kRetailWidth, kRetailHeight};
 }
 
 // --- the refusals, one static body each so each can be forked in isolation --------------------------
@@ -209,6 +238,34 @@ void refusesUnusablePlan() {
   auto plan = planFor(PresentationAspect::Wide16x9);
   plan.guestDrawWidth = 0;
   (void)vagrant::BattleProjectionOwner::derive(completePublication(), plan);
+}
+
+// The display-area cross-check, refused on the SHIPPING READER. Same positive control as 7b — the
+// stated width is 320 and the height 224, and only the word the leaf stored is perturbed, to the
+// 256 that BATTLE's own `screen` rect literal uses — so a reader that ignored the word entirely
+// would survive this and fail 7b.
+void refusesDrawAreaDisagreement() {
+  Fixture fixture;
+  if (!vagrant::installBattleProjection(fixture.core, fixture.resident)) {
+    return;
+  }
+  stateDisplayArea(fixture.core, kRetailWidth, kRetailHeight);
+  fixture.core.mem_w16(facts::kResidentDispEnv + facts::kLeafEnvWidthOffset,
+                       static_cast<std::uint16_t>(facts::kPublicationScreenWidth));
+  invokeLeaf(fixture.core, facts::kSetDefDispEnv, "display-area disagreement");
+}
+
+// The same reader, handed a struct outside guest RAM. The word address is now DERIVED from the
+// caller's `$a0`, so this is a bound the reader owes and the old constant-address version could not
+// have needed.
+void refusesNonGuestRamArea() {
+  Fixture fixture;
+  if (!vagrant::installBattleProjection(fixture.core, fixture.resident)) {
+    return;
+  }
+  fixture.core.r[4] = 0x80200000u;
+  fixture.core.r[7] = static_cast<std::uint32_t>(kRetailWidth);
+  invokeLeaf(fixture.core, facts::kSetDefDispEnv, "display area outside guest RAM");
 }
 
 } // namespace
@@ -257,6 +314,9 @@ int main() {
   expect(diesOnSignal(refusesInconsistentClipEdge), "a clip right edge past the widened width must be refused");
   expect(diesOnSignal(refusesOffCentreWidening), "a widened centre that is not half the widened width must be refused");
   expect(diesOnSignal(refusesUnusablePlan), "a plan with no guest draw width must be refused");
+  expect(diesOnSignal(refusesDrawAreaDisagreement),
+         "a publication whose own width word disagrees with the stated width must be refused");
+  expect(diesOnSignal(refusesNonGuestRamArea), "a display area outside guest RAM must be refused rather than read");
 
   // 5. Registration refuses an address that resolves to no active image. A run must never be left
   //    half-registered, so this is checked with a Core that published nothing.
@@ -280,13 +340,80 @@ int main() {
   // 7. The guest-RAM bound, which the owner relies on and which a low-address-only fixture could
   //    never catch for itself.
   expect(vagrant::BattleProjectionOwner::isGuestRam(facts::kViewportRectWord),
-         "the resident viewport rectangle must be readable guest RAM");
+         "the overlay viewport rectangle must be readable guest RAM");
   expect(vagrant::BattleProjectionOwner::isGuestRam(facts::kProjectionDistanceWord),
          "the resident projection-distance word must be readable guest RAM");
   expect(!vagrant::BattleProjectionOwner::isGuestRam(0u), "a NULL address is never a valid record");
   expect(!vagrant::BattleProjectionOwner::isGuestRam(0x80200000u), "the first address past main RAM is not a record");
   expect(vagrant::BattleProjectionOwner::isGuestRam(0x80100000u),
          "an address inside the two megabytes of main RAM is a record");
+  expect(vagrant::BattleProjectionOwner::isGuestRam(facts::kResidentDispEnv + facts::kLeafEnvWidthOffset),
+         "the resident publication's own width word must be readable guest RAM");
+
+  // 7b. THE FIX, AS A POSITIVE TEST OF THE THING THAT WAS BROKEN. The first authenticated run
+  //     aborted comparing the boot's 320-wide publication against BATTLE's rectangle, which is
+  //     still zero BSS while the resident runs. So the same publication is driven again with that
+  //     rectangle left at zero — and the owner must SURVIVE it, which it could not before. The
+  //     widths below are the boot's own: `re_viewport.py` reads them out of `_initScreen` at
+  //     0x80042054 and the single call site at 0x800420F0, so this is the boot and not a convenient
+  //     number.
+  {
+    Fixture boot;
+    expect(vagrant::installBattleProjection(boot.core, boot.resident),
+           "the projection owner must install on the fixture that replays the boot publication");
+    expect(boot.core.mem_r16s(facts::kViewportWidthWord) == 0,
+           "the overlay rectangle must be left at zero in this fixture, or it proves nothing");
+    runCentre(boot);
+    runScreenDistance(boot);
+    runDisplayArea(boot);
+    const auto &owner = vagrant::BattleProjectionOwner::from(boot.core);
+    expect(owner.retail().drawWidth == 320 && owner.retail().drawHeight == 224,
+           "the boot's 320x224 publication must be measured while the overlay rectangle holds zero");
+    expect(boot.core.mem_r16s(facts::kViewportWidthWord) == 0,
+           "reading the publication must not have written the overlay rectangle");
+  }
+
+  // 7c. THE REFUSAL IS STILL A REFUSAL, observed in the refusals section below as
+  //     `refusesDrawAreaDisagreement`. A cross-check that stopped disagreeing is a cross-check that
+  //     stopped checking, so the negative case has to be on the shipping reader: the guest states
+  //     320 and the word the leaf stored is 256. The BATTLE publication installs exactly that pair —
+  //     its `screen` rect literal is 256 — so this is a value the title really does produce.
+
+  // 7d. THE OWNER PERFORMS THE GTE LEAVES RATHER THAN OBSERVING A FIELD NOBODY WROTE. Before this
+  //     change the four overrides REPLACED all four resident leaves, so the guest's GTE geometry and
+  //     its display area were never written by anything; a pre-seeded register would have hidden
+  //     that, so the fixture seeds NOTHING and the assertion reads both destinations back. This is
+  //     the test that would have failed against the previous owner.
+  {
+    Fixture gte;
+    expect(vagrant::installBattleProjection(gte.core, gte.resident),
+           "the GTE fixture must install the same four leaves");
+    // The centre leaf alone, so the argument-register assertion below is not confused by the screen
+    // distance leaf that shares `$a0` and legitimately leaves it unshifted.
+    runCentre(gte);
+    expect(gte_read_ctrl(facts::kGteControlOfx) == (static_cast<std::uint32_t>(kRetailCentreX) << 16),
+           "SetGeomOffset must have moved CR24 itself, not merely recorded an argument");
+    expect(gte_read_ctrl(facts::kGteControlOfy) == (static_cast<std::uint32_t>(kPresenterCentreY) << 16),
+           "SetGeomOffset must have moved CR25 itself");
+    expect(gte.core.rsub.projParams.geomOfx() == static_cast<float>(kRetailCentreX) &&
+               gte.core.rsub.projParams.geomOfy() == static_cast<float>(kPresenterCentreY),
+           "the port's own projection record must move with the coprocessor, which is what makes the "
+           "centre cross-check two statements rather than one");
+    // And the leaf's own side effect on its argument registers, read from the leaf's two `sll`
+    // words at 0x80041540. A widening is only idempotent if the owner never leaves a shifted value
+    // where retail left an unshifted one.
+    expect(gte.core.r[4] == (static_cast<std::uint32_t>(kRetailCentreX) << 16) &&
+               gte.core.r[5] == (static_cast<std::uint32_t>(kPresenterCentreY) << 16),
+           "SetGeomOffset must leave its arguments shifted into place, as its own body does");
+    runScreenDistance(gte);
+    expect(gte_read_ctrl(facts::kGteControlH) == static_cast<std::uint32_t>(kRetailScreenDistance),
+           "SetGeomScreen must have moved CR26 itself");
+    expect(gte.core.rsub.projParams.geomH() == static_cast<float>(kRetailScreenDistance),
+           "SetGeomScreen must move the port's own record of H with the coprocessor");
+    expect(gte.core.r[4] == static_cast<std::uint32_t>(kRetailScreenDistance),
+           "SetGeomScreen must leave its argument unshifted: its body is one register move and no "
+           "shift, so an owner that shifted it would be substituting behaviour");
+  }
 
   // 8. The projection distance is never widened, and the thresholds that make that necessary are
   //    named constants rather than comments. This is the state hazard, asserted as a fact about the
@@ -360,9 +487,9 @@ int main() {
     std::fprintf(stderr, "battle projection contract: %d failure(s)\n", failures);
     return 1;
   }
-  std::printf("battle projection contract: retail publication %dx%d at (%d,%d) H %d measured; 4:3 identity "
-              "and the 428 px 16:9 derivation both accepted; 6 derivation refusals and 2 registration "
-              "refusals observed to fire\n",
+  std::printf("battle projection contract: retail publication %dx%d at (%d,%d) H %d measured; the GTE "
+              "leaves moved CR24/CR25/CR26 themselves; 4:3 identity and the 428 px 16:9 derivation both "
+              "accepted; 6 derivation, 2 display-area and 2 registration refusals observed to fire\n",
               publication.drawWidth,
               publication.drawHeight,
               publication.centreX,

@@ -129,6 +129,29 @@ if(BUILD_TESTING)
   add_test(NAME vagrant_viewport_bytes
            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_viewport.py")
 
+  # THE VSync(n) CALL-SITE CENSUS, split out of re_viewport.py because it answers a different
+  # question of the same image: what EVERY call site passes to one library routine, rather than what
+  # ONE publication does. Same provisioning rule — both halves REFUSE (exit 2) without the images,
+  # because a census that cannot see the image must say "not measured" and never print a zero. The
+  # selftest is registered first and must be green wherever the gate runs.
+  add_test(NAME vagrant_vsync_sites_selftest
+           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_vsync_sites.py"
+                   --selftest)
+  add_test(NAME vagrant_vsync_sites
+           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_vsync_sites.py")
+
+  # THE RESIDENT'S DISPLAY-AREA PUBLICATION, and the word that IS one horizontal extent. Split out of
+  # re_viewport.py because it is a different PUBLICATION: that tool measures BATTLE's overlay
+  # publication, this one the boot's, and the first authenticated run of this title died because a
+  # check written for the first was asked about the second (docs/issues/0042). The shared MIPS decoder
+  # and the SHA-bound image loaders are imported, not copied, so the two agree on what an instruction
+  # word means. Same provisioning rule: both halves REFUSE without the images.
+  add_test(NAME vagrant_display_area_selftest
+           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_display_area.py"
+                   --selftest)
+  add_test(NAME vagrant_display_area
+           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_display_area.py")
+
   # The field-cadence census. It answers whether this 30 fps-title presents 30 or 60 fps, which
   # is what decides whether an interpolated 60 fps path is IN scope for it. Both the selftest
   # and the census need the provisioned images and all three overlays, so both REFUSE (exit 2)

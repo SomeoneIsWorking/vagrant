@@ -1,8 +1,18 @@
 #!/usr/bin/env python3
-"""MEASURE Vagrant Story's guest viewport publication, and the VSync argument census, FROM BYTES.
+"""MEASURE Vagrant Story's guest viewport publication, FROM BYTES.
 
-  python3 tools/re_viewport.py                  # the claim table + the census
+  python3 tools/re_viewport.py                  # the claim table
   python3 tools/re_viewport.py --selftest       # every check fed a case that MUST answer the other way
+
+ONE PUBLICATION, ONE TABLE. This tool answers "what does the guest's own viewport publication do, and
+which words are its own extent". The companion `tools/re_vsync_sites.py` answers a different question
+of the same image — what EVERY call site passes to one library routine — and was split out of this
+file rather than left in it: the two have different evidence shapes (settled instruction words versus
+resolved register values) and different failure modes (a wrong address versus a propagation that
+cannot cross a branch), and the structure verifier's 1200-line cap exists because a file holding two
+responsibilities is a file whose halves stop agreeing. The shared MIPS-I field extractor and the
+SHA-bound image loaders are imported by that tool rather than copied, because a second ISA decoder is
+a second set of answers about the same words.
 
 WHY THIS TOOL EXISTS, AND WHAT IT REPLACES. `tools/re_projection.py` censuses the vendored
 CC0 `external/rood-reverse` DECOMPILATION, so it runs with no game image and it says so on every
@@ -27,8 +37,8 @@ WHAT IT DOES NOT ANSWER, AND SAYS SO ON EVERY RUN.
     provisioned overlays it covered. A missing image is a REFUSAL, never a zero.
   * A "no site" answer is "no site in the scanned words of the named modules", with the scanned
     instruction count attached. It is never "the guest has no such site".
-  * The VSync census reports the ARGUMENT AT EACH CALL SITE, and separates the ones its backward
-    constant propagation could resolve from the ones it could not. It does not report a frame rate.
+  * It reports no frame rate, and it reports no call-site argument census: that is
+    `tools/re_vsync_sites.py`, and a field count is not a rate either.
 """
 
 from __future__ import annotations
@@ -39,6 +49,7 @@ import os
 import re
 import struct
 import sys
+
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOD_CONFIG = os.path.join(ROOT, "external", "rood-reverse", "config")
@@ -84,6 +95,18 @@ LEAF_SET_GEOM_OFFSET = 0x80041540
 LEAF_SET_DEF_DRAW_ENV = 0x8002B374
 LEAF_SET_DEF_DISP_ENV = 0x8002B434
 VSYNC = 0x8001F6C4
+
+# THE RESIDENT'S OWN DISPLAY-AREA PUBLICATION, and the two words inside it that carry one horizontal
+# extent. `vs_main_dispEnv` is named 0x8005E188 by the decompilation's own `symbol_addrs.txt` for
+# SLUS_010.40 (line 790); here it is read out of the resident's body instead, because a name is not a
+# measurement and the address is the one the owner's refusal is about.
+RESIDENT_INIT_SCREEN = 0x80042054      # `_initScreen`, the resident's only display-area publication
+RESIDENT_DISP_ENV_PAGE = 0x8006        # the `lui` half of `vs_main_dispEnv`
+RESIDENT_DISP_ENV_DISPLACEMENT = -7800  # 0x80060000 - 7800 == 0x8005E188
+# The two env leaves store the stated width and height at +4 and +6 of the struct the CALLER handed
+# them, so a publication's OWN horizontal extent is at `env + 4` — a per-call address, not a constant.
+LEAF_ENV_WIDTH_OFFSET = 4
+LEAF_ENV_HEIGHT_OFFSET = 6
 
 THRESHOLD_LOW = 0x110                  # 272, compared with slti
 THRESHOLD_HIGH = 0x111                  # 273, the `> 272` spelling
@@ -198,10 +221,18 @@ def decode(word: int):
     elif shape == "rd_rs_rt":
         args = (REG_NAMES[rd], REG_NAMES[rs], REG_NAMES[rt])
     elif shape == "cop2":
-        # The PSX coprocessor move. Bit 25 is the MTC2/MFC2 selector; `cr` is the register number the
-        # projection cross-checks read back, so it is the field those checks depend on.
-        return {"mnemonic": "mtc2" if ((word >> 25) & 1) else "mfc2", "args": (REG_NAMES[rt], rd),
-                "cr": rd, "to_coproc": (word >> 25) & 1, **fields}
+        # A PSX coprocessor register move. `cr` is the coprocessor register number, which every GTE
+        # transfer encoding carries in the `rd` field, and it is the field the projection cross-check
+        # reads back — so it is reported from the word.
+        #
+        # THE DIRECTION IS NOT DECODED, and a previous revision of this file got that wrong in a way
+        # that could not fail: it named EVERY one of these `mfc2` or `mtc2` from bit 25 alone, so a
+        # reader saw a direction the extractor never measured. Naming one needs the R3000A COP2
+        # transfer encoding, which is a reference, not a field. So the name here is neutral, and
+        # `cop2sel` carries the raw five-bit selector bits 25..21 so the missing decision stays
+        # visible instead of becoming a confident label.
+        return {"mnemonic": "cop2reg", "args": (REG_NAMES[rt], rd), "cr": rd,
+                "cop2sel": (word >> 21) & 0x1F, **fields}
     else:
         return None
     return {"mnemonic": name, "args": args, **fields}
@@ -314,7 +345,7 @@ class ExeSet:
             (LEAF_SET_DEF_DRAW_ENV, "SetDefDrawEnv", "addiu"),
             (LEAF_SET_DEF_DISP_ENV, "SetDefDispEnv", "lw"),
             (VSYNC, "VSync", "lui"),
-            (LEAF_SET_GEOM_SCREEN, "SetGeomScreen", "mfc2"),
+            (LEAF_SET_GEOM_SCREEN, "SetGeomScreen", "cop2reg"),
             (LEAF_SET_GEOM_OFFSET, "SetGeomOffset", "sll"),
             (0x80042054, "resident viewport publication", "addiu"),
             (0x8004261C, "vs_main_gametimeUpdate", "addiu"),
@@ -408,6 +439,17 @@ def _ends_in_jr_ra(img, va, span=10):
         if d and d.get("mnemonic") == "jr" and d.get("rs") == 31:
             return True
     return False
+
+
+# Every `sh` at one struct offset inside one leaf's own words. A SCAN and not an address, so the
+# caller cannot point a claim at a neighbouring instruction — the failure this exists to prevent.
+# `window` is a byte count from the leaf's entry, and the caller prints it as the denominator, so a
+# leaf whose scan finds nothing reports "0 of N" rather than an absence with no size.
+def _leaf_sh_stores(img, leaf, window, struct_offset):
+    for a in range(leaf, leaf + window, 4):
+        d = img.insn(a)
+        if d and d.get("mnemonic") == "sh" and d.get("imm") == struct_offset:
+            yield a
 
 
 def verify(bat, exe, overlays, out=print):
@@ -550,12 +592,11 @@ def verify(bat, exe, overlays, out=print):
             (LEAF_SET_GEOM_OFFSET, "SetGeomOffset 0x80041540", (24, 25), 6),
             (LEAF_SET_GEOM_SCREEN, "SetGeomScreen 0x80041534", (26,), 3)):
         ins = [exe.insn(va + 4 * i) for i in range(span)]
-        crs = [i["cr"] for i in ins if i and i.get("mnemonic") in ("mtc2", "mfc2")]
+        crs = [i["cr"] for i in ins if i and i.get("mnemonic") == "cop2reg"]
         shifts = [i for i in ins if i and i.get("mnemonic") == "sll" and i.get("sa") == 16]
         ok = tuple(crs) == must_cop2 and _ends_in_jr_ra(exe, va, span)
         claims.append(Claim(
-            "%s is a leaf that writes GTE CR%s and nothing else"
-            % (name, "/CR".join(str(c) for c in must_cop2)),
+            "%s is a leaf that names GTE CR%s and nothing else" % (name, "/CR".join(str(c) for c in must_cop2)),
             "CONFIRMED" if ok else "REFUTED",
             _cite(exe, va, span) +
             ["      coprocessor registers named, in order: %s ; <<16 argument shifts: %d"
@@ -573,10 +614,11 @@ def verify(bat, exe, overlays, out=print):
     # the two register-number questions the owner's read-back depends on
     crs_offset = [exe.insn(LEAF_SET_GEOM_OFFSET + 4 * i) for i in range(6)]
     crs_screen = [exe.insn(LEAF_SET_GEOM_SCREEN + 4 * i) for i in range(3)]
-    got = [i["cr"] for i in crs_offset if i and i.get("mnemonic") in ("mtc2", "mfc2")]
-    got += [i["cr"] for i in crs_screen if i and i.get("mnemonic") in ("mtc2", "mfc2")]
+    got = [i["cr"] for i in crs_offset if i and i.get("mnemonic") == "cop2reg"]
+    got += [i["cr"] for i in crs_screen if i and i.get("mnemonic") == "cop2reg"]
     claims.append(Claim(
-        "kGteControlOfx/Ofy/H = 24/25/26 name the registers the two leaves actually touch",
+        "kGteControlOfx/Ofy/H = 24/25/26 name the registers the two leaves actually touch "
+        "(the transfer DIRECTION is not decoded by this tool, and is not claimed here)",
         "CONFIRMED" if got == [GTE_CR_OFX, GTE_CR_OFY, GTE_CR_H] else "REFUTED",
         _cite(exe, LEAF_SET_GEOM_SCREEN, 3) + _cite(exe, LEAF_SET_GEOM_OFFSET, 6) +
         ["      registers named, in call order: %s" % got]))
@@ -610,6 +652,17 @@ def verify(bat, exe, overlays, out=print):
         "CONFIRMED" if (12 in zeros and 14 in zeros) else "REFUTED",
         ["      DRAWENV offsets SetDefDrawEnv zero-fills: %s" % zeros] +
         _cite(bat, 0x80076204, 9)))
+
+    # --- 3b. THE RESIDENT DISPLAY AREA IS NOT MEASURED HERE --------------------------------------
+    #
+    # It is `tools/re_display_area.py`, and it is a SEPARATE TOOL rather than a section of this one
+    # because the two measure different subjects and the first run of this title is what made that
+    # visible: this file measures BATTLE's projection publication, that one measures the RESIDENT
+    # boot's display-area publication, and an owner installed on their shared `SetDefDispEnv` leaf
+    # cross-checked one against the other's rectangle. Each has its own constants and its own
+    # selftest; there is deliberately no call between them, because a check that is only a valid
+    # second statement of one horizontal extent for ONE of two publications is the defect they
+    # exist to keep apart.
 
     # --- 4. the presenter ---------------------------------------------------------------------------
     lit_x = bat.insn(0x800762E0)
@@ -693,16 +746,11 @@ def verify(bat, exe, overlays, out=print):
         ["      height (0x8005DFDA) readers: %s" % ", ".join(sym(a) for a in height_readers)] +
         _cite(bat, 0x800BB8FC, 9)))
 
-    # --- 7. the VSync rate question -------------------------------------------------------------------
-    mods = [("SLUS_010.40", exe, exe.t_addr, exe.t_addr + exe.t_size),
-            ("BATTLE.PRG", bat, bat.base, bat.base + bat.file_end)]
-    for key in ("TITLE.PRG", "INITBTL.PRG"):
-        img = overlays.get(key)
-        if img is not None:
-            mods.append((key, img, img.base, img.base + img.file_end))
-    census = vsync_census(mods)
-    census["modules"] = [(m[0], m[3] - m[2]) for m in mods]
-    return claims, census
+    # The VSync(n) call-site census lives in `tools/re_vsync_sites.py`: it asks a different question
+    # of the same image — what EVERY call site passes to one library routine, rather than what ONE
+    # publication does — and the two have different evidence shapes and different failure modes.
+    # `docs/issues/0042` records the split.
+    return claims
 
 
 def _args_320_240_H(img, site, window=12):
@@ -757,14 +805,30 @@ def _args_320_240_H(img, site, window=12):
     return (a0 == 320 and a1 == 240 and a2_reads_H and zero(7) and sorted(set(stack_zero)) == [0x10, 0x14])
 
 
-def _lui_field_readers(img, target, window=0x44):
-    """Every instruction that READS `target` as `lui $r, page` + a signed displacement.
+# The load/store opcodes that name a main-RAM address through a register, and whether each one READS
+# or WRITES it. Anything else is not an access this census claims to have seen.
+MEMORY_ACCESS = {
+    0x20: "lb", 0x21: "lh", 0x23: "lw", 0x24: "lbu", 0x25: "lhu", 0x1C: "lwl", 0x26: "lwr",
+    0x28: "sb", 0x29: "sh", 0x2B: "sw", 0x2A: "swl", 0x2E: "swr",
+}
 
-    The page is not compared on its own: this title names 0x8005DFD6 as `lui 0x8006` + (-0x202A), so
-    matching either half alone would accept a page or a displacement borrowed from a different word.
-    The SUM is the test, and only read opcodes count, so a store does not answer a reader census.
+
+def _lui_field_refs(img, targets, window=0x44):
+    """Every instruction that NAMES one of `targets` as `lui $r, page` + a signed displacement.
+
+    `targets` is a SET of guest addresses, because the question this answers is about a RECTANGLE
+    rather than one word. The page is not compared on its own: this title names 0x8005DFD6 as
+    `lui 0x8006` + (-0x202A), so matching either half alone would accept a page or a displacement
+    borrowed from a different word. The SUM is the test, and each instruction is reported ONCE however
+    many `lui`s in the window produce the same page — a census that counted pairs would report one
+    store three times, which is how a "three writers" reading appears where there is one.
+
+    `window` is a BYTE COUNT, not an end address. Returns (address, mnemonic, word) for every load and
+    store, so a caller states its own read/write rule rather than this function quietly answering the
+    narrower question.
     """
-    out = []
+    wanted = set(targets)
+    seen = {}
     lo = img.base
     hi = img.base + (img.file_end - img.file_start)
     for va, w in img.words(lo, hi):
@@ -775,108 +839,26 @@ def _lui_field_readers(img, target, window=0x44):
         for a, w2 in img.words(va + 4, min(va + window, hi)):
             if ((w2 >> 21) & 0x1F) != reg:
                 continue
-            op2 = w2 >> 26
-            if op2 not in (0x23, 0x25, 0x21, 0x24, 0x20):     # lw / lhu / lh / lbu / lb
+            kind = MEMORY_ACCESS.get(w2 >> 26)
+            if kind is None:
                 continue
             imm = w2 & 0xFFFF
             simm = imm - 0x10000 if imm & 0x8000 else imm
-            if page + simm == target:
-                out.append(a)
+            if (page + simm) in wanted:
+                seen[a] = (a, kind, w2)
                 break
-    return out
+    return [seen[a] for a in sorted(seen)]
 
 
-# --- the VSync census -------------------------------------------------------------------------------
-
-def _a0_backward(img, site, window=40):
-    """The value $a0 holds at a call site, by backward constant propagation, or None.
-
-    THE RULE, and it is one rule: walk backward and answer from the NEAREST definition of $a0. Any
-    earlier definition is irrelevant, because it executed before that one. Two things follow that an
-    earlier revision of this file got wrong, and both produced confident wrong answers rather than
-    absent ones:
-
-      * A SPECIAL instruction's destination is `rd`, not `rt`. Reading `rt` as the destination made
-        every `move $sX, $a0` erase the value the scan had just established two instructions later,
-        and 43 of 57 sites came back UNRESOLVED while a handful came back wrong.
-      * The walk must NOT keep going after it has the answer, and must NOT discard an answer because
-        an earlier instruction overwrote the register. The call's own delay slot executes BEFORE the
-        callee, so it is the nearest definition and it wins; two of this title's sites put the
-        argument there.
-
-    A word this decoder does not cover counts as a definition of both candidate destination
-    registers, because skipping it would let a value survive a write the tool could not see.
-    """
-    env = {}
-    order = [site + 4] + [site - 4 * i for i in range(1, window + 1)]
-    for a in order:
-        w = img.word(a)
-        if w is None:
-            return None
-        op = (w >> 26) & 0x3F
-        rs = (w >> 21) & 0x1F
-        rt = (w >> 16) & 0x1F
-        rd = (w >> 11) & 0x1F
-        sa = (w >> 6) & 0x1F
-        funct = w & 0x3F
-        imm = w & 0xFFFF
-        simm = imm - 0x10000 if imm & 0x8000 else imm
-
-        if op in (0x02, 0x03, 0x04, 0x05, 0x06, 0x07) or (op == 0x00 and funct in (8, 9)):
-            return env.get("$a0")            # the straight-line segment ends here
-        if w == 0:
-            continue
-
-        if op == 0x00:
-            if funct in (0, 2, 3) and sa:
-                v = env.get(REG_NAMES[rt])
-                env[REG_NAMES[rd]] = None if v is None else (
-                    (v << sa) if funct == 0 else (v >> sa))
-            elif funct in (0x21, 0x23, 0x25, 0x24, 0x26, 0x27):
-                lv, rv = env.get(REG_NAMES[rs]), env.get(REG_NAMES[rt])
-                if rs == 0:
-                    env[REG_NAMES[rd]] = rv
-                elif rt == 0:
-                    env[REG_NAMES[rd]] = lv
-                else:
-                    env[REG_NAMES[rd]] = None
-            else:
-                env[REG_NAMES[rd]] = None
-            if REG_NAMES[rd] == "$a0":
-                return env["$a0"]
-            continue
-
-        if op in (0x2B, 0x28, 0x29, 0x2A, 0x2E, 0x2F):        # a store writes no register
-            continue
-        if op in (0x09, 0x0D):
-            env[REG_NAMES[rt]] = simm if op == 0x09 else imm if rs == 0 else None
-        elif op in (0x23, 0x24, 0x25, 0x21, 0x20, 0x1C, 0x26):
-            env[REG_NAMES[rt]] = None
-        else:
-            env[REG_NAMES[rt]] = None
-            env[REG_NAMES[rd]] = None
-        if REG_NAMES[rt] == "$a0":
-            return env["$a0"]
-    return env.get("$a0")
-
-
-def vsync_census(modules):
-    """Every `jal VSync(0x8001F6C4)` site and the field count its argument register holds."""
-    rows = []
-    scanned = 0
-    for name, img, lo, hi in modules:
-        n = 0
-        for va, w in img.words(lo, hi):
-            n += 1
-            if target_of(w, va) == VSYNC:
-                rows.append((name, va, _a0_backward(img, va)))
-        scanned += n
-    return {"rows": rows, "scanned": scanned}
+def _lui_field_readers(img, target, window=0x44):
+    """Every instruction that READS `target`. Read opcodes only, so a store cannot answer a
+    reader census; see `_lui_field_refs` for the sum rule this filters."""
+    return [a for a, kind, _w in _lui_field_refs(img, {target}, window) if kind.startswith("l")]
 
 
 # --- reporting ---------------------------------------------------------------------------------------
 
-def report_verify(claims, census, exe, out=print):
+def report_verify(claims, out=print):
     out("=" * 100)
     out("VAGRANT STORY — GUEST VIEWPORT PUBLICATION, VERIFIED AGAINST BYTES")
     out("Every address below was decoded from the image this tool SHA-1-checked. CONFIRMED means the")
@@ -888,80 +870,40 @@ def report_verify(claims, census, exe, out=print):
         for line in c.words:
             out(line)
     out("")
+    out("  THE VSync(n) CALL-SITE CENSUS IS `tools/re_vsync_sites.py`: a different question of the same")
+    out("  image, with its own scanned-word count for every module it read.")
     out("=" * 100)
-    out("VSync(n) ARGUMENT CENSUS  —  a FIELD COUNT, and a field count is not a frame rate")
-    out("=" * 100)
-    rows = census["rows"]
-    hist = {}
-    per = {}
-    for name, va, val in rows:
-        key = val if val is not None else "unresolved"
-        hist[key] = hist.get(key, 0) + 1
-        per.setdefault(name, {})
-        per[name][key] = per[name].get(key, 0) + 1
-    unresolved = sum(1 for _n, _v, val in rows if val is None)
+def mutated_exe(real, image):
+    """An `ExeSet` over a MUTATED copy of the resident image, for a claim that must be able to flip.
 
-    out("  modules scanned, and how much of each: %s"
-        % ", ".join("%s %d words" % (n, c) for n, c in census.get("modules", [])))
-    out("  VSync(0x%08X) call sites:            %d" % (VSYNC, len(rows)))
-    out("  instruction words scanned:          %d" % census["scanned"])
-    out("  argument resolved by propagation:    %d" % (len(rows) - unresolved))
-    out("  UNRESOLVED (argument from memory or a register): %d — listed below, not hidden"
-        % unresolved)
-    out("")
-    out("  argument -> site count, ALL modules")
-    for k in sorted(hist, key=lambda x: (x == "unresolved", x)):
-        out("    a0 = %-12s %d" % (k, hist[k]))
-    out("")
-    out("  per module")
-    for name in sorted(per):
-        out("    %-12s %s" % (name, ", ".join(
-            "a0=%s x%d" % (k, v) for k, v in sorted(per[name].items(),
-                                                   key=lambda x: (x[0] == "unresolved", x[0])))))
-    out("")
-    out("  sites that are NOT a no-op field count (a0 >= 2), with their addresses")
-    waiting = [(n, v, a) for n, a, v in rows if v is not None and v >= 2]
-    for name, val, va in waiting:
-        out("    %-12s %s  a0 = %d" % (name, sym(va), val))
-    if not waiting:
-        out("    none")
-    out("")
-    out("  unresolved sites")
-    for name, va, val in rows:
-        if val is None:
-            out("    %-12s %s" % (name, sym(va)))
-    out("")
-    out("  WHAT THIS SUPPORTS, AND WHAT IT DOES NOT.")
-    out("  The VSync body at 0x%08X is read from the bytes: it spins on the vsync counter, then" % VSYNC)
-    out("  branches — `beq $a0, 1` returns with no wait at 0x8001F824, `blez $a0` returns the current")
-    out("  count at 0x8001F760, and only a0 >= 2 falls through to the field-count wait. So an")
-    out("  argument of 0 or 1 consumes NO field and an argument of -1 is the query mode, exactly as")
-    out("  the workspace method states.")
-    out("")
-    out("  IT DOES NOT YIELD A FRAME RATE, and the reason is structural rather than a gap in effort:")
-    out("  a rate is how many fields elapse per wall-clock second, so it needs the number of these")
-    out("  calls on ONE control-flow path per frame, and a call-site census cannot recover a path.")
-    out("  What the census does establish is the per-module field-count profile above, and the")
-    out("  BATTLE.PRG line is the one that matters for a gameplay frame: %s"
-        % ", ".join("a0=%s x%d" % (k, v) for k, v in sorted(per.get("BATTLE.PRG", {}).items())))
-    out("  Two sites, both VSync(1), both resolved, none unresolved: the BATTLE module itself never")
-    out("  waits a field count through VSync. The frame pacing therefore lives in the resident")
-    out("  exe and in the title, not in BATTLE.PRG — which is where a rate search has to look next.")
+    The header fields carry over so `verify` sees the segment geometry it measured; only the bytes
+    differ. A claim that cannot be made to REFUTE has not been shown to be able to CONFIRM.
+    """
+    clone = ExeSet.__new__(ExeSet)
+    clone.path = real.path
+    clone.data = bytes(image.data)
+    clone.t_addr = real.t_addr
+    clone.t_size = real.t_size
+    clone.image = image
+    return clone
 
 
 def selftest(out=print):
     """Every claim this tool makes, fed an input whose answer is known WITHOUT this tool."""
-    out("== re_viewport.py --selftest: 8 checks, each a case that MUST come out the other way " + "=")
+    out("== re_viewport.py --selftest: 6 checks, each a case that MUST come out the other way " + "=")
     plan = [
         "1. the four images decode; a wrong SHA-1 is REFUSED before any address is read",
         "2. a BATTLE.PRG with ONE byte changed at the publication entry is REFUSED by identity",
         "3. the publication's centre computation, on a MUTATED copy, no longer matches its claim",
-        "4. a caller census that is pointed at an address with no caller reports ZERO, not 57",
-        "5. the VSync census on a module with its jal encodings zeroed reports 0 sites, and SAYS it",
-        "6. the `_a0_backward` resolver returns None for an argument this tool cannot resolve",
-        "7. the `_lui_field_readers` scan reports 0 readers for an address nothing references",
-        "8. the exe segment map's corroboration count can go below its own denominator",
+        "4. a reader census for an address nothing references reads ZERO, and one that is referenced "
+        "does not",
+        "5. the rectangle census answers ZERO for the overlay rectangle 0x8005DFD4..DA and NONZERO "
+        "for a word the resident demonstrably names — one scan, two targets, opposite answers",
+        "6. the exe segment map's corroboration count can go below its own denominator",
     ]
+    out("   the RESIDENT display-area claims and their four checks are `tools/re_display_area.py`'s,")
+    out("   and the VSync(n) call-site census and its three are `tools/re_vsync_sites.py`'s. What is")
+    out("   left here is the BATTLE overlay publication and the decoder both tools share.")
     for line in plan:
         out("   " + line)
     out("")
@@ -1011,7 +953,7 @@ def selftest(out=print):
     # [3] the shipping claim check must answer the OTHER way on the mutated image
     mut = Image("mutated", bytes(raw), BATTLE_LOAD_BASE, 0, len(raw))
     mut.code = OVERLAYS[0][4]
-    good_claims, _ = verify(mut, exe, ov, out=lambda s: None)
+    good_claims = verify(mut, exe, ov, out=lambda s: None)
     mutated_verdicts = [c.verdict for c in good_claims if "arg0/2" in c.title]
     out("  [3] %s the arg0/2 centre claim on a mutated BATTLE.PRG reads %s (unchanged: %s)"
         % ("PASS" if mutated_verdicts and mutated_verdicts[0] == "REFUTED" else "FAIL",
@@ -1019,60 +961,42 @@ def selftest(out=print):
     if not (mutated_verdicts and mutated_verdicts[0] == "REFUTED"):
         fails.append(3)
 
-    # [4] a census pointed at an address with no caller
-    fake = VIEWPORT_PUBLICATION + 4
-    bat_lo = ov["BATTLE.PRG"].base + ov["BATTLE.PRG"].code[0]
-    bat_hi = ov["BATTLE.PRG"].base + ov["BATTLE.PRG"].code[1]
-    n_fake = len(_find_jals(ov["BATTLE.PRG"], bat_lo, bat_hi, fake))
-    n_real = len(_find_jals(ov["BATTLE.PRG"], bat_lo, bat_hi, VIEWPORT_PUBLICATION))
-    out("  [4] %s caller census: %d for the real publication, %d for publication+4 (must differ)"
-        % ("PASS" if (n_real > 0 and n_fake == 0) else "FAIL", n_real, n_fake))
-    if not (n_real > 0 and n_fake == 0):
-        fails.append(4)
-
-    # [5] the VSync census on a module whose jal encodings are zeroed
-    blank = Image("blank", bytes(len(ov["BATTLE.PRG"].data)), BATTLE_LOAD_BASE, 0,
-                  len(ov["BATTLE.PRG"].data))
-    c0 = vsync_census([("BATTLE.PRG", blank, blank.base, 0x8D124)])
-    out("  [5] %s a zeroed BATTLE.PRG yields %d VSync sites (real: %d) — a zero is a MEASURED zero"
-        % ("PASS" if c0["rows"] == [] else "FAIL", len(c0["rows"]),
-           len(vsync_census([("BATTLE.PRG", ov["BATTLE.PRG"], bat_lo, bat_hi)])["rows"])))
-    if c0["rows"]:
-        fails.append(5)
-
-    # [6] the a0 resolver must be able to say "I do not know"
-    unknown = _a0_backward(ov["BATTLE.PRG"], ov["BATTLE.PRG"].base)
-    known = None
-    for name, va, val in vsync_census(
-            [("BATTLE.PRG", ov["BATTLE.PRG"], bat_lo, bat_hi)])["rows"]:
-        if val is not None:
-            known = (va, val)
-            break
-    out("  [6] %s resolver returns None for a synthetic site (%s) and a value for at least one real "
-        "site (%s)" % ("PASS" if unknown is None and known is not None else "FAIL", unknown,
-                       ("%s a0=%s" % (sym(known[0]), known[1])) if known else None))
-    if not (unknown is None and known is not None):
-        fails.append(6)
-
-    # [7] a reader census for an address nothing references
+    # [4] A READER CENSUS FOR AN ADDRESS NOTHING REFERENCES, beside one that IS referenced. The
+    #     OTHER half of that census — who WRITES the rectangle, which is what decided the
+    #     boot-versus-overlay reading of issue 0042 — is `re_display_area.py`'s, because the
+    #     rectangle it censuses is that tool's subject.
     none_read = _lui_field_readers(ov["BATTLE.PRG"], 0x8005DFDE)
     some_read = _lui_field_readers(ov["BATTLE.PRG"], VIEWPORT_RECT + 2)
-    out("  [7] %s readers of 0x8005DFDE: %d (must be 0); readers of the published width: %d"
+    out("  [4] %s readers of 0x8005DFDE: %d (must be 0); readers of the published width: %d"
         % ("PASS" if none_read == [] and some_read else "FAIL", len(none_read), len(some_read)))
     if not (none_read == [] and some_read):
-        fails.append(7)
+        fails.append(4)
 
-    # [8] the corroboration denominator is a real count, not a constant
+    # [5] THE CENSUS HAS TO BE ABLE TO SAY ZERO AND NON-ZERO ON THE SAME SCAN. A reference census
+    # that reports zero for everything reads exactly like one that has found nothing, and the two are
+    # different facts. The control is a word the resident demonstrably names: 0x8005E248, the
+    # projection distance the boot reads at 0x800420CC. Same module, same scan, opposite answers.
+    rect_targets = {VIEWPORT_RECT + off for off in (0, 2, 4, 6)}
+    resident_zero = _lui_field_refs(exe.image, rect_targets)
+    control_some = _lui_field_refs(exe.image, {PROJECTION_DISTANCE})
+    out("  [5] %s the resident names 0x8005DFD4..DA %d time(s) (must be 0) and the control word "
+        "0x8005E248 %d time(s) (must be > 0)"
+        % ("PASS" if (not resident_zero and control_some) else "FAIL",
+           len(resident_zero), len(control_some)))
+    if not (not resident_zero and control_some):
+        fails.append(5)
+
+    # [6] the corroboration denominator is a real count, not a constant
     empty = ExeSet.__new__(ExeSet)
     empty.image = Image("z", b"", 0x80010000, EXE_HEADER, EXE_HEADER + 0x10)
     good_bad, total_bad = empty.corroborate(out=lambda s: None)
-    out("  [8] %s corroboration over a segment that cannot hold the entry points reads %d of %d "
+    out("  [6] %s corroboration over a segment that cannot hold the entry points reads %d of %d "
         "(must be 0 of %d)" % ("PASS" if good_bad == 0 else "FAIL", good_bad, total_bad, total_bad))
     if good_bad != 0:
-        fails.append(8)
+        fails.append(6)
 
     out("")
-    out("  selftest: %d of %d checks FAILED %s" % (len(fails), 8, fails or ""))
+    out("  selftest: %d of %d checks FAILED %s" % (len(fails), 6, fails or ""))
     # The mutated BATTLE.BIN this selftest builds is DELETED, not left lying around: a file named
     # BATTLE.BIN that is not the authenticated image is exactly the kind of thing someone later
     # provisions from by accident.
@@ -1118,8 +1042,8 @@ def main(argv):
                          "claims can be checked. tools/re_projection.py answers what the "
                          "DECOMPILATION says with no disc; this tool answers what the BYTES say and "
                          "there are none to read." % ov_dir)
-        claims, census = verify(bat, exe, ov)
-        report_verify(claims, census, exe)
+        claims = verify(bat, exe, ov)
+        report_verify(claims)
         return 0
     except Refuse as e:
         print("[re_viewport] REFUSING: %s" % e, file=sys.stderr)

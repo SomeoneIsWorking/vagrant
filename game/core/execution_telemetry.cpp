@@ -54,12 +54,12 @@ void ExecutionTelemetry::recordOverrideHit(std::string_view name) {
   ++overrideHits_.entryCount;
 }
 
-void ExecutionTelemetry::recordExecutableWrite(std::uint64_t bytes, std::uint64_t overlappedBytes) {
+void ExecutionTelemetry::recordExecutableWrite(WriteExtents extents) {
   ++executableWrites_.candidates;
-  executableWrites_.candidateBytes += bytes;
-  if (overlappedBytes != 0u) {
+  executableWrites_.candidateBytes += extents.bytes;
+  if (extents.overlappedBytes != 0u) {
     ++executableWrites_.residencyOverlaps;
-    executableWrites_.overlapBytes += overlappedBytes;
+    executableWrites_.overlapBytes += extents.overlappedBytes;
   }
 }
 

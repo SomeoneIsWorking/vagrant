@@ -78,16 +78,59 @@ struct WideBattleProjection {
   bool widens = false;
 };
 
+// What one display-area publication left behind in the struct the LEAF was handed: the width at
+// +4 and the height at +6, which is exactly where `SetDefDispEnv` and `SetDefDrawEnv` store the
+// arguments the guest stated. A publication's own horizontal extent is a per-call address, so it is
+// returned as a measurement of one call rather than named as a constant.
+struct PublishedArea {
+  int width = 0;
+  int height = 0;
+};
+
+// The two statements the display-area cross-check compares, as ONE value.
+//
+// They are a `uint32_t` and an `int32_t` sitting next to each other, which is the shape
+// `bugprone-easily-swappable-parameters` exists to refuse, and it is right to: passing the stated
+// width where the struct address belongs reads a plausible-looking pair of halfwords out of
+// whatever guest RAM that number names, and the comparison it feeds is a refusal — so the mistake
+// shows up as an abort about a viewport rather than as the wrong argument. Naming the roles removes
+// the swap rather than documenting it.
+struct DisplayAreaPublication {
+  std::uint32_t env = 0;        // the caller's `$a0`: the struct the leaf was handed
+  std::int32_t statedWidth = 0; // the caller's `$a3`: the width the guest stated
+};
+
 class BattleProjectionOwner {
 public:
   // --- the three installed override bodies, one per publication leaf --------------------------
   //
-  // Each runs the retail body FIRST and observes afterwards, so an observer can never change what
-  // the guest published: this owner is a measurement, and its refusals are about the measurement
-  // disagreeing with itself, never about substituting a value.
-  void observeCentre(Core &core);
-  void observeScreenDistance(Core &core);
-  void observeDrawArea(Core &core);
+  // TWO SHAPES, AND THE DIFFERENCE IS MEASURED RATHER THAN CHOSEN. What each leaf's retail body
+  // actually does decides whether the owner may replace it or must run it:
+  //
+  //   * `SetGeomOffset` is three words that move two GTE control registers and touch nothing else, so
+  //     the owner PERFORMS that effect — through psxport's own public GTE primitive, which is the one
+  //     implementation of the write and of the port's record of it — and then observes. Running the
+  //     original instead would leave `ProjParams` with no writer at all, and the centre check is
+  //     between that record and the coprocessor precisely because both move.
+  //   * `SetDefDrawEnv` and `SetDefDispEnv` write GUEST MEMORY and nothing else, so the guest's own
+  //     body is the correct implementation of them and the owner RUNS THE ORIGINAL, then reads the
+  //     word the leaf just filled. An owner that skipped that would be the only thing in the product
+  //     that had ever written the title's display environment, which is a replacement wearing an
+  //     observation's name.
+  //
+  // This is what the previous revision of this header claimed ("each runs the retail body FIRST and
+  // observes afterwards") and what the product did not do: the four overrides replaced all four
+  // leaves, so the guest's display area, draw area and GTE geometry were never written at all, and
+  // the first authenticated run aborted on a check that was reading a BATTLE-only word for the
+  // boot's own publication.
+  void publishCentre(Core &core);
+  void publishScreenDistance(Core &core);
+  void publishDisplayArea(Core &core, std::uint32_t leaf);
+
+  // THE READING, SEPARATED FROM THE PUBLISHING so it is the shipping path a test can drive. It
+  // refuses, by name, when the two statements of one horizontal extent disagree or when the caller
+  // handed the leaf an address outside guest RAM.
+  [[nodiscard]] static PublishedArea readPublishedArea(Core &core, const DisplayAreaPublication &stated);
 
   [[nodiscard]] const BattleProjectionPublication &retail() const {
     return retail_;
@@ -124,6 +167,12 @@ public:
   static BattleProjectionOwner &from(Core &core);
 
 private:
+  // The two observations, taking the value the guest STATED rather than re-reading it out of a
+  // register the leaf has already consumed: the GTE leaves leave their arguments shifted into place,
+  // so the register and the stated value are no longer the same thing afterwards.
+  void recordCentre(Core &core, std::int32_t statedX, std::int32_t statedY);
+  void recordScreenDistance(Core &core, std::int32_t statedH);
+
   BattleProjectionPublication retail_{};
   bool centreSet_{};
   bool screenDistanceSet_{};

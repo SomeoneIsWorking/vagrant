@@ -16,11 +16,14 @@ namespace {
 namespace facts = vagrant::battle_projection;
 
 // The guest's argument registers at each leaf, named so the numbers carry their meaning. These are
-// the ABI, not title facts: `SetGeomOffset(long ofx, long ofy)` takes its two arguments in a0/a1 and
-// `SetDefDrawEnv(DRAWENV*, int x, int y, int w, int h)` its fourth in a3, with the fifth on the
-// stack, which is why the height is taken from the guest's own rectangle instead of the frame.
+// the ABI, not title facts: `SetGeomOffset(long ofx, long ofy)` takes its two arguments in a0/a1,
+// `SetDefDispEnv(DISPENV*, int x, int y, int w, int h)` its fourth in a3, and both env leaves take
+// their fifth on the stack, which is why the height is read back from the struct the leaf filled
+// rather than from a register the leaf has already consumed.
 constexpr int kCentreXArgument = 4;
 constexpr int kCentreYArgument = 5;
+constexpr int kScreenDistanceArgument = 4;
+constexpr int kEnvPointerArgument = 4;
 constexpr int kDrawWidthArgument = 7;
 
 [[noreturn]] void refuse(const char *what) {
@@ -66,7 +69,7 @@ std::int32_t publishedScreenDistance(const Core &core) {
 
 namespace vagrant {
 
-void BattleProjectionOwner::observeCentre(Core &core) {
+void BattleProjectionOwner::publishCentre(Core &core) {
   // The title's OWN argument, at this instant. This is the base a widening would ride and the reason
   // the widening is idempotent by construction: the leaf is a pure function of its argument, the
   // coprocessor register is never fed back into it, and BATTLE's presenter passes a literal every
@@ -77,6 +80,35 @@ void BattleProjectionOwner::observeCentre(Core &core) {
     refuse("a guest centre was negative, so there is no centre to record");
   }
 
+  // THE RETAIL BODY, performed rather than skipped. `SetGeomOffset` at 0x80041540 is five words:
+  // two `sll` by 16 and two coprocessor register moves naming CR24 and CR25. The shift is
+  // 16.16 fixed point, which psxport's `proj_params.h` already documents, and the primitive below is
+  // the one implementation of the write AND of the port's own record of it — so this owner calls it
+  // instead of restating the shift and keeping its own copy of the record to drift.
+  libgte_set_geom_offset(&core, statedX, statedY);
+  // The leaf leaves its arguments shifted into place, because its own body does. Reproducing that is
+  // what makes this override byte-for-byte the leaf the framework's own HLE handler would have run;
+  // a caller that read its own arguments back would see retail's values and not this port's.
+  core.r[kCentreXArgument] = static_cast<std::uint32_t>(statedX) << 16;
+  core.r[kCentreYArgument] = static_cast<std::uint32_t>(statedY) << 16;
+
+  recordCentre(core, statedX, statedY);
+}
+
+void BattleProjectionOwner::publishScreenDistance(Core &core) {
+  // RECORDED AND NEVER MODIFIED. `vs_main_projectionDistance` is not only a projection parameter:
+  // two BATTLE functions branch on it against kProjectionDistanceBranchThreshold, and it scales the
+  // GTE fog. A widening that raised it would flip a gameplay decision, so this leaf exists to make
+  // "the owner never touches H" a checked fact rather than an intention, and to put the value the
+  // run actually used on the record.
+  const auto statedH = static_cast<std::int32_t>(core.r[kScreenDistanceArgument]);
+  // `SetGeomScreen` at 0x80041534 is ONE coprocessor register move naming CR26 and `jr $ra`. It does
+  // not transform its argument, so the primitive gets the value untouched.
+  libgte_set_geom_screen(&core, statedH);
+  recordScreenDistance(core, statedH);
+}
+
+void BattleProjectionOwner::recordCentre(Core &core, std::int32_t statedX, std::int32_t statedY) {
   const ProjParams &projection = core.rsub.projParams;
   const auto recordedX = static_cast<std::int32_t>(projection.geomOfx());
   const auto recordedY = static_cast<std::int32_t>(projection.geomOfy());
@@ -103,24 +135,18 @@ void BattleProjectionOwner::observeCentre(Core &core) {
   centreSet_ = true;
 }
 
-void BattleProjectionOwner::observeScreenDistance(Core &core) {
-  // RECORDED AND NEVER MODIFIED. `vs_main_projectionDistance` is not only a projection parameter:
-  // two BATTLE functions branch on it against kProjectionDistanceBranchThreshold, and it scales the
-  // GTE fog. A widening that raised it would flip a gameplay decision, so this leaf exists to make
-  // "the owner never touches H" a checked fact rather than an intention, and to put the value the
-  // run actually used on the record.
-  const auto stated = static_cast<std::int32_t>(core.r[kCentreXArgument]);
+void BattleProjectionOwner::recordScreenDistance(Core &core, std::int32_t statedH) {
   const ProjParams &projection = core.rsub.projParams;
   const auto recorded = static_cast<std::int32_t>(projection.geomH());
   const auto published = publishedScreenDistance(core);
   if (recorded != published) {
     refuseDisagreement("screen distance", recorded, published);
   }
-  if (recorded != stated) {
+  if (recorded != statedH) {
     lucent::error("vagrant-proj",
                   "SLUS_010.40 SetGeomScreen was handed {} and the coprocessor holds {}; refusing "
                   "to record a screen distance this owner cannot account for",
-                  stated,
+                  statedH,
                   published);
     std::abort();
   }
@@ -132,36 +158,68 @@ void BattleProjectionOwner::observeScreenDistance(Core &core) {
   screenDistanceSet_ = true;
 }
 
-void BattleProjectionOwner::observeDrawArea(Core &core) {
-  // The width the title is publishing RIGHT NOW, cross-checked against the guest's own resident
-  // rectangle. Two independent statements of one horizontal extent: the argument, and the word the
-  // publication stores it in. If they disagree, this owner is not looking at the publication it was
-  // written against, and a widening built on either number would be a guess wearing a measurement.
-  const auto statedWidth = static_cast<std::int32_t>(core.r[kDrawWidthArgument]);
-  if (statedWidth <= 0) {
+void BattleProjectionOwner::publishDisplayArea(Core &core, std::uint32_t leaf) {
+  // THE TWO STATEMENTS OF ONE HORIZONTAL EXTENT, both captured BEFORE the retail body runs: the
+  // register the guest stated, and — after the leaf has executed — the word the leaf stored it in.
+  // Capturing the caller's `$a0` first matters, because that is the only statement of WHERE the
+  // publication is: the address is the caller's, so it cannot be a constant this repository holds.
+  const DisplayAreaPublication stated{.env = core.r[kEnvPointerArgument],
+                                      .statedWidth = static_cast<std::int32_t>(core.r[kDrawWidthArgument])};
+
+  // THE RETAIL BODY, RUN, through the framework's own owner of "call the original, it must return".
+  // Both env leaves are finite and their whole effect is guest memory, so the guest's own body is
+  // the correct implementation of them — the title's `screen` rect, the zeroed draw clip and the
+  // display resolution are all written by the leaf, and an owner that skipped it would be the only
+  // thing in the product that had ever written them.
+  //
+  // `psx::cpu::callOriginalToReturn` is the ONE implementation of that rule (native_dispatch.h) and
+  // this file does not restate it. It also makes the right call here for a second reason: it ABORTS
+  // on a budget exit, and for these two leaves that is the correct reading rather than a harsh one.
+  // The measured bodies are 12 and about 20 instructions against a 564,480-cycle turn
+  // (`re_viewport.py` prints both, and `kLeafEnvWidthOffset` below is gated on their words), so a
+  // budget exit inside one of them means the leaf at this address is not the leaf this owner was
+  // measured against — which is exactly the failure this observation exists to catch. The other
+  // caller in this repository, `vs_main_initHeap`, is the case that DOES need a resume, and it
+  // carries its own for the framework's stated reason: see `docs/issues/0042`.
+  psx::cpu::callOriginalToReturn(
+      core, leaf, psx::cpu::ExecutionBudget::currentTurn(core), "Vagrant display-area publication");
+
+  const PublishedArea area = readPublishedArea(core, stated);
+  retail_.drawWidth = area.width;
+  retail_.drawHeight = area.height;
+  drawAreaSet_ = true;
+}
+
+PublishedArea BattleProjectionOwner::readPublishedArea(Core &core, const DisplayAreaPublication &stated) {
+  // The width the title is publishing RIGHT NOW, cross-checked against the word the LEAF ITSELF
+  // wrote: the argument, and the halfword at +4 of the struct the caller named. Two independent
+  // statements of one horizontal extent, for ANY caller of either env leaf — which is the property
+  // 0x8005DFD6 never had. The boot's `_initScreen` publishes 320 through this leaf and the overlay
+  // publication publishes 320 through the same one, and each of them fills its own struct.
+  if (stated.statedWidth <= 0) {
     refuse("the guest published a non-positive draw width");
   }
-  if (!isGuestRam(facts::kViewportWidthWord) || !isGuestRam(facts::kViewportHeightWord)) {
-    refuse("the resident viewport rectangle is not at a guest RAM address this owner may read");
+  const auto widthWord = stated.env + facts::kLeafEnvWidthOffset;
+  const auto heightWord = stated.env + facts::kLeafEnvHeightOffset;
+  if (!isGuestRam(widthWord) || !isGuestRam(heightWord)) {
+    refuse("the display area the leaf was handed is not at a guest RAM address this owner may read");
   }
 
-  const auto rectangleWidth = core.mem_r16s(facts::kViewportWidthWord);
-  const auto rectangleHeight = core.mem_r16s(facts::kViewportHeightWord);
-  if (rectangleWidth != statedWidth) {
+  const auto publishedWidth = core.mem_r16s(widthWord);
+  const auto publishedHeight = core.mem_r16s(heightWord);
+  if (publishedWidth != stated.statedWidth) {
     lucent::error("vagrant-proj",
-                  "SLUS_010.40 published a {} wide draw area while its own viewport rectangle holds "
-                  "{}; these are two statements of one horizontal extent and they disagree",
-                  statedWidth,
-                  rectangleWidth);
+                  "SLUS_010.40 published a {} wide draw area and the leaf stored {} at 0x{:08X}; "
+                  "these are two statements of one horizontal extent and they disagree",
+                  stated.statedWidth,
+                  publishedWidth,
+                  widthWord);
     std::abort();
   }
-  if (rectangleHeight <= 0) {
-    refuse("the guest's own viewport rectangle holds a non-positive height");
+  if (publishedHeight <= 0) {
+    refuse("the display area the leaf filled holds a non-positive height");
   }
-
-  retail_.drawWidth = rectangleWidth;
-  retail_.drawHeight = rectangleHeight;
-  drawAreaSet_ = true;
+  return {publishedWidth, publishedHeight};
 }
 
 WideBattleProjection BattleProjectionOwner::derive(const BattleProjectionPublication &retail,
@@ -268,19 +326,19 @@ BattleProjectionOwner &BattleProjectionOwner::from(Core &core) {
 namespace {
 
 void centreOverride(Core *core) {
-  ownerFor(core, "SetGeomOffset")->observeCentre(*core);
+  ownerFor(core, "SetGeomOffset")->publishCentre(*core);
 }
 
 void screenDistanceOverride(Core *core) {
-  ownerFor(core, "SetGeomScreen")->observeScreenDistance(*core);
+  ownerFor(core, "SetGeomScreen")->publishScreenDistance(*core);
 }
 
 void drawAreaOverride(Core *core) {
-  ownerFor(core, "SetDefDrawEnv")->observeDrawArea(*core);
+  ownerFor(core, "SetDefDrawEnv")->publishDisplayArea(*core, facts::kSetDefDrawEnv);
 }
 
 void displayAreaOverride(Core *core) {
-  ownerFor(core, "SetDefDispEnv")->observeDrawArea(*core);
+  ownerFor(core, "SetDefDispEnv")->publishDisplayArea(*core, facts::kSetDefDispEnv);
 }
 
 } // namespace
