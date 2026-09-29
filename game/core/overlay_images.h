@@ -41,6 +41,14 @@ public:
   OverlayImages(const OverlayImages &) = delete;
   OverlayImages &operator=(const OverlayImages &) = delete;
 
+  // The measured spec table this Core writes into. Public and narrow so a test can ask the
+  // SHIPPING values which guest range each module occupies, rather than restating three addresses
+  // beside the code that uses them — a restated table is a second answer to "where does this module
+  // land", and it is exactly the kind of copy that survives a change to the real one.
+  const std::array<OverlaySpec, 3> &specs() const {
+    return specs_;
+  }
+
   OverlayLoadResult load(OverlayKind kind, std::span<const std::uint8_t> bytes);
   // Publish a completed whole-sector CD transfer. The final sector's bytes beyond the ISO file
   // length are part of the guest RAM write, but not of the executable image identity.

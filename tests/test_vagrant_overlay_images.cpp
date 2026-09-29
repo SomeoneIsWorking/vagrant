@@ -295,8 +295,92 @@ bool syntheticAdoption() {
 
 } // namespace
 
+// WHY THIS GROUP EXISTS. psxport issue 0050 measured that `lightrec_invalidate(addr, len)` revokes a
+// translated block only when the write lands on the block's FIRST word: an interior-word write is
+// reported to the invalidation owner, counted in `ExecutorCounters::invalidations`, and has no
+// effect, so the stale block keeps executing. The operator's question for THIS title was whether
+// that explains the remaining blocker — the 960-field wait in `CD_sync` at 0x80020F28 — before it
+// is treated as a CD question.
+//
+// IT DOES NOT, and the reason is arithmetic on the shipping constants rather than a run's opinion.
+// `0x80020F28` and the single writer of the byte that wait polls (`0x80020D38`) are both inside the
+// RESIDENT text segment, which is written once at boot BEFORE any guest instruction is translated.
+// The only writer of executable bytes in this title is the overlay loader, and every range it can
+// write starts at 0x80068800 — 0x6800 bytes ABOVE the resident text's end at 0x80062000. So no
+// module load can reach the block the wait runs in, and a stale translated block cannot be the
+// cause. That is a falsifier with a denominator, which is worth more than the fix: it says the CD
+// work is still CD work.
+//
+// The denominator is printed on every run and is 3 of 3 overlay specs examined. A future overlay
+// loaded INSIDE the resident segment is exactly the case that would break this, so the assertion is
+// on the range, not on a constant: it recomputes each range from the production spec table and its
+// CD sector tail, and fails if any of them reaches the resident text.
+bool noModuleLoadReachesTheResidentText() {
+  constexpr std::uint32_t kResidentTextStart = vagrant::kResidentHeader.textAddress;
+  constexpr std::uint32_t kResidentTextEnd = kResidentTextStart + vagrant::kResidentHeader.textBytes;
+  constexpr std::uint32_t kCdSectorBytes = 2048u;
+
+  // The two addresses the CD blocker turns on. Both are named here as numbers, and the group asserts
+  // they are inside the resident segment — because a claim that "the wait is not in an overwritten
+  // range" is only checkable if the wait's address is itself inside the range that is never written.
+  constexpr std::uint32_t kCdSyncWaitPc = 0x80020F28u;   // the wait loop's entry
+  constexpr std::uint32_t kCdStateWriterPc = 0x80020D38u; // the only writer of 0x800324D8
+  constexpr std::uint32_t kCdStateWord = 0x800324D8u;
+
+  // The Core needs this title's runtime installed BEFORE it is constructed, or the per-Core
+  // context it carries is null and the first owner that touches it dereferences nothing.
+  vagrant::VagrantRuntime runtime;
+  psxport_install_game(runtime);
+  auto owned = std::make_unique<Game>();
+  const vagrant::OverlayImages overlays(owned->core);
+
+  // The PRODUCTION spec table, read through the Core's own owner. Not a restatement: this group is
+  // about the ranges the shipping loader can write, and a copy of the three addresses beside it
+  // would still pass after the table changed.
+  const auto &rows = overlays.specs();
+
+  std::size_t examined = 0;
+  std::size_t reaching = 0;
+  for (const vagrant::OverlaySpec &row : rows) {
+    const std::size_t tail = (kCdSectorBytes - row.byteCount % kCdSectorBytes) % kCdSectorBytes;
+    const std::uint32_t start = row.guestBase;
+    const std::uint32_t end = row.guestBase + static_cast<std::uint32_t>(row.byteCount + tail);
+    ++examined;
+    const bool hits = start < kResidentTextEnd && end > kResidentTextStart;
+    reaching += hits ? 1u : 0u;
+    std::printf("  overlay %-11s transfer 0x%08X..0x%08X (%zu bytes + %zu tail) vs resident text "
+                "0x%08X..0x%08X: %s\n",
+                row.name.c_str(), start, end, row.byteCount, tail, kResidentTextStart, kResidentTextEnd,
+                hits ? "OVERLAPS" : "disjoint");
+  }
+
+  const bool addressesInside =
+      kCdSyncWaitPc >= kResidentTextStart && kCdSyncWaitPc < kResidentTextEnd &&
+      kCdStateWriterPc >= kResidentTextStart && kCdStateWriterPc < kResidentTextEnd &&
+      kCdStateWord >= kResidentTextStart && kCdStateWord < kResidentTextEnd;
+
+  std::printf("  stale-block census: %zu of %zu executable-write ranges in this title reach the "
+              "resident text, and the CD wait (0x%08X), its only writer (0x%08X) and the byte it "
+              "polls (0x%08X) are all inside that segment: %s\n",
+              reaching, examined, kCdSyncWaitPc, kCdStateWriterPc, kCdStateWord,
+              addressesInside ? "yes" : "NO");
+  std::uint32_t lowestBase = rows.front().guestBase;
+  for (const vagrant::OverlaySpec &row : rows) {
+    lowestBase = row.guestBase < lowestBase ? row.guestBase : lowestBase;
+  }
+  std::printf("  resident text ends at 0x%08X; the lowest overlay base is 0x%08X, a gap of %u bytes\n",
+              kResidentTextEnd, lowestBase, lowestBase - kResidentTextEnd);
+
+  return require(reaching == 0 && examined == rows.size() && addressesInside,
+                 "a module load in this title can reach the resident text, so an interior-word "
+                 "invalidation could leave a stale block in the CD wait and issue 0050 applies here");
+}
+
 int main(int argc, char **argv) {
   if (!syntheticReplacement() || !syntheticAdoption()) {
+    return 1;
+  }
+  if (!noModuleLoadReachesTheResidentText()) {
     return 1;
   }
   if (argc == 3 && std::string_view(argv[1]) == "--retail-input-dir") {
