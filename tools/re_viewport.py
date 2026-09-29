@@ -84,10 +84,38 @@ PROJECTION_DISTANCE = 0x8005E248
 NEAR_CLIP = 0x8005E0C8
 PARITY = 0x8005E210
 
-DRAW_ENV0 = 0x8006E0D0                  # BATTLE.PRG globals: two DRAWENVs then two DISPENVs
+# BATTLE.PRG's two DRAWENVs then two DISPENVs, at the addresses its OWN words name. These three
+# constants were 0x8006E0D0 / 0x8006E188 — the overlay's file-offset address, not the guest's — and
+# nothing read them, so they were wrong in a way a reader could not have detected from this file.
+# The addresses below are what the publication computes: `lui $s0, 0x8006` + `addiu $s0, $s0, -7984`
+# at 0x80076134/0x80076138 is 0x8005E0D0, and `lui $s1, 0x8006` + `addiu $s1, $s1, -7800` at
+# 0x80076154/0x80076158 is 0x8005E188.
+DRAW_ENV0 = 0x8005E0D0
+# The STRIDE is read out of the guest's own arithmetic rather than taken from the SDK header:
+# `addiu $s4, $s0, 92` at 0x80076174 is the second DRAWENV, and `sb $zero, 0x73($s0)` at
+# 0x80076210 is the second one's `dfe` — 0x73 == 0x5C + 0x17, the same 0x5C by a second route.
 DRAW_ENV_STRIDE = 0x5C
-DISP_ENV0 = 0x8006E188
+DRAW_ENV_DFE_OFFSET = 0x17
+DISP_ENV0 = 0x8005E188
 DISP_ENV_STRIDE = 0x14
+
+# THE DRAWING-AREA CLIP, and where the previous revision of this file went wrong reading it.
+#
+# The SDK's `DRAWENV` (`external/rood-reverse/include/psx/libgpu.h`, vendored unmodified) is
+# `RECT clip` at +0, `short ofs[2]` at +8, `RECT tw` at +0xC and `dtd/dfe/isbg` at +0x16..+0x18.
+# This file used to read the leaf's four zero-fills at +0xC..+0x12 as the CLIP and CONFIRM, from
+# them, that "the DRAWING area is unclipped for the whole field". Those are the TEXTURE WINDOW's
+# x/y/w/h. The clip is at +0x00..+0x06 and the leaf fills it from its own arguments, so the
+# drawing area is clipped. `docs/issues/0038` carries the same correction; the two must agree, and
+# the claims below are what they now agree on.
+DRAW_ENV_CLIP_OFFSETS = (0, 2, 4, 6)
+DRAW_ENV_TW_OFFSETS = (12, 14, 16, 18)
+# What `SetDefDrawEnv` decides from the clip HEIGHT before it stores it: the PAL (289) and NTSC (257)
+# vertical-resolution classes, published to `dfe` at +0x17. So cliph is live, not padding.
+DRAW_ENV_HEIGHT_CLASSES = (289, 257)
+# The substring the selftest looks for to find the clip claims. A claim that cannot be NAMED cannot
+# be shown to flip, and a named-but-absent claim has to read as a failure rather than as a skip.
+CLIP_CLAIM_MARK = "DRAWENV +0x00"
 FRAME_PARITY_WORD = PARITY
 
 LEAF_SET_GEOM_SCREEN = 0x80041534
@@ -452,6 +480,7 @@ def _leaf_sh_stores(img, leaf, window, struct_offset):
             yield a
 
 
+
 def verify(bat, exe, overlays, out=print):
     """Every claim in the previous arm's reconstruction, decided by the instruction words."""
     claims = []
@@ -637,32 +666,25 @@ def verify(bat, exe, overlays, out=print):
         _cite(exe, LEAF_SET_DEF_DISP_ENV, 16) +
         ["      DISPENV offsets written, in order: %s" % disp_map]))
 
-    # SetDefDrawEnv zeroes the draw-area clip
-    zeros = []
-    for i in range(30):
-        d = exe.insn(LEAF_SET_DEF_DRAW_ENV + 4 * i)
-        if d and d.get("mnemonic") == "sh" and d.get("rt") == 0 and d.get("rs") == 17 \
-                and len(d.get("args", ())) == 3:
-            zeros.append(d["args"][1])
-    body_offsets = sorted({d["args"][1] for a in range(VIEWPORT_PUBLICATION, VIEWPORT_PUBLICATION + 0x1D4)
-                           for d in [bat.insn(a)] if d and d.get("mnemonic") == "sb"})
-    claims.append(Claim(
-        "SetDefDrawEnv writes the draw-area CLIP w/h (DRAWENV +0xC/+0xE) as ZERO and the publication "
-        "never stores there, so the DRAWING area is unclipped for the whole field",
-        "CONFIRMED" if (12 in zeros and 14 in zeros) else "REFUTED",
-        ["      DRAWENV offsets SetDefDrawEnv zero-fills: %s" % zeros] +
-        _cite(bat, 0x80076204, 9)))
-
-    # --- 3b. THE RESIDENT DISPLAY AREA IS NOT MEASURED HERE --------------------------------------
+    # --- 3b. THE ENV STRUCTS ARE NOT MEASURED HERE ------------------------------------------------
     #
-    # It is `tools/re_display_area.py`, and it is a SEPARATE TOOL rather than a section of this one
-    # because the two measure different subjects and the first run of this title is what made that
-    # visible: this file measures BATTLE's projection publication, that one measures the RESIDENT
-    # boot's display-area publication, and an owner installed on their shared `SetDefDispEnv` leaf
-    # cross-checked one against the other's rectangle. Each has its own constants and its own
-    # selftest; there is deliberately no call between them, because a check that is only a valid
-    # second statement of one horizontal extent for ONE of two publications is the defect they
-    # exist to keep apart.
+    # `tools/re_display_area.py` owns them, and it is a SEPARATE TOOL rather than a section of this
+    # one because the two measure different subjects. This file measures the BATTLE projection
+    # publication — what the guest states about its frustum and the gameplay thresholds on the word
+    # that carries it. That one measures the STRUCTS the guest hands the four SDK leaves: which
+    # word in a DRAWENV or DISPENV carries the stated extent, which rectangle in the image is written
+    # by which publication, and what the drawing-area clip actually is. The first authenticated run
+    # of this title is what made the boundary visible: an owner installed on their shared
+    # `SetDefDispEnv` leaf cross-checked the boot's stated width against BATTLE's rectangle, and the
+    # two publications' constants have to be able to disagree in a run without a reader mistaking
+    # that for a contradiction.
+    #
+    # It is a SCAN rather than a fixed address at each leaf's field map, so a claim reads the
+    # instruction it is about instead of a neighbour of it, and it prints the scan's denominator.
+    import re_display_area
+
+    claims.extend(re_display_area.display_area_claims(exe, overlays, out=out))
+    claims.extend(re_display_area.draw_area_clip_claims(bat, exe, out=out))
 
     # --- 4. the presenter ---------------------------------------------------------------------------
     lit_x = bat.insn(0x800762E0)

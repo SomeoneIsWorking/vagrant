@@ -93,12 +93,37 @@ inline constexpr std::uint32_t kBattleLoadBase = 0x80068800u;
 //    `SetDefDispEnv` at 0x8002B434 writes its four arguments to DISPENV +0/+2/+4/+6 and ZEROES
 //    +8/+0xA/+0xC/+0xE, so +0..+6 is the `disp` rect and +8..+0xE is the `screen` rect. The
 //    publication calls `SetDefDispEnv(disp, 320, 0, 320, 224)` and then OVERWRITES the `screen` rect
-//    with the LITERALS x=0, y=8, w=256, h=224. Meanwhile `SetDefDrawEnv` at 0x8002B374 writes the
-//    DRAW-AREA clip (DRAWENV +0xC/+0xE) as ZERO and the publication never stores there.
+//    with the LITERALS x=0, y=8, w=256, h=224.
 //
-//    So there is NO 256-pixel horizontal clip in this title's draw path. The 256 is the display
-//    window's width, in the same struct the 320 lives in, and the drawing area is UNCLIPPED. A
-//    widening is therefore not blocked by a 256-pixel clip this port could not interpret.
+//    THAT HALF SURVIVES. So there is NO 256-pixel horizontal clip in this title's draw path: the 256
+//    is the display window's width, in the same struct the 320 lives in. A widening is therefore not
+//    blocked by a 256-pixel clip this port could not interpret.
+//
+//    CORRECTED 2026-09-29 — THE DRAWING AREA IS NOT UNCLIPPED, AND THE PREVIOUS REVISION OF THIS
+//    COMMENT SAID THAT IT WAS. It said, in these words: "`SetDefDrawEnv` at 0x8002B374 writes the
+//    DRAW-AREA clip (DRAWENV +0xC/+0xE) as ZERO and the publication never stores there ... the
+//    drawing area is UNCLIPPED." BOTH halves of that are refuted by the leaf's own words, which had
+//    not been decoded when it was written:
+//
+//         0x8002B3AC  A6330000  sh  $s3, 0x0($s1)   ; +0x00 <- $a1
+//         0x8002B3B0  A6340002  sh  $s4, 0x2($s1)   ; +0x02 <- $a2
+//         0x8002B3B4  A6300004  sh  $s0, 0x4($s1)   ; +0x04 <- $a3
+//         0x8002B3DC  A6320006  sh  $s2, 0x6($s1)   ; +0x06 <- DELAY SLOT, UNCONDITIONAL
+//
+//     `+0x00..+0x06` IS the `RECT clip`; `+0x0C/+0x0E` is the TEXTURE WINDOW's x/y, which is what the
+//     leaf zero-fills. The SDK struct the decompilation vendors unmodified
+//     (`external/rood-reverse/include/psx/libgpu.h:364`: `RECT clip` at +0, `short ofs[2]` at +8,
+//     `RECT tw` at +0xC, `u_char dtd,dfe,isbg` at +0x16/+0x17/+0x18) sizes DRAWENV at 0x5C, which is
+//     the element stride the guest's own `23*4` index arithmetic at 0x80076408 computes. `cliph` is
+//     live and not padding: 0x8002B3E4 and 0x8002B3E8 test it against 289 and 257, the PAL and NTSC
+//     vertical-resolution classes, and publish the result to `dfe` at +0x17. The publication then
+//     sets that byte to 0 in both environments (0x80076210 into env1 at +0x73, 0x80076214 into env0
+//     at +0x17), and the
+//     SDK names it "flag to draw on display area (0:off 1:on)", so the DRAWING area — the clip — is
+//     what bounds the primitives.
+//
+//     So the drawing area IS clipped, to 640 x 224 — kBattleClipLeftX..kBattleClipHeight below — and
+//     the values come from LITERALS at one call site, so the clip is a constant and not game state.
 //
 //    BUT IT IS STILL NOT OWNED, and the reason is a different and stronger one, stated in
 //    kUnappliedBoundary below. The honest correction is to the REASON, not to the outcome.
@@ -112,6 +137,41 @@ inline constexpr std::int32_t kPublicationScreenX = 0;
 inline constexpr std::int32_t kPublicationScreenY = 8;
 inline constexpr std::int32_t kPublicationScreenWidth = 256;
 inline constexpr std::int32_t kPublicationScreenHeight = 224;
+// THE DRAWING-AREA CLIP: 640 x 224, IN TWO 320-WIDE HALVES, AND A COMPILE-TIME CONSTANT.
+//
+// MEASURED 2026-09-29 from BATTLE.PRG's words, and this supersedes the previous revision of this
+// header, which recorded the clip as zero and the drawing area as unclipped (that correction is in
+// the numbered block above, and it is the reason this block exists). The leaf populates the clip
+// from its arguments, so the values below are the publication's own literals and nothing is left at
+// the SDK default:
+//
+//     0x800760D4  00809021  move    $s2, $a0         ; $s2 = arg0 = 320 (literal at 0x8008A270)
+//     0x800760E8  24B3FFF0  addiu   $s3, $a1, -0x10  ; $s3 = arg1 - 16 = 224 (literal at 0x8008A274)
+//     0x80076140  00002821  move    $a1, $zero      ; env0 clip.x = 0
+//     0x80076148  02403821  move    $a3, $s2        ; env0 clip.w = 320
+//     0x80076150  AFB30010  sw      $s3, 0x10($sp)  ; DELAY SLOT -> env0 clip.h = 224
+//     0x8007617C  02402821  move    $a1, $s2        ; env1 clip.x = 320
+//     0x80076184  02403821  move    $a3, $s2        ; env1 clip.w = 320
+//     0x8007618C  AFB30010  sw      $s3, 0x10($sp)  ; DELAY SLOT -> env1 clip.h = 224
+//
+// The only RAM read on the publication path is `lw $a2, -0x1DB8($v0)` at 0x8008A27C, and that is
+// kProjectionDistanceWord, which becomes H and NOT a clip coordinate. The two halves are the two
+// FRAME BUFFERS, not two halves of a picture: the DISPENVs at 0x8005E188 and 0x8005E19C are
+// published at x = 320 and x = 0 respectively (decompilation `146C.c:4534` and `146C.c:4536`), and
+// the presenter re-`Put`s whichever one is NOT on display every field — 0x80076400 PutDispEnv,
+// 0x8007642C PutDrawEnv, 0x8007643C DrawOTag. The clip spans both halves because the guest draws
+// into the one it is not showing.
+//
+// SO THE CLIP IS ALREADY 2x THE PRESENTED WIDTH — 640 against a 320-wide display area — and is NOT
+// the binding horizontal bound. Recorded because the corrected claim is still not a widening: there
+// is nothing beyond x < 640 to reveal, because nothing is drawn there. The widening question is
+// about the projection, and the projection is kProjectionDistanceWord, which is gameplay state.
+inline constexpr std::uint32_t kBattleDrawEnv = 0x8005E0D0u;
+inline constexpr std::uint32_t kBattleDrawEnvStride = 0x5Cu;
+inline constexpr std::int32_t kBattleClipLeftX = 0;
+inline constexpr std::int32_t kBattleClipRightX = 320;
+inline constexpr std::int32_t kBattleClipWidth = 320;
+inline constexpr std::int32_t kBattleClipHeight = 224;
 // func_8007629C — the sole BATTLE field presenter, and the per-field re-publication of a literal
 // horizontal centre. CONFIRMED from BATTLE.PRG bytes: at 0x800762E0/0x800762E4 it holds
 // `addiu $a0, $zero, 0xA0` (160) and `addiu $a1, $zero, 0x70` (112) immediately before
@@ -247,20 +307,32 @@ inline constexpr std::int32_t kProjectionDistanceZoomStep = 64;
 // REWRITTEN 2026-09-27, AND THE REASON CHANGED. The previous text said the horizontal CLIP "is
 // published by the overlay from a VRAM layout and a screen rectangle this port has not read from
 // bytes". The bytes have now been read, and they REFUTE that reason: `re_viewport.py` CONFIRMS that
-// the 256 is a literal in the DISPENV `screen` rect and CONFIRMS that `SetDefDrawEnv` writes the
-// DRAW-AREA clip to zero and the publication never touches it. There is no 256-pixel clip in this
-// title's draw path to move. Keeping the old sentence would have left a REFUTED claim standing as
-// the port's reason, which is worse than having had no reason: a reader checking the clip would
+// the 256 is a literal in the DISPENV `screen` rect. There is no 256-pixel clip in this title's
+// draw path to move. Keeping the old sentence would have left a REFUTED claim standing as the
+// port's reason, which is worse than having had no reason: a reader checking the clip would
 // conclude the boundary was a measurement when it was a guess about a measurement.
+//
+// RE-READ AND CORRECTED AGAIN 2026-09-29, because that rewrite introduced a NEW refuted claim
+// beside the one it fixed. It also said, in these words: "`re_viewport.py` CONFIRMS that
+// `SetDefDrawEnv` writes the DRAW-AREA clip to zero and the publication never touches it." It does
+// not. The leaf writes the clip from its arguments — 0x8002B3AC `sh $s3,0x0($s1)`,
+// 0x8002B3B0 `sh $s4,0x2($s1)`, 0x8002B3B4 `sh $s0,0x4($s1)` and 0x8002B3DC `sh $s2,0x6($s1)`, the
+// last being the delay slot of the `beqz` and therefore UNCONDITIONAL — and `+0x0C/+0x0E` is the
+// texture window's x/y, not the clip. The drawing area is clipped, to 640 x 224, and
+// kUnappliedBoundary did not change because the clip was never what it named: what a widening has to
+// move is the DISPLAY RESOLUTION. Both corrections are kept side by side because a reader arriving
+// at the second must be able to see what the first one got wrong.
 //
 // THE REAL BOUNDARY, WHICH IS STRONGER. A widening is the PAIR (centre, clip) and BOTH halves are
 // per-field, so the two halves have to move in the same field or one of them is a translation:
 //
 //   * the CENTRE is re-stated every field as a LITERAL (160, 112) by the presenter, so it is only
 //     interceptable at the resident `SetGeomOffset` leaf — which is where this owner already sits;
-//   * the CLIP is the `screen` rect, and `SetDefDispEnv` ZEROES it, so the publication's literals are
-//     the only clip in the field, written by the overlay ONCE at area entry and then re-Put every
-//     field by the presenter.
+//   * the CLIP is the DRAWENV `clip` rect, the pair (0,0,320,224) and (320,0,320,224) at 0x8005E0D0
+//     and 0x8005E12C — 640 x 224 in total — set from LITERALS by the overlay's one call site and
+//     re-Put every field by the presenter. It is NOT the DISPENV `screen` rect, which is the
+//     display resolution. It is also not a widening lever: it is already twice the presented width
+//     and it is the two FRAME BUFFERS, not two halves of a picture.
 //
 // So both halves are owned, and the derivation would have a complete publication to work from. What
 // is NOT owned is the thing a widening would actually change: `SetDefDispEnv(disp, 320, 0, 320, 224)`

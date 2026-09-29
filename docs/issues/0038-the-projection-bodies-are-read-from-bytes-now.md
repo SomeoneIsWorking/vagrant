@@ -5,7 +5,7 @@ status: open
 symptom: `docs/issues/0037` shipped `vagrant::BattleProjectionOwner` against four SDK leaves whose bodies were a decompilation reconstruction, refused to widen, and named the reason as a 256-pixel screen rectangle this port "has not read from bytes". The image it needed is now provisioned, so the reconstruction could be checked.
 tags: S008,S010,S011,S015,widescreen,projection,vsync,decomp,bytes
 created: 2026-09-27
-updated: 2026-09-27
+updated: 2026-09-29
 ---
 
 ## What was found, and how it was found
@@ -58,7 +58,7 @@ Run `python3 tools/re_viewport.py`. Each row prints the instruction words that s
 | `SetGeomScreen` writes CR26 only | CONFIRMED | `0x48C4D000`→CR26, `jr $ra` |
 | `kGteControlOfx/Ofy/H = 24/25/26` | CONFIRMED | the register fields of the two cop2 words above |
 | `SetDefDispEnv` writes args to +0/+2/+4/+6, zeroes +8..+0xE | CONFIRMED | eight `sh` at offsets `[0,2,4,8,10,12,14,6]` |
-| draw-area clip is zero ⇒ drawing area unclipped | CONFIRMED | `SetDefDrawEnv` zero-fills DRAWENV `[12,14,16,18]`; the publication stores nothing there |
+| ~~draw-area clip is zero ⇒ drawing area unclipped~~ | **REFUTED 2026-09-29** | the clip is `DRAWENV +0x00..+0x06` and the leaf fills it from its arguments: `0x8002B3AC sh $s3,0x0($s1)`, `0x8002B3B0 sh $s4,0x2($s1)`, `0x8002B3B4 sh $s0,0x4($s1)`, `0x8002B3DC sh $s2,0x6($s1)` (delay slot, unconditional). `+0x0C/+0x0E` is the texture window's x/y. The clip is **640 x 224** |
 | presenter re-states a literal `SetGeomOffset(160,112)` | CONFIRMED | `0x240400A0` / `0x24050070` before `0x800762E4 jal 0x80041540` |
 | presenter re-issues the display area every field | CONFIRMED | `0x80076400` `PutDispEnv` inside the presenter |
 | `func_80074580` branches on `< 272` | CONFIRMED | `0x80074584 lw $v0,-0x1db8($v0)` then `0x28420110 slti $v0,$v0,0x110` |
@@ -92,10 +92,18 @@ The bytes say something different and more specific:
   dispenvs, at `0x800761B8..0x800761D8` in BATTLE.PRG, `0x80071968..0x80071988` in TITLE.PRG and
   `0x80042090..0x800420A8` in the **resident executable**. Three independently written modules, one
   set of literals.
-* `SetDefDrawEnv` at `0x8002B374` writes the **draw-area** clip (DRAWENV `+0xC/+0xE`) as **zero**, and
+* `SetDefDrawEnv` at `0x8002B374` writes the **draw-area** clip (DRAWENV `+0xC/+0x0E`) as **zero**, and
   the publication never stores there. The drawing area is **unclipped** for the whole field.
+  ⇒ **BOTH SENTENCES REFUTED 2026-09-29, AND THIS ONE IS HOW THE FILE GOT IT WRONG.**
+  `+0x0C/+0x0E` is the texture window's x/y, and the clip is `+0x00..+0x06`, which the leaf fills from
+  its arguments — so the publication does store there, through the leaf, with the values it is
+  holding in registers. The reading came from the decompilation's `libgpu.h` field NAMES being read
+  without the struct's offsets: `RECT clip` is at +0, `short ofs[2]` at +8, `RECT tw` at +0xC. The
+  drawing area is clipped, to **640 x 224** (see "The clip derivation" below).
 
-So there is no 256-pixel horizontal clip in this title's draw path. **The previous blocker named a
+So there is no **256**-pixel horizontal clip in this title's draw path — that part stands, and it
+stands for a different reason than this section gave: the 256 is the display window's width, and the
+clip that does exist is 640 wide. **The previous blocker named a
 constraint that does not exist.** Leaving the sentence would have left a refuted claim standing as the
 port's reason, which is worse than having had no reason: a reader checking the clip would have
 concluded the boundary was a measurement when it was a guess about a measurement.
@@ -130,7 +138,8 @@ measured:
 | half | where it is stated | when | from bytes |
 |---|---|---|---|
 | centre | resident `SetGeomOffset` leaf, a literal (160, 112) | every field | confirmed |
-| clip | DISPENV `screen` rect, literals (0, 8, 256, 224) | once, then re-`Put` every field | confirmed, in three modules |
+| clip | **DRAWENV `clip` rect**, literals (0, 0, 320, 224) and (320, 0, 320, 224) at `0x8005E0D0`/`0x8005E12C` — **640 x 224** | at the one call site `0x8008A288`, then re-`Put` every field by the presenter at `0x8007642C` | confirmed from the bytes, 2026-09-29 |
+| display resolution | DISPENV `screen` rect, literals (0, 8, 256, 224) | once, then re-`Put` every field | confirmed, in three modules |
 
 `derive()` already refuses anything that is not the pair, and the two refusal tests
 (`refusesUnwidenedClip`, `refusesInconsistentClipEdge`) are now backed by a measured clip rather than

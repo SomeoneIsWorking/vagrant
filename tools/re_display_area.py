@@ -44,13 +44,22 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from re_viewport import (  # noqa: E402  — the shared MIPS-field primitives, imported once
     DEFAULT_EXE,
-    EXE_HEADER,
     DEFAULT_OVERLAY_DIR,
+    DRAW_ENV0,
+    DRAW_ENV_CLIP_OFFSETS,
+    DRAW_ENV_DFE_OFFSET,
+    DRAW_ENV_HEIGHT_CLASSES,
+    DRAW_ENV_STRIDE,
+    DRAW_ENV_TW_OFFSETS,
+    EXE_HEADER,
+    LEAF_SET_DEF_DRAW_ENV,
     PROJECTION_DISTANCE,
+    VIEWPORT_PUBLICATION,
     VIEWPORT_RECT,
     Claim,
     ExeSet,
     Refuse,
+    _args_320_240_H,
     _cite,
     _find_jals,
     _is,
@@ -259,7 +268,7 @@ def selftest(out=print):
     "the claim broke" from "the byte I perturbed is not the byte the claim reads" is not a negative
     case, and one of these three was green against a claim that had never held.
     """
-    out("== re_display_area.py --selftest: 4 checks, each a case that MUST come out the other way " + "=")
+    out("== re_display_area.py --selftest: 5 checks, each a case that MUST come out the other way " + "=")
     for line in (
             "1. the resident publication claim, on a copy whose `$a3 <- $a0` word is perturbed, REFUTES",
             "2. the SetDefDispEnv width-store claim, on a copy whose `sh $a3, 4($v0)` is perturbed, REFUTES",
@@ -339,8 +348,67 @@ def selftest(out=print):
     if not ok:
         fails.append(4)
 
+    # [5] THE DRAWENV CLIP, and the argument scanner underneath it. Three defects in that scanner
+    #     each held a CONFIRMED claim down to REFUTED, and each was invisible because a claim that
+    #     always says REFUTED reads exactly like a claim about a title that differs. So this case
+    #     establishes the claim CONFIRMED on the real image FIRST, and then shows each of the
+    #     scanner's three rules can give a different answer on a perturbed one.
+    #
+    #     The three, and what each perturbation breaks:
+    #       * the window is BEHIND the call — a word placed AFTER the `jal` must not be read;
+    #       * the NEAREST definition wins — an extra earlier definition must not displace a nearer one;
+    #       * an argument register copied from another resolves — a copy chain must be followed.
+    bat = ov["BATTLE.PRG"]
+    bcode = (bat.base + bat.code[0], bat.base + bat.code[1])
+    before = _verdicts(draw_area_clip_claims(bat, exe), "the two DRAWENVs' clips")
+
+    def clip_of(image):
+        return [_resolve_arguments(_call_arguments(image, s), {0: 0, 18: 320, 19: 224})[1:]
+                for s in (0x8007614C, 0x80076188)]
+
+    real = clip_of(bat)
+    # (a) direction. `addu $a1, $s2, $zero` lives at 0x80076160, AFTER the call, and a scanner that
+    #     reads forward would report the clip's x as 320 at the FIRST site and 0 at the second —
+    #     which is exactly the inversion that was shipped. Assert the real order, not just equality.
+    behind_only = clip_of(bat)[0] == [0, 0, 320, 224] and clip_of(bat)[1] == [320, 0, 320, 224]
+    # (b) nearest-wins and (c) argument-register copy, each shown by perturbing the IMAGE the way a
+    #     compiler change would and reading the answer back, so the rules are tested where they run.
+    def with_word(address, word):
+        """A copy of BATTLE.PRG with ONE instruction word replaced, little-endian as the image is.
+
+        A copy of the OVERLAY, not of the executable: `copy()` above clones SLUS_010.40, and writing
+        an overlay address into it would have perturbed an unrelated module and left the claim
+        reading exactly what it read before — a negative case that cannot fail, which is the failure
+        mode this whole case exists to avoid. `code` is carried over because the claim reads the
+        module's declared extent.
+        """
+        image = type(bat)(bat.name, bytearray(bat.data), bat.base, bat.file_start, bat.file_end)
+        image.code = bat.code
+        struct.pack_into("<I", image.data, address - bat.base, word)
+        return image
+
+    # Make the nearer `addu $a1, $zero, $zero` into `addu $a1, $s2, $zero`: the nearest definition
+    # now says 320, and a nearest-wins scanner must report that, not the 0 that is now only the
+    # further-back $a2 copy's source.
+    nearest = with_word(0x80076140, 0x02402821)      # addu $a1, $s2, $zero
+    # Break the copy: turn `addu $a2, $a1, $zero` into a move from an unresolvable register, so `y`
+    # can only come out if the resolver really is following the argument-register chain.
+    copy_broken = with_word(0x80076144, 0x02A03021)  # addu $a2, $s5, $zero
+    reads_behind = clip_of(nearest)[0][0] == 320
+    follows_copy = clip_of(copy_broken)[0][1] is None
+
+    ok = before == ["CONFIRMED"] and behind_only and reads_behind and follows_copy and real
+    out("  [5] %s the clip claim: unperturbed %s, measured clips %s; a nearer definition reading 320 "
+        "is read as %s (must be 320), and a broken `$a2` copy reads y=%s (must be None) — all five "
+        "must hold"
+        % ("PASS" if ok else "FAIL", before, real,
+           clip_of(nearest)[0][0] if nearest else None,
+           clip_of(copy_broken)[0][1] if copy_broken else "?"))
+    if not ok:
+        fails.append(5)
+
     out("")
-    out("  selftest: %d of %d checks FAILED %s" % (len(fails), 4, fails or ""))
+    out("  selftest: %d of %d checks FAILED %s" % (len(fails), 5, fails or ""))
     return fails
 
 
@@ -376,8 +444,246 @@ def main(argv):
              ", ".join(k for k, v in sorted(ov.items()) if v is not None)))
     print("A missing overlay is a REFUSAL for the claims that would have come from it — never a zero.")
     print("")
+    # Both halves of this module's subject: the resident DISPLAY area and the DRAWING-area clip.
+    # The clip claims are reported HERE as well as being extended into `re_viewport.py`'s table,
+    # because the tool that owns the subject has to be able to show its own verdicts without
+    # depending on another tool's report to print them.
     report(display_area_claims(exe, ov))
+    bat = ov.get("BATTLE.PRG")
+    if bat is None:
+        print("[re_display_area] REFUSING: BATTLE.PRG absent, so NO clip claim was evaluated — "
+              "that is a refusal, not a pass", file=sys.stderr)
+        return 2
+    report(draw_area_clip_claims(bat, exe))
     return 0
+
+
+# ====================================================================================================
+# THE DRAWING-AREA CLIP, moved here from `re_viewport.py` for the same reason section 3b moved.
+#
+# It belongs here because it answers the question 3b answers — WHICH WORD IN THE ENV STRUCT CARRIES
+# WHAT — for the other of the two structs the guest hands the leaves. `re_viewport.py` keeps the
+# BATTLE projection publication; the env structs are this module's subject.
+#
+# Every name the moved block uses is imported from `re_viewport` in the list above: there is no
+# second binding here and no address is declared in this module. A correction in `re_viewport.py`
+# therefore reaches this measurement without anyone editing it twice, which is the whole reason the
+# split is a module and not a text move.
+
+def _call_arguments(img, site, back=5):
+    """The five values a call site hands its callee, as `("imm", n)` / `("reg", n)` / None tuples.
+
+    Positions 0..3 are `$a0..$a3` and position 4 is the fifth argument, which the `jal`'s DELAY
+    SLOT writes to 0x10($sp) AFTER the call word — a backwards-only scan misses it and
+    under-reports the argument count, which is the same failure as a census that reports zero
+    because it never looked where the value is. A position with no writer found stays None, and
+    None resolves to None, which equals no expected value: a gap in the argument setup is a
+    REFUTED claim rather than a silent zero.
+
+    **TWO RULES, AND BOTH WERE WRONG IN THE FIRST VERSION OF THIS FUNCTION.** The claim below was
+    REFUTED against bytes that confirm it, and the claim is the only reason either was caught —
+    because it prints the values it resolved, and they did not match the words in front of it.
+
+      1. THE WINDOW IS BEHIND THE CALL, not in front of it. The first version walked
+         `site + 4 * delta` for delta 1..5, which reads the five instructions AFTER the `jal` — the
+         code that runs once the callee has returned. It reported the clip at 0x8007614C as
+         `x = 320` from `addu $a1, $s2, $zero` at 0x80076160, a post-call instruction, while the
+         nearest real definition in front of the call is `addu $a1, $zero, $zero` at 0x80076140.
+         So the fix is the SIGN: `site - 4 * delta`. The ONE forward instruction is the delay slot
+         at `site + 4`, which genuinely executes before the callee and is read as delta -1.
+      2. THE NEAREST DEFINITION WINS, because the instruction nearest the call is the last one to
+         have executed, so a slot already holding a value is not overwritten by a further-back one.
+         With unconditional assignment the EARLIEST instruction in the window won.
+
+    Together they are the same rule `_a0_backward` in `re_viewport.py` already states for the same
+    straight line — and this file had it in the opposite state, which is the duplication this module
+    exists to stop, found the hard way.
+    """
+    args = [None] * 5
+
+    def claim(slot, value):
+        if args[slot] is None:
+            args[slot] = value
+
+    for delta in list(range(1, back + 1)) + [-1]:
+        # delta 1..N walks BACKWARDS from the call; delta -1 is the delay slot, which is forward.
+        d = img.insn(site - 4 * delta if delta > 0 else site + 4)
+        if d is None:
+            continue
+        if d.get("op") == 0 and d.get("rt") == 0 and 4 <= d.get("rd", 0) <= 7:
+            claim(d["rd"] - 4, ("reg", d["rs"]))          # `addu $rd, $rs, $zero` is this move
+        elif d.get("mnemonic") == "addiu" and d.get("rs") == 0 and 4 <= d.get("rt", 0) <= 7:
+            claim(d["rt"] - 4, ("imm", d["imm"]))
+        elif d.get("mnemonic") == "sw" and d.get("rs") == 29 and d.get("imm") == 0x10:
+            claim(4, ("reg", d["rt"]))
+    return args
+
+
+def _resolve_arguments(args, known):
+    """`_call_arguments` output as numbers, with `known` mapping register number to value.
+
+    `known` exists because the publication states its clip in registers it computed once at its
+    entry — `$s2` is arg0 and `$s3` is `arg1 - 16` — so the call sites themselves hold no literal.
+    Register 0 is `$zero`, which is the one register whose value needs no evidence.
+
+    **AN ARGUMENT REGISTER COPIED FROM ANOTHER ARGUMENT REGISTER RESOLVES THROUGH IT.** The measured
+    setup at 0x80076140..0x80076144 is `addu $a1, $zero, $zero` then `addu $a2, $a1, $zero` — the
+    second is a copy of the FIRST, not a fresh literal, and treating it as an unknown register left
+    the clip's `y` at None and the claim REFUTED on bytes that settle it. So a definition in
+    registers 4..7 is resolved from the already-resolved argument slot it names, and the resolution
+    is a small fixpoint rather than a single pass, because the copy can point forwards as well as
+    backwards. `rounds` is reported by the caller so a claim cannot be silently resolved by a
+    resolver that gave up, and a CYCLE is a named refusal rather than a None that reads as a gap.
+    """
+    # `$aN` is argument register N, so slot i of `args` is also the source register for a copy out
+    # of it. The map is built from the raw defs, then iterated to a fixpoint.
+    out = []
+    for a in args:
+        if a is None:
+            out.append(None)
+        elif a[0] == "imm":
+            out.append(a[1])
+        elif a[1] in known:
+            out.append(known[a[1]])
+        elif 4 <= a[1] <= 7:
+            out.append(("argreg", a[1] - 4))          # unresolved copy: resolve on the next round
+        else:
+            out.append(None)
+
+    rounds = 0
+    for rounds in range(1, 5):
+        changed = False
+        for i, value in enumerate(out):
+            if isinstance(value, tuple) and value[0] == "argreg":
+                source = out[value[1]]
+                if source is not None and not isinstance(source, tuple):
+                    out[i] = source
+                    changed = True
+        if not changed:
+            break
+    else:
+        raise Refuse(
+            "_resolve_arguments: argument registers 4..7 copy each other in a cycle over %d rounds "
+            "at %s; the argument setup is not a straight line and this resolver does not model it"
+            % (rounds, args))
+
+    return out
+
+
+def draw_area_clip_claims(bat, exe, out=print):
+    """The DRAWENV clip field map, its `dfe` flag, and the two clips the publication states."""
+    claims = []
+    # BATTLE.PRG's declared code extent, derived from the image rather than restated: `code` is the
+    # (first, last) byte pair `load_overlays` bound from rood-reverse's own `splat.yaml`, and the
+    # block moved here used the caller's copy of this. Recomputing it is one line and keeps a single
+    # derivation; hard-coding a range here would be a second answer to "where does this module end".
+    BCODE = (bat.base + bat.code[0], bat.base + bat.code[1])
+
+    # --- 3a. THE DRAWING-AREA CLIP, WHICH THE PREVIOUS REVISION OF THIS FILE GOT WRONG -------------
+    #
+    # It said, in these words: "SetDefDrawEnv writes the draw-area CLIP w/h (DRAWENV +0xC/+0xE) as
+    # ZERO and the publication never stores there, so the DRAWING area is unclipped for the whole
+    # field", and reported it CONFIRMED. BOTH halves are refuted by the leaf's own words, and the
+    # cause is legible: the decompilation's `libgpu.h` FIELD NAMES were read without the struct's
+    # OFFSETS, so the leaf's four zero-fills at +0xC..+0x12 — the TEXTURE WINDOW — were read as a
+    # clip. The clip is at +0x00..+0x06, and the leaf fills it from its arguments. A reader arriving
+    # at the corrected claims below has to be able to see what the wrong one claimed and why, so the
+    # wrong sentence is quoted rather than deleted. `docs/issues/0038` carries the same correction
+    # and the same quote; the tool and the issue agree or one of them is a guess.
+    clip_stores = ((0x8002B3AC, 0, 19), (0x8002B3B0, 2, 20), (0x8002B3B4, 4, 16), (0x8002B3DC, 6, 18))
+
+    def store_fields(img, a):
+        # A word this decoder does not recognise is `None`, not a pair of zero fields: an
+        # undecodable instruction must be able to fail the claim rather than satisfy it.
+        d = img.insn(a)
+        return (d.get("imm"), d.get("rt")) if d is not None else None
+
+    got_clip = [store_fields(exe, a) for a, _o, _r in clip_stores]
+    got_tw = [store_fields(exe, 0x8002B3B8 + 4 * i) for i in range(4)]
+    # `+6` is the one store that is NOT between the leaf's own stores of the other three: it is the
+    # delay slot of the `beq` at 0x8002B3D8, so it runs on BOTH paths. A claim that read it as
+    # conditional would leave the clip's height unstated, which is the half that bounds the field.
+    unconditional = _is(exe.insn(0x8002B3D8), mnemonic="beq")
+    # ... and the three registers the clip is filled from are the leaf's own copies of the three
+    # arguments, with `+6` coming from the caller's argument area (`lw $s2, 0x38($sp)`, 0x38 == the
+    # fifth argument once this leaf's own -0x28 frame is added to 0x10).
+    sources = [_is(exe.insn(a), op=0, rt=0, rd=r, rs=s) for a, r, s in
+               ((0x8002B38C, 19, 5), (0x8002B394, 20, 6), (0x8002B3A4, 16, 7))]
+    sources.append(_is(exe.insn(0x8002B37C), mnemonic="lw", rt=18, rs=29, imm=0x38))
+    ok = (got_clip == [(o, r) for _a, o, r in clip_stores] and
+          got_tw == [(o, 0) for o in DRAW_ENV_TW_OFFSETS] and unconditional and all(sources))
+    claims.append(Claim(
+        "SetDefDrawEnv fills the RECT CLIP at DRAWENV +0x00/+0x02/+0x04/+0x06 from its own arguments "
+        "and zero-fills +0xC..+0x12, which is the TEXTURE WINDOW: so the DRAWING area is CLIPPED, "
+        "and the previous revision of this tool's claim that it is unclipped read the wrong offsets",
+        "CONFIRMED" if ok else "REFUTED",
+        ["      clip stores (offset, source register) found: %s" % got_clip] +
+        ["      texture-window zero-fills (offset, source register) found: %s" % got_tw] +
+        ["      the +0x06 store is the delay slot of a `beq`, so it is UNCONDITIONAL: %s"
+         % unconditional] +
+        ["      each clip register is a copy of one of the leaf's arguments: %s" % sources] +
+        _cite(exe, 0x8002B3AC, 4) + _cite(exe, 0x8002B3D8, 2)))
+
+    # The clip HEIGHT is load-bearing rather than padding, and that is what the leaf's two `slti`
+    # against it are for: it decides `dfe`, the SDK's "draw on display area" flag, which is what
+    # makes the clip bind. The publication then forces that byte to 0 in BOTH draw environments, so
+    # the clip is honoured rather than bypassed — and the second of the two stores is at +0x73, which
+    # is the second DRAWENV's +0x17 and therefore a second, independent reading of the 0x5C stride.
+    dfe_leaf = exe.insn(0x8002B3EC)
+    dfe_env0 = bat.insn(0x80076214)
+    dfe_env1 = bat.insn(0x80076210)
+    ok = (_is(exe.insn(0x8002B3E4), mnemonic="slti", rs=18, imm=DRAW_ENV_HEIGHT_CLASSES[0]) and
+          _is(exe.insn(0x8002B3E8), mnemonic="slti", rs=18, imm=DRAW_ENV_HEIGHT_CLASSES[1]) and
+          _is(dfe_leaf, mnemonic="sb", rs=17, rt=2, imm=DRAW_ENV_DFE_OFFSET) and
+          _is(dfe_env0, mnemonic="sb", rs=16, rt=0, imm=DRAW_ENV_DFE_OFFSET) and
+          _is(dfe_env1, mnemonic="sb", rs=16, rt=0, imm=DRAW_ENV_STRIDE + DRAW_ENV_DFE_OFFSET))
+    claims.append(Claim(
+        "the clip HEIGHT is live and not padding: SetDefDrawEnv tests it against 289 and 257 and "
+        "publishes the result to `dfe` at DRAWENV +0x17, and the publication then forces that byte "
+        "to 0 in BOTH draw environments — so the drawing area really is clipped",
+        "CONFIRMED" if ok else "REFUTED",
+        _cite(exe, 0x8002B3E4, 4) + _cite(bat, 0x80076210, 3)))
+
+    # The two clips themselves, and their total. Every extent is a literal or that literal minus
+    # 16: `$s2` is arg0 and `$s3` is `arg1 - 16` at the publication's entry, and its ONE call site
+    # passes (320, 240) — so 320 and 224 are what the guest's words produce, and the clip is a
+    # COMPILE-TIME CONSTANT rather than game state. That is the fact the widening question needs:
+    # a constant clip cannot be a per-field lever, and it is already twice the presented width.
+    pub_sites = _find_jals(bat, BCODE[0], BCODE[1], VIEWPORT_PUBLICATION)
+    sized = (len(pub_sites) == 1 and _args_320_240_H(bat, pub_sites[0]) and
+             _is(bat.insn(0x800760D4), op=0, rt=0, rd=18, rs=4) and
+             _is(bat.insn(0x800760E8), mnemonic="addiu", rs=5, rt=19, imm=-16))
+    known = {0: 0, 18: 320, 19: 224}                    # $zero, $s2 = arg0, $s3 = arg1 - 16
+    # The clip is the leaf's SECOND through FIFTH arguments (x, y, w, h). `$a0` is the DRAWENV
+    # pointer and is dropped, which is why the slice starts at 1: comparing the whole five-element
+    # argument list against a four-element RECT could never succeed, and the first version of this
+    # claim did exactly that — a comparison that cannot pass is a claim that reports REFUTED for a
+    # reason that is not the bytes.
+    env0 = _resolve_arguments(_call_arguments(bat, 0x8007614C), known)[1:]
+    env1 = _resolve_arguments(_call_arguments(bat, 0x80076188), known)[1:]
+    base_ok = (_is(bat.insn(0x80076134), mnemonic="lui", rt=16, raw_imm=0x8006) and
+               _is(bat.insn(0x80076138), mnemonic="addiu", rs=16, rt=16, imm=-7984))
+    stride_ok = _is(bat.insn(0x80076174), mnemonic="addiu", rs=16, rt=20, imm=DRAW_ENV_STRIDE)
+    ok = (sized and base_ok and stride_ok and (0x80060000 - 7984) == DRAW_ENV0 and
+          env0 == [0, 0, 320, 224] and env1 == [320, 0, 320, 224] and
+          target_of(bat.word(0x8007614C), 0x8007614C) == LEAF_SET_DEF_DRAW_ENV and
+          target_of(bat.word(0x80076188), 0x80076188) == LEAF_SET_DEF_DRAW_ENV)
+    def width_of(clip):
+        return clip[2] if clip[2] is not None else 0
+
+    claims.append(Claim(
+        "the two DRAWENVs' clips are (0, 0, 320, 224) at 0x8005E0D0 and (320, 0, 320, 224) at "
+        "0x8005E0D0+0x5C — 640 x 224 IN TOTAL, side by side, and every extent a literal at the one "
+        "call site, so the drawing-area clip is a compile-time constant and not game state",
+        "CONFIRMED" if ok else "REFUTED",
+        ["      env0 clip (x, y, w, h) = %s ; env1 clip (x, y, w, h) = %s" % (env0, env1)] +
+        ["      both clips of width %d, so %d in total against a %d-wide display area"
+         % (width_of(env0), width_of(env0) + width_of(env1), 320)] +
+        ["      $s2 = arg0 and $s3 = arg1 - 16 at the entry, over one call site passing (320, 240): "
+         "%s" % sized] +
+        _cite(bat, 0x80076134, 7) + _cite(bat, 0x80076174, 6)))
+
+    return claims
 
 
 if __name__ == "__main__":

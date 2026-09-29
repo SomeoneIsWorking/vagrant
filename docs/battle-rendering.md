@@ -15,12 +15,18 @@ Against BATTLE.PRG SHA-1 `d53aaccc3b3a2fc057d05e0dcea92f7182bc72a9`:
   `0x80055C80`, clears 0x800 entries, and passes the tail to the presenter. Packet pools are likewise
   heap results stored through `0x8005E0C0`; they are not fixed `GameConfig` regions.
 - `0x800760CC` owns BATTLE viewport initialization. Its measured call sequence supplies 320x240;
-  the function subtracts the 16-line convention and establishes a 320x224 draw/display area. **Read
+  the function subtracts the 16-line convention and establishes a 320x224 area. **Read
   from the bytes (issue 0038)**, it states OFX as `width/2` = 160 and OFY as `(height-16)/2 + 16` =
   **128**, calls `SetDefDrawEnv` twice and `SetDefDispEnv` twice, writes both DISPENV `screen` rects as
   the literals (0, 8, 256, 224), and writes the resident rect at `0x8005DFD4` as x=0, y=0, w=320,
-  h=224. Its call site is `0x8008A288`, called as `(320, 240, vs_main_projectionDistance, 0, 0, 0)`;
-  INITBTL.PRG calls it the same way at `0x800FA69C`.
+  h=224. **Corrected 2026-09-29 from the bytes of `SetDefDrawEnv` itself**: the two draw areas are
+  the clip rectangles **(0, 0, 320, 224) and (320, 0, 320, 224)** at `0x8005E0D0` and `0x8005E12C`, so
+  the drawing area is clipped to **640 x 224** — two 320-wide halves, the two frame buffers, not two
+  halves of a picture. Every coordinate is a literal (`0x80076140`, `0x80076148`, `0x8007617C`,
+  `0x80076184`, and the delay slots `0x80076150`/`0x8007618C` for the height), and the only RAM read
+  on this path, `0x8008A27C`, is the projection distance. Its call site is `0x8008A288`, called as
+  `(320, 240, vs_main_projectionDistance, 0, 0, 0)`; INITBTL.PRG calls it the same way at
+  `0x800FA69C`.
 - `0x8005E248` is the projection-distance word used by that call. Setter `0x8007CCF0` stores its
   argument there and calls `SetGeomScreen` — both confirmed from the words at `0x8007CCFC` and
   `0x8007CD00`. The word is **branched on at three thresholds** (272 twice, 768 in a zoom clamp) and
@@ -42,10 +48,14 @@ their game-owned inputs:
   four measured resident SDK leaves this viewport is stated through, measures the publication, and
   derives the wide one — but publishes no aspect. **The reason was corrected on 2026-09-27 by reading
   the bytes** (`tools/re_viewport.py`, issue 0038), and the correction is to the REASON, not the outcome:
-  the 256 in the display `screen` rect is NOT a horizontal clip, and the draw-area clip is written to
-  zero by `SetDefDrawEnv` and never touched, so the drawing area is unclipped. What a widening would
-  actually have to move is the guest's DISPLAY RESOLUTION, which `SetDefDispEnv` states and
-  `PutDispEnv` at `0x80028E80` turns into the GPU's display-mode word. That is presentation
+  the 256 in the display `screen` rect is NOT a horizontal clip. **The previous revision of this
+  sentence also said the draw-area clip is written to zero by `SetDefDrawEnv` and never touched, so
+  the drawing area is unclipped; that is REFUTED** — `+0x00..+0x06` is the clip and the leaf fills it
+  from its arguments, `+0x0C/+0x0E` is the texture window's x/y, and the drawing area is clipped to
+  640 x 224 (`0x8002B3AC`, `0x8002B3B0`, `0x8002B3B4`, `0x8002B3DC`). The boundary is unchanged,
+  because the clip was never what it named, and the clip is already twice the presented width. What a
+  widening would actually have to move is the guest's DISPLAY RESOLUTION, which `SetDefDispEnv`
+  states and `PutDispEnv` at `0x80028E80` turns into the GPU's display-mode word. That is presentation
   infrastructure this port has not measured and cannot verify without the adapter S015 has not
   supplied. With no title policy the framework resolves the guest projection at `Standard4x3`, which is
   the enforcement.
