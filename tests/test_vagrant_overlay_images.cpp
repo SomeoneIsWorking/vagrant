@@ -323,7 +323,7 @@ bool noModuleLoadReachesTheResidentText() {
   // The two addresses the CD blocker turns on. Both are named here as numbers, and the group asserts
   // they are inside the resident segment — because a claim that "the wait is not in an overwritten
   // range" is only checkable if the wait's address is itself inside the range that is never written.
-  constexpr std::uint32_t kCdSyncWaitPc = 0x80020F28u;   // the wait loop's entry
+  constexpr std::uint32_t kCdSyncWaitPc = 0x80020F28u;    // the wait loop's entry
   constexpr std::uint32_t kCdStateWriterPc = 0x80020D38u; // the only writer of 0x800324D8
   constexpr std::uint32_t kCdStateWord = 0x800324D8u;
 
@@ -350,26 +350,37 @@ bool noModuleLoadReachesTheResidentText() {
     reaching += hits ? 1u : 0u;
     std::printf("  overlay %-11s transfer 0x%08X..0x%08X (%zu bytes + %zu tail) vs resident text "
                 "0x%08X..0x%08X: %s\n",
-                row.name.c_str(), start, end, row.byteCount, tail, kResidentTextStart, kResidentTextEnd,
+                row.name.c_str(),
+                start,
+                end,
+                row.byteCount,
+                tail,
+                kResidentTextStart,
+                kResidentTextEnd,
                 hits ? "OVERLAPS" : "disjoint");
   }
 
-  const bool addressesInside =
-      kCdSyncWaitPc >= kResidentTextStart && kCdSyncWaitPc < kResidentTextEnd &&
-      kCdStateWriterPc >= kResidentTextStart && kCdStateWriterPc < kResidentTextEnd &&
-      kCdStateWord >= kResidentTextStart && kCdStateWord < kResidentTextEnd;
+  const bool addressesInside = kCdSyncWaitPc >= kResidentTextStart && kCdSyncWaitPc < kResidentTextEnd &&
+                               kCdStateWriterPc >= kResidentTextStart && kCdStateWriterPc < kResidentTextEnd &&
+                               kCdStateWord >= kResidentTextStart && kCdStateWord < kResidentTextEnd;
 
   std::printf("  stale-block census: %zu of %zu executable-write ranges in this title reach the "
               "resident text, and the CD wait (0x%08X), its only writer (0x%08X) and the byte it "
               "polls (0x%08X) are all inside that segment: %s\n",
-              reaching, examined, kCdSyncWaitPc, kCdStateWriterPc, kCdStateWord,
+              reaching,
+              examined,
+              kCdSyncWaitPc,
+              kCdStateWriterPc,
+              kCdStateWord,
               addressesInside ? "yes" : "NO");
   std::uint32_t lowestBase = rows.front().guestBase;
   for (const vagrant::OverlaySpec &row : rows) {
     lowestBase = row.guestBase < lowestBase ? row.guestBase : lowestBase;
   }
   std::printf("  resident text ends at 0x%08X; the lowest overlay base is 0x%08X, a gap of %u bytes\n",
-              kResidentTextEnd, lowestBase, lowestBase - kResidentTextEnd);
+              kResidentTextEnd,
+              lowestBase,
+              lowestBase - kResidentTextEnd);
 
   return require(reaching == 0 && examined == rows.size() && addressesInside,
                  "a module load in this title can reach the resident text, so an interior-word "
