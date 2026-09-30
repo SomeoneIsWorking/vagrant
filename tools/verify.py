@@ -55,7 +55,7 @@ def run(*command: object, capture: bool = False) -> subprocess.CompletedProcess[
 
 def resolve_framework() -> Path | None:
     configured = os.environ.get("PSXPORT_DIR")
-    if not configured and run(sys.executable, ROOT / "tools" / "psxport_sync.py", "--auto").returncode:
+    if not configured and run(sys.executable, ROOT / "tools" / "psxport_fetch.py", "--auto").returncode:
         return None
     framework = Path(configured) if configured else ROOT / "external" / "psxport"
     if not framework.is_absolute():

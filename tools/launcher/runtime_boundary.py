@@ -108,7 +108,7 @@ def framework_checkout(environment: Mapping[str, str], root: Path) -> Path:
         framework = Path(configured)
         return framework if framework.is_absolute() else root / framework
     subprocess.run(
-        [sys.executable, "tools/psxport_sync.py", "--auto"],
+        [sys.executable, "tools/psxport_fetch.py", "--auto"],
         cwd=root,
         check=True,
         env=dict(environment),
