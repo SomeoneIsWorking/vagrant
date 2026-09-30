@@ -22,6 +22,7 @@ This is the factual capability inventory. Epic intent is in `docs/project-goals.
 | S014 | Streaming CD/XA and audio behavior is owned beyond the verified intro path | partial | S003 | G001 |
 | S015 | The gameplay product executes authenticated guest images through psxport's dynarec-only runtime | partial | S001, S002 | G001 |
 | S016 | Hosted CI truthfully distinguishes repository policy from native product support on Linux, Windows, macOS, and Android | partial | S015 | G001 |
+| S017 | Vagrant Story: load operations complete without loading-only waits or presentation; logos cancel through the recovered route | missing | S015 | G005 |
 
 ## Current focus
 
@@ -441,3 +442,10 @@ timeout. The job is intentionally host-neutral policy coverage rather than a Lin
 Gap: create platform jobs only after the corresponding native runtime boundary exists and can be
 exercised with redistributable synthetic inputs; repeating the Python policy verifier on another host
 does not establish platform support.
+
+### S017 — Vagrant Story loading removal
+
+Missing. No load operation has been censused or classified for Vagrant Story. Gap: enumerate its load
+issuers and the wait and presentation each drives, then complete each through the title's own load
+mechanics without its loading-only wait, with payload and terminal state compared against retail
+and the absence of loading presentation captured.
