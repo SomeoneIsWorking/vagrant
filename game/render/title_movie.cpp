@@ -11,7 +11,7 @@
 
 namespace {
 
-// RE-13: tools/re_title_movie.py derives the callback and MovieData field from the SHA-bound retail
+// RE-13: the callback and MovieData field are read from the SHA-bound retail
 // TITLE.PRG. The intact callback uploads one decoded 24-halfword RGB24 slice through LoadImage and
 // writes MovieData::frameComplete after the final slice of a 480-halfword by 224-line frame.
 constexpr std::uint32_t kTitleMovieDctOutCallback = 0x8006F174u;

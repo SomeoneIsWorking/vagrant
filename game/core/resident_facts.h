@@ -5,7 +5,7 @@
 namespace vagrant::resident {
 
 // RE-19: exact resident/TITLE bootstrap facts measured from the SHA-bound SLUS_010.40 by
-// tools/re_resident.py. These are finite guest leaves; neither VSync call is dispatched.
+// the SHA-bound executable. These are finite guest leaves; neither VSync call is dispatched.
 inline constexpr std::uint32_t kCxxMain = 0x8001F5ECu;
 inline constexpr std::uint32_t kSetVideoMode = 0x80020354u;
 inline constexpr std::uint32_t kSetDispMask = 0x800285B8u;

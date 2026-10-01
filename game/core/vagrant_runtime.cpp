@@ -44,7 +44,7 @@ const PlatformHlePlan VagrantRuntime::platformPlan_{
     // 0x8002105C after 564,502 guest cycles — a WAIT for a controller IRQ psxport's synchronous CD
     // model does not deliver, not compute. Resuming the turn would only spin again, so the leaves
     // are the framework's typed synchronous owners instead. `game/cd/cd_facts.h` already holds the
-    // measured addresses and `tools/re_cd.py` already gates them; this is the declaration, not a
+    // measured addresses out of the authenticated image; this is the declaration, not a
     // second measurement.
     .cdCommandAddress = cd::kCdCommand,
     .cdSyncAddress = cd::kCdSync,

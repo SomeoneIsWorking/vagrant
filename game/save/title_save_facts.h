@@ -4,7 +4,7 @@
 
 namespace vagrant::title_save {
 
-// RE-23: SHA-bound _saveFileExists facts measured by tools/re_title_save.py. The native owner keeps
+// RE-23: SHA-bound _saveFileExists facts measured from the SHA-bound title bytes. The native owner keeps
 // the complete 0x68-byte frame live and invokes every finite non-VSync leaf in retail order.
 inline constexpr std::uint32_t kOwner = 0x8006E988u;
 inline constexpr std::uint32_t kGameTimeUpdate = 0x8004261Cu;

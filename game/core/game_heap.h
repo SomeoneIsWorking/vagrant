@@ -6,7 +6,7 @@ class Core;
 
 namespace vagrant::heap {
 
-// RE-07, MEASURED by tools/re_heap.py from SLUS_010.40 itself: the image's only `jal` into its own
+// RE-07, MEASURED from SLUS_010.40's own bytes: the image's only `jal` into its own
 // allocator initialiser (0x80043F74, rood-reverse `vs_main_initHeap`) sits at 0x80042B2C inside
 // `_sysReinit`, and the initialiser's own stores name the two free-list control blocks. The decomp's
 // symbol_addrs names (heapA/heapB) corroborate; the bytes decide.

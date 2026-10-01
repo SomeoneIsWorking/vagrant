@@ -4,7 +4,7 @@
 
 namespace vagrant::title_memcard {
 
-// SHA-bound TITLE.PRG facts measured by tools/re_title_memcard.py. The native owner keeps the
+// SHA-bound TITLE.PRG facts measured from the SHA-bound title bytes. The native owner keeps the
 // overlay's allocation, pointer graph, image upload, reset policy, and event lifecycle, while the
 // two retail CD-queue transfers are finite direct reads from the same disc extents.
 inline constexpr std::uint32_t kOwner = 0x8006A49Cu;

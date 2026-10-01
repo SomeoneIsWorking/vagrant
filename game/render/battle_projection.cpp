@@ -176,7 +176,7 @@ void BattleProjectionOwner::publishDisplayArea(Core &core, std::uint32_t leaf) {
   // this file does not restate it. It also makes the right call here for a second reason: it ABORTS
   // on a budget exit, and for these two leaves that is the correct reading rather than a harsh one.
   // The measured bodies are 12 and about 20 instructions against a 564,480-cycle turn
-  // (`re_viewport.py` prints both, and `kLeafEnvWidthOffset` below is gated on their words), so a
+  // (the measurement prints the page and the displacement separately, and `kLeafEnvWidthOffset` below is gated on their sum), so a
   // budget exit inside one of them means the leaf at this address is not the leaf this owner was
   // measured against — which is exactly the failure this observation exists to catch. The other
   // caller in this repository, `vs_main_initHeap`, is the case that DOES need a resume, and it

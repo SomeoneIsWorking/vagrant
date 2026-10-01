@@ -4,7 +4,7 @@
 
 // RE-07: the first native body seeded from the matching decomp. rood-reverse (CC0) main.c
 // vs_main_initHeap is the readable source; every constant it names was re-measured from our own
-// executable by tools/re_heap.py before shipping. The future dynarec adapter owns installation and
+// executable's bytes before shipping. The future dynarec adapter owns installation and
 // original-body comparison; this module owns only the native behavior.
 void vagrant::heap::initHeap(Core *c) {
   const std::uint32_t node = c->r[4];  // a0: first arena block

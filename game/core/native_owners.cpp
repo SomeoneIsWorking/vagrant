@@ -12,7 +12,7 @@ namespace vagrant {
 namespace {
 
 // The registered handler for the game's own allocator initialiser. It runs the VERIFIED native body
-// (S007, gated byte-for-byte by tools/re_heap.py) and then re-enters the ORIGINAL guest body so the
+// (S007, measured byte-for-byte from the SHA-bound executable) and then re-enters the ORIGINAL guest body so the
 // guest keeps whatever else that function does. `superCall` is the framework's one spelling of
 // "execute the retail body with this override suppressed for one call", and it is what keeps this
 // leaf a native/dynarec hybrid rather than a replacement of the guest.

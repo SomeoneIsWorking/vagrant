@@ -11,7 +11,7 @@
 
 namespace {
 
-// RE-17: tools/re_frame.py derives BATTLE's sole guest frame presenter from the SHA-bound retail
+// RE-17: BATTLE's sole guest frame presenter is read from the SHA-bound retail
 // overlay. The retained body flips the resident parity word, installs the selected display/draw
 // environments, and submits the caller-provided dynamic OT through DrawOTag before returning here.
 constexpr std::uint32_t kBattleFramePresenter = 0x8007629Cu;

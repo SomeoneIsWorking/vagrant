@@ -4,7 +4,7 @@
 
 namespace vagrant::gpu {
 
-// RE-21: the bounded product trace and tools/re_resident.py identify this as PsyQ libgpu's
+// RE-21: the bounded product trace and the SHA-bound bytes identify this as PsyQ libgpu's
 // GPU-command timeout arm. ClearImage 0x800287D4 reaches queue owner 0x8002A3E8, which calls this
 // leaf before submitting the command. Its retail body reads VSync(-1), stores that value + 240 in
 // kTimeoutDeadline, and clears kTimeoutFlag. The host GPU completes the command synchronously, so

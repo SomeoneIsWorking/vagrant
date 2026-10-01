@@ -11,7 +11,7 @@
 
 namespace {
 
-// RE-12: tools/re_title_startup.py derives this unique TITLE leaf from the SHA-bound overlay. It
+// RE-12: this unique TITLE leaf is read from the SHA-bound overlay. It
 // super-calls DrawSync, materialises a 0x64 SPRT in the overlay's static primitive buffer, and calls
 // DrawPrim with the four semantic arguments captured below.
 constexpr std::uint32_t kTitleDrawSprite = 0x8006A778u;

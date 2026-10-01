@@ -34,7 +34,7 @@ bool aliasesRam(const Core &core, std::span<const std::uint8_t> bytes) {
 } // namespace
 
 // SHA-256 of the same owned files whose SHA-1 and load bases are independently checked by
-// tools/extract_overlays.py and tools/re_overlay.py. Construct owning strings with this Core's
+// tools/extract_overlays.py. Construct owning strings with this Core's
 // overlay owner so an allocation failure propagates at construction, not during static init.
 OverlayImages::OverlayImages(Core &core)
     : core_(core), specs_({{{OverlayKind::Title,

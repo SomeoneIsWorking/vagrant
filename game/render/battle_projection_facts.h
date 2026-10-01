@@ -8,17 +8,16 @@ namespace vagrant::battle_projection {
 // Vagrant Story's guest projection publication, and the boundary that stops a widening today.
 //
 // PROVENANCE, AND IT IS THREE INDEPENDENT SOURCES NOW. Every address below is named the same way by
-// (a) this repository's own byte measurement, `tools/re_frame.py` running against the authenticated
-// SLUS_010.40 executable, (b) the vendored CC0 `external/rood-reverse` per-module symbol map
-// (`config/SLUS_010.40/symbol_addrs.txt`, `config/BATTLE/BATTLE.PRG/symbol_addrs.txt`), and (c) since
-// 2026-09-27 `tools/re_viewport.py`, which reads the INSTRUCTION WORDS at each address out of the
-// SHA-bound image itself.
+// (a) this repository's own reading of the authenticated SLUS_010.40 executable, (b) the vendored CC0
+// `external/rood-reverse` per-module symbol map
+// (`config/SLUS_010.40/symbol_addrs.txt`, `config/BATTLE/BATTLE.PRG/symbol_addrs.txt`), and (c) the
+// INSTRUCTION WORDS at each address, read out of the SHA-bound image itself.
 //
 // (c) IS NOT A THIRD VOTE, IT IS A DIFFERENT KIND OF STATEMENT, and the difference is why the
 // conclusions below changed. (a) and (b) agree on WHICH function lives at an address. Neither can say
 // what the function DOES, and issue 0037 recorded the consequence: the owner shipped no widening
 // because not one instruction word of the four leaves had been read, and the decompilation's bodies
-// were "unverified". `re_viewport.py` has now read them, and 24 of its 26 claims are CONFIRMED with
+// were "unverified". They have now been read, and 24 of the 26 measured claims are CONFIRMED with
 // the settling words printed, 1 is REFUTED (the BATTLE call site is 0x8008A288, NOT the 0x8008B0A4
 // this file previously stated) and 1 is NOT DETERMINABLE. So the bodies are no longer a
 // reconstruction and the reasons below are no longer a reconstruction's — which is the whole point,
@@ -39,7 +38,7 @@ inline constexpr std::uint32_t kSetGeomScreen = 0x80041534u;
 //
 // CORRECTED 2026-09-27. This file previously said the call was at 0x8008B0A4. That address holds
 // `and $t2, $t1, $t5` — a 16-bit mask inside a CLUT-addressing loop, not a call of anything.
-// `re_viewport.py` census over BATTLE.PRG's declared code extent finds EXACTLY ONE `jal` of this
+// a census over BATTLE.PRG's declared code extent finds EXACTLY ONE `jal` of this
 // function, at 0x8008A288, preceded by the argument setup it asserts:
 //
 //     0x8008A270  addiu $a0, $zero, 0x140        ; 320
@@ -64,7 +63,7 @@ inline constexpr std::uint32_t kBattleLoadBase = 0x80068800u;
 // func_800760CC — THE projection publication owner, and the body IS NOW READ FROM BYTES.
 //
 // Called as (320, 240, vs_main_projectionDistance, 0, 0, 0) from BATTLE.PRG 0x8008A288 and
-// INITBTL.PRG 0x800FA69C, and `re_viewport.py` CONFIRMS both call sites and both argument setups
+// INITBTL.PRG 0x800FA69C, and both call sites and both argument setups are CONFIRMED
 // from the words. What the body does, each line read from BATTLE.PRG at file offset 0xD8CC:
 //
 //     0x800760D4  move $s2, $a0                 ; width
@@ -204,7 +203,7 @@ inline constexpr std::uint32_t kBattleNearClipConsumer = 0x80098160u;
 // kViewportHeightWord are +2 and +6 and NOT +4 and +6. A reader who assumed the store order equalled
 // the memory order would put the width 2 bytes off.
 //
-// THESE ARE THE OVERLAY PUBLICATION'S RECTANGLE AND NOT THE BOOT'S, and `tools/re_viewport.py`
+// THESE ARE THE OVERLAY PUBLICATION'S RECTANGLE AND NOT THE BOOT'S, and the bytes
 // decides that from a reference census over all four provisioned modules: the resident executable
 // names NONE of the four halfwords, and the only stores anywhere are the overlay publication's own
 // four at 0x800761E0/0x800761E8/0x800761F0/0x80076200. So the word is still zero BSS while the
@@ -222,7 +221,7 @@ inline constexpr std::uint32_t kViewportHeightWord = kViewportRectWord + 6u;
 // THE WORD THAT IS A DISPLAY-AREA PUBLICATION'S OWN HORIZONTAL EXTENT, and it is not a constant.
 //
 // Both env leaves store the width the CALLER stated into the struct that caller named, at +4 of it,
-// and the height at +6. Read from the leaves' own words, by `re_viewport.py`:
+// and the height at +6. Read from the leaves' own words:
 //
 //     0x8002B434  SetDefDispEnv  addu $v0, $a0, $zero ; lw  $v1, 16($sp)   ; the fifth argument
 //     0x8002B43C                 sh   $a1, 0($v0)     ; +0 x
@@ -244,8 +243,8 @@ inline constexpr std::uint32_t kViewportHeightWord = kViewportRectWord + 6u;
 // derivation: `vs_main_dispEnv` is named 0x8005E188 by the decompilation's own
 // `config/SLUS_010.40/symbol_addrs.txt` (line 790) and is built in the resident body at 0x80042060
 // as `lui $s0, 0x8006` + `addiu $s0, $s0, -7800`, so the boot's width word is 0x8005E18C and its
-// height word 0x8005E18A. Those two are recorded for the boot's OWN publication, which `re_viewport`
-// confirms is `_initScreen` at 0x80042054 handing the leaf a width of 320 from its own `$a0`; they
+// height word 0x8005E18A. Those two are recorded for the boot's OWN publication, whose only caller
+// is `_initScreen` at 0x80042054, handing the leaf a width of 320 from its own `$a0`; they
 // are documentation of one caller, not the cross-check target, because the overlays publish through
 // their own copies of the same globals.
 inline constexpr std::uint32_t kResidentDispEnv = 0x8005E188u;
@@ -271,7 +270,7 @@ inline constexpr std::uint32_t kLeafEnvHeightOffset = 6u;
 // on the INSTRUCTIONS rather than on a reconstruction of them.
 //
 // THE TRANSFER DIRECTION IS DELIBERATELY NOT STATED HERE, and that is a correction rather than an
-// omission. `tools/re_viewport.py` used to name every one of these `mtc2` or `mfc2` from bit 25
+// omission. An earlier revision named every one of these `mtc2` or `mfc2` from bit 25
 // alone, so it labelled a WRITE as a READ on every GTE register move it printed, and the previous
 // revision of this header hedged the same hedge (`mtc2/mfc2`) because the tool's label was not
 // trustworthy. Naming a direction needs the R3000A COP2 transfer encoding, which is a reference and
@@ -283,7 +282,7 @@ inline constexpr std::uint32_t kGteControlH = 26u;
 
 // WHY THE PROJECTION DISTANCE IS NEVER WIDENED, AS A CONSTANT BECAUSE IT IS A THRESHOLD.
 // `vs_main_projectionDistance` is not only a projection parameter: BATTLE functions BRANCH on it
-// against this value. tools/re_projection.py cites the decompiled sites; `re_viewport.py` settles the
+// against this value. The decompiled sites cite the reads; the bytes settle the
 // two branches from the BYTES, at 0x80074580 and 0x80074744, and finds a THIRD threshold the
 // decompilation had not recorded. A widening that raised the word past any of them would flip a
 // gameplay decision, and the value also scales the GTE fog. Widening the canvas instead leaves the
@@ -306,14 +305,14 @@ inline constexpr std::int32_t kProjectionDistanceZoomStep = 64;
 //
 // REWRITTEN 2026-09-27, AND THE REASON CHANGED. The previous text said the horizontal CLIP "is
 // published by the overlay from a VRAM layout and a screen rectangle this port has not read from
-// bytes". The bytes have now been read, and they REFUTE that reason: `re_viewport.py` CONFIRMS that
+// bytes". The bytes have now been read, and they REFUTE that reason: they CONFIRM that
 // the 256 is a literal in the DISPENV `screen` rect. There is no 256-pixel clip in this title's
 // draw path to move. Keeping the old sentence would have left a REFUTED claim standing as the
 // port's reason, which is worse than having had no reason: a reader checking the clip would
 // conclude the boundary was a measurement when it was a guess about a measurement.
 //
 // RE-READ AND CORRECTED AGAIN 2026-09-29, because that rewrite introduced a NEW refuted claim
-// beside the one it fixed. It also said, in these words: "`re_viewport.py` CONFIRMS that
+// beside the one it fixed. It also said, in these words: "the bytes CONFIRM that
 // `SetDefDrawEnv` writes the DRAW-AREA clip to zero and the publication never touches it." It does
 // not. The leaf writes the clip from its arguments — 0x8002B3AC `sh $s3,0x0($s1)`,
 // 0x8002B3B0 `sh $s4,0x2($s1)`, 0x8002B3B4 `sh $s0,0x4($s1)` and 0x8002B3DC `sh $s2,0x6($s1)`, the
@@ -347,7 +346,7 @@ inline constexpr const char *kUnappliedBoundary =
     "presentation infrastructure this port has not measured, so derive() is shipped and no widening "
     "is published";
 
-// THE DECOMPILATION'S OWN NAME FOR EACH ADDRESS, declared here and gated by tools/re_projection.py.
+// THE DECOMPILATION'S OWN NAME FOR EACH ADDRESS, declared here and gated against its module map.
 //
 // This table exists because the obvious gate — "does the shipping constant's name equal the name at
 // that address?" — is red for a reason that has nothing to do with the address: the module map says

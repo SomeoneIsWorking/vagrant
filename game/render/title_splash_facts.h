@@ -4,7 +4,7 @@
 
 namespace vagrant::title_splash {
 
-// RE-12/RE-23: SHA-bound TITLE.PRG facts measured by tools/re_title_startup.py. The host phase
+// RE-12/RE-23: SHA-bound TITLE.PRG facts measured from the SHA-bound title bytes. The host phase
 // retains the exact finite leaves around _displayPublisherAndDeveloper's VSync boundaries.
 inline constexpr std::uint32_t kInitGameData = 0x80071B14u;
 inline constexpr std::uint32_t kGameSaveScreen = 0x8006EDBCu;

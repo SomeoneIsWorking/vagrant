@@ -11,7 +11,7 @@
 
 namespace {
 
-// RE-14: tools/re_title_menu.py derives the completion leaf from the SHA-bound retail TITLE.PRG.
+// RE-14: the completion leaf is read from the SHA-bound retail TITLE.PRG.
 // Each call completes one display-buffer pass after the guest has submitted its background and menu
 // item DrawPrim packets; the caller reaches VSync only after this function returns.
 constexpr std::uint32_t kTitleMenuItemsComplete = 0x800705ACu;

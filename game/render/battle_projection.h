@@ -2,12 +2,12 @@
 // keeps a widening from being claimed on a reconstruction.
 //
 // WHAT THE GUEST'S PROJECTION IS, AND WHERE IT IS PUBLISHED. Two independent sources agree: this
-// repository's byte measurement (`tools/re_frame.py` against the authenticated SLUS_010.40
+// repository's byte measurement (this repository's reading of the authenticated SLUS_010.40
 // executable, recorded in `docs/battle-rendering.md`) and the vendored CC0 decompilation's own
 // per-module symbol map. The publication is BATTLE.PRG's `func_800760CC` at 0x800760CC — an OVERLAY
 // address, in a module loaded at 0x80068800, not in the boot executable — and it states its
 // viewport through four RESIDENT SDK leaves: SetGeomOffset, SetGeomScreen, SetDefDrawEnv and
-// SetDefDispEnv. `tools/re_projection.py` re-derives that agreement and fails when it stops holding.
+// SetDefDispEnv. That agreement is asserted here and fails when it stops holding.
 //
 // WHY THE OWNER SITS ON THE LEAVES AND NOT ON THE OVERLAY CALL SITE. BATTLE's field presenter
 // re-states a LITERAL horizontal centre through SetGeomOffset on every single field, so an owner on
@@ -20,7 +20,7 @@
 //
 // WHY IT REFUSES INSTEAD OF WIDENING, AND WHY THE REASON IS NOT THE ONE THIS FILE PREVIOUSLY GAVE.
 // The bodies used to be a reconstruction, read from no image. They are not any more:
-// `tools/re_viewport.py` decodes them out of the SHA-bound image, and 24 of its 26 claims are
+// they are decoded out of the SHA-bound image, and 24 of the 26 measured claims are
 // CONFIRMED with the settling words, one is REFUTED (the call site this repository recorded as
 // 0x8008B0A4 is 0x8008A288) and one is not determinable from the provisioned modules.
 //
