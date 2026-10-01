@@ -67,5 +67,5 @@ negative, zero guest-VSync violations, and independent CPU/device-state comparis
 
 Disc resolution is explicit argument, `PSXPORT_VAGRANT_DISC`, `.env`, then an unambiguous
 repository-root CHD. Validate the resident executable and every loaded overlay. `external/psxport`
-resolves to the shared checkout or a private clone at `psxport.pin`; framework execution and HLE
+resolves to the workspace's live checkout, or a clone of its main where there is none; framework execution and HLE
 changes belong there, while title identity and native behavior stay here.

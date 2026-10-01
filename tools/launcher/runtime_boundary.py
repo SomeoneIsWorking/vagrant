@@ -39,8 +39,8 @@ OVERLAY_DIRECTORY = Path("scratch/bin/overlays")
 
 REQUIRED_TOOLS = ("cmake", "git", "ninja")
 
-# Where the framework lands when `PSXPORT_DIR` is not set: a symlink to the workspace's single
-# writable checkout, or a private clone at `psxport.pin` on a fresh machine.
+# Where the framework lands when `PSXPORT_DIR` is not set: a relative symlink to the workspace's
+# live checkout, or a clone of psxport `main` where there is none.
 DEFAULT_FRAMEWORK = Path("external/psxport")
 
 
@@ -100,8 +100,8 @@ def framework_checkout(environment: Mapping[str, str], root: Path) -> Path:
     """Resolve the framework, establishing the workspace symlink when the environment does not.
 
     `PSXPORT_DIR` wins so an agent or CI job can point at a specific checkout. Otherwise the
-    repository's own sync tool establishes `external/psxport`, which is a symlink to the workspace's
-    single writable framework in this workspace and a private clone at `psxport.pin` anywhere else.
+    repository's own fetch tool establishes `external/psxport`, which is a relative symlink to the
+    workspace's live framework checkout, and a clone of psxport `main` where there is no sibling.
     """
     configured = environment.get("PSXPORT_DIR")
     if configured:

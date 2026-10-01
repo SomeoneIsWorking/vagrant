@@ -14,22 +14,8 @@ include(CTest)
 set(PSXPORT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/psxport" CACHE PATH
     "psxport framework source directory (default: external/psxport)")
 if(NOT EXISTS "${PSXPORT_DIR}/cmake/psxport.cmake")
-  message(FATAL_ERROR "PSXPORT_DIR=${PSXPORT_DIR} has no cmake/psxport.cmake — resolve the pinned psxport checkout")
+  message(FATAL_ERROR "PSXPORT_DIR=${PSXPORT_DIR} has no cmake/psxport.cmake — resolve the psxport checkout")
 endif()
-find_package(Git REQUIRED)
-execute_process(
-  COMMAND "${GIT_EXECUTABLE}" -C "${PSXPORT_DIR}" rev-parse HEAD
-  OUTPUT_VARIABLE PSXPORT_RESOLVED_SHA
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  ERROR_VARIABLE PSXPORT_REVISION_ERROR
-  RESULT_VARIABLE PSXPORT_REVISION_RESULT)
-string(LENGTH "${PSXPORT_RESOLVED_SHA}" PSXPORT_RESOLVED_LENGTH)
-if(NOT PSXPORT_REVISION_RESULT EQUAL 0 OR NOT PSXPORT_RESOLVED_LENGTH EQUAL 40 OR
-   NOT PSXPORT_RESOLVED_SHA MATCHES "^[0-9a-fA-F]+$")
-  message(FATAL_ERROR "cannot identify PSXPORT_DIR=${PSXPORT_DIR}: ${PSXPORT_REVISION_ERROR}")
-endif()
-file(WRITE "${CMAKE_BINARY_DIR}/psxport_resolved.txt"
-     "dir = ${PSXPORT_DIR}\ncommit = ${PSXPORT_RESOLVED_SHA}\n")
 set(PSXPORT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(PSXPORT_BUILD_SMOKE OFF CACHE BOOL "" FORCE)
 add_subdirectory("${PSXPORT_DIR}" framework EXCLUDE_FROM_ALL)
@@ -119,15 +105,3 @@ if(BUILD_TESTING)
 # guest code as a host object: the product is this binary or it does not exist.
 add_executable(vagrant_port game/main.cpp)
 target_link_libraries(vagrant_port PRIVATE vagrant_native)
-
-# THE LIVE PIN CHECK against this repository's real psxport.pin and the real build receipt. --build
-# points at THIS build directory, configured moments ago, so the receipt is current by construction.
-if(BUILD_TESTING)
-  add_test(
-    NAME vagrant_psxport_pin_live
-    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/external/psxport/tools/psxport_sync.py"
-            --repo "${CMAKE_SOURCE_DIR}" --check --build "${CMAKE_BINARY_DIR}")
-endif()
-
-# The pin tool's own behaviour is tested once, in the framework. The only pin tool this repository
-# ships is tools/psxport_fetch.py.
