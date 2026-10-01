@@ -81,7 +81,7 @@ def check_repository(root: Path) -> list[Finding]:
             or relative in {"bootstrap.py", "tools/run.py"}
             or relative.startswith("tools/launcher/")
         ) and not relative.startswith("tests/")
-        policy_fixture = relative in {"tools/quality/structure.py", "tests/test_structure.py"}
+        policy_fixture = relative == "tools/quality/structure.py"
         findings.extend(
             analyze_text(
                 relative,

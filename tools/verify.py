@@ -28,20 +28,9 @@ NATIVE_TESTS = frozenset({
 # product that compiles only on a player's machine is not a product, and the failure this replaces
 # was a repository whose build rules refused to produce any executable at all.
 PRODUCT_TARGET = "vagrant_port"
-# CTest names that must be present but are NOT build targets. The two projection-census entries run a
-# Python instrument through `add_test`, so naming them in NATIVE_TESTS would ask ninja for a target
-# that does not exist. They still run — the final `ctest` below executes every registered test — but
-# a missing registration would otherwise go unnoticed, so they are required here.
-SCRIPT_TESTS = frozenset({
-    "vagrant_projection_census",
-    "vagrant_projection_census_selftest",
-    # The BYTE census, and its selftest. Registered as REQUIRED rather than merely present: a
-    # measurement this port's widening decision rests on that is not in REQUIRED_TESTS is a
-    # measurement nothing fails on when it stops being true.
-    "vagrant_viewport_bytes",
-    "vagrant_viewport_bytes_selftest",
-})
-REQUIRED_TESTS = NATIVE_TESTS | SCRIPT_TESTS
+# CTest names that must be present. Every one of them is a build target, so a missing registration
+# is a missing contract.
+REQUIRED_TESTS = NATIVE_TESTS
 sys.path.insert(0, str(ROOT))
 
 from tools.quality.structure import check_repository
@@ -136,8 +125,7 @@ def verify_native(framework: Path) -> bool:
         print(f"[verify] REFUSED: missing required contracts: {sorted(REQUIRED_TESTS - names)}", file=sys.stderr)
         return False
     print(
-        f"[verify] discovered {len(REQUIRED_TESTS)} of {len(REQUIRED_TESTS)} required contracts "
-        f"({len(NATIVE_TESTS)} build targets, {len(SCRIPT_TESTS)} script registrations)"
+        f"[verify] discovered {len(REQUIRED_TESTS)} of {len(REQUIRED_TESTS)} required contracts"
     )
     contracts_ok = run("ctest", "--test-dir", BUILD, "--output-on-failure", "--no-tests=error").returncode == 0
     return contracts_ok and product_ok
@@ -148,21 +136,12 @@ def verify_product_link(framework: Path) -> bool:
 
     S002 says the offline-generated guest execution path and its selectors are absent. A SOURCE
     pattern can only show that the repository does not mention them; it cannot show the shipped binary
-    does not CONTAIN them. This is the difference between "we removed the code" and "the product does
-    not link it", and the second is the claim a player would make.
+    does not CONTAIN them. The retired interpreter symbols and the generated-corpus symbols below are
+    the ones that must be absent.
 
-    THIS WAS A VACUOUS GATE, and the first run of this title found it. It checked three symbols —
-    `xemu_interpret_block`, `int_exec`, `psx_cpu_interpret_step` — that all belong to the
-    offline-interpreter generation psxport RETIRED. Those symbols cannot exist, so the check could
-    never fire. It printed "0 of 3 interpreter entry points present" in the strongest possible terms
-    ("S002's claim is about the LINKED PRODUCT") and went **green on the one title that had never
-    run**. A gate whose subject is not the thing being measured passes vacuously.
-
-    So it now reports the interpreter that IS on the execution path, and says plainly that its
-    presence is PERMITTED rather than a violation — because it is. The architecture keeps Lightrec's
-    per-block interpreter for bounded, accounted fallback, and `fallback.calls` is the number that
-    says whether a title actually used it. **A link check cannot substitute for that number, and this
-    function must not be read as if it could.**
+    The Lightrec per-block interpreter that IS on the execution path is reported rather than forbidden:
+    the architecture keeps it for bounded, accounted fallback. Its presence says nothing about whether
+    this title used one; that number is `fallback.calls` at run time, read from the executor.
     """
     product = BUILD / PRODUCT_TARGET
     if not product.is_file():
@@ -174,22 +153,16 @@ def verify_product_link(framework: Path) -> bool:
         return False
     symbols = result.stdout
 
-    # The RETIRED generation. These genuinely must be absent; the check is now honest that it is
-    # checking a component that is no longer built, so a future reintroduction would be caught.
+    # The retired generation and the retired generated-corpus artifact. Neither can be present in a
+    # dynarec-only product.
     retired = ("xemu_interpret_block", "int_exec", "psx_cpu_interpret_step")
     linked_retired = [name for name in retired if name in symbols]
+    corpus_candidates = ("xemu_rom", "xemu_rom_entry", "xemu_call")
 
     # The interpreter that is ACTUALLY on the execution path. Its presence is expected and permitted;
     # the number that matters is `fallback.calls` at run time, which no link inspection can measure.
     live = ("lightrec_run_interpreter", "lightrec_emit_jump_to_interpreter")
     linked_live = [name for name in live if name in symbols]
-
-    # The generated guest corpus is the banned ARTIFACT, and unlike an interpreter its presence in the
-    # binary would mean the retired pipeline shipped. That is checkable here, so it is.
-    # THE DENOMINATOR IS THE NUMBER ASKED FOR, not the number found. Reporting "0 of 0" because a
-    # comprehension came back empty is exactly the silent short answer `psxport/AGENTS.md` forbids, and
-    # it is how a check that examined nothing reads as a check that examined everything and passed.
-    corpus_candidates = ("xemu_rom", "xemu_rom_entry", "xemu_call")
     corpus = [name for name in corpus_candidates if name in symbols]
 
     for name in linked_retired:

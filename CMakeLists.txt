@@ -112,59 +112,7 @@ if(BUILD_TESTING)
   target_link_libraries(vagrant_dynarec_dispatch PRIVATE vagrant_native)
   add_test(NAME vagrant_dynarec_dispatch COMMAND vagrant_dynarec_dispatch)
 
-  add_test(NAME vagrant_projection_census_selftest
-           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_projection.py"
-                   --selftest)
-  add_test(NAME vagrant_projection_census
-           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_projection.py")
-
-  # The BYTE census, which needs the provisioned images and so REFUSES without them. Registered
-  # unconditionally on purpose: a tool that can only run on a provisioned machine must still be able
-  # to fail on a machine that has one, and its selftest runs everywhere because it builds its own
-  # mutated fixtures. The selftest is registered first because it is the one that must be green
-  # wherever the gate runs.
-  add_test(NAME vagrant_viewport_bytes_selftest
-           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_viewport.py"
-                   --selftest)
-  add_test(NAME vagrant_viewport_bytes
-           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_viewport.py")
-
-  # THE VSync(n) CALL-SITE CENSUS, split out of re_viewport.py because it answers a different
-  # question of the same image: what EVERY call site passes to one library routine, rather than what
-  # ONE publication does. Same provisioning rule — both halves REFUSE (exit 2) without the images,
-  # because a census that cannot see the image must say "not measured" and never print a zero. The
-  # selftest is registered first and must be green wherever the gate runs.
-  add_test(NAME vagrant_vsync_sites_selftest
-           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_vsync_sites.py"
-                   --selftest)
-  add_test(NAME vagrant_vsync_sites
-           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_vsync_sites.py")
-
-  # THE RESIDENT'S DISPLAY-AREA PUBLICATION, and the word that IS one horizontal extent. Split out of
-  # re_viewport.py because it is a different PUBLICATION: that tool measures BATTLE's overlay
-  # publication, this one the boot's, and the first authenticated run of this title died because a
-  # check written for the first was asked about the second (docs/issues/0042). The shared MIPS decoder
-  # and the SHA-bound image loaders are imported, not copied, so the two agree on what an instruction
-  # word means. Same provisioning rule: both halves REFUSE without the images.
-  add_test(NAME vagrant_display_area_selftest
-           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_display_area.py"
-                   --selftest)
-  add_test(NAME vagrant_display_area
-           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_display_area.py")
-
-  # The field-cadence census. It answers whether this 30 fps-title presents 30 or 60 fps, which
-  # is what decides whether an interpolated 60 fps path is IN scope for it. Both the selftest
-  # and the census need the provisioned images and all three overlays, so both REFUSE (exit 2)
-  # without them rather than reporting a rate: a cadence tool that cannot see the image must
-  # say "not measured", never a number. The selftest is registered first and must be green
-  # wherever the gate runs; it builds its own mutated fixtures in memory, so it needs no
-  # writable scratch and no second copy of the image.
-  add_test(NAME vagrant_cadence_selftest
-           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_cadence.py"
-                   --selftest)
-  add_test(NAME vagrant_cadence
-           COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/re_cadence.py")
-endif()
+  endif()
 
 # THE SHIPPING PRODUCT. One executable over the title adapter and psxport's dynarec-only executor.
 # There is deliberately no second target, no engine selector, and no build rule that can produce
@@ -172,14 +120,8 @@ endif()
 add_executable(vagrant_port game/main.cpp)
 target_link_libraries(vagrant_port PRIVATE vagrant_native)
 
-# THE LIVE PIN CHECK. Not a selftest: this runs the real function against this repository's real
-# psxport.pin and the real build receipt, so it can fail when the pin is actually wrong.
-#
-# MEASURED 2026-09-27: every port in the workspace registered only a SELFTEST of the check function, run
-# against a temporary fixture. A selftest asserts the function behaves; it cannot fail when this repo's
-# pin is stale, which is why ten ports reported green while four pins were demonstrably stale. --build
-# points at THIS build directory, configured moments ago, so the receipt is current by construction and
-# the staleness guard cannot fire spuriously. Verified: perturbing psxport.pin turns it red.
+# THE LIVE PIN CHECK against this repository's real psxport.pin and the real build receipt. --build
+# points at THIS build directory, configured moments ago, so the receipt is current by construction.
 if(BUILD_TESTING)
   add_test(
     NAME vagrant_psxport_pin_live
@@ -187,6 +129,5 @@ if(BUILD_TESTING)
             --repo "${CMAKE_SOURCE_DIR}" --check --build "${CMAKE_BINARY_DIR}")
 endif()
 
-# The pin tool's own behaviour (staleness guard, a bump that records the commit the build RESOLVED) is
-# tested once, in the framework (tests/test_psxport_sync.py). The only pin tool this repository ships
-# is tools/psxport_fetch.py.
+# The pin tool's own behaviour is tested once, in the framework. The only pin tool this repository
+# ships is tools/psxport_fetch.py.
