@@ -22,7 +22,8 @@ finite resident/TITLE phases, CD and memory-card ownership, pad delivery, native
 presentation producers, a BATTLE field fence, and the measured retail facts each of them rests on. The
 old runtime's successful splash/menu/BATTLE observations are historical evidence from the RETIRED
 static-recomp product, not claims about this one. See `docs/project-state.md` for the capability
-inventory and `docs/issues/` for the open defects.
+inventory, `docs/issues/` for the open defects, and `docs/re-frontier.md` for the ordered binary
+evidence chain.
 
 ## Intended product
 

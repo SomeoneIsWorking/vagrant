@@ -4,7 +4,9 @@ This repository ports USA `SLUS_010.40` as a title-specific native/Lightrec cons
 `external/psxport`. The CC0 `external/rood-reverse` decompilation is a source aid, not an authority
 over the authenticated game bytes. Read `external/psxport/CLAUDE.md` for framework rules. Consult
 `docs/project-goals.md` for intent, `docs/project-state.md` for current capability status,
-`docs/codemap.md` for subsystem placement, and `docs/issues/` for open defects and missing features.
+`docs/codemap.md` for subsystem placement, `docs/issues/` for open defects and missing features, and
+`docs/re-frontier.md` for the ordered binary evidence chain (`uv run --frozen python
+tools/re_frontier.py next`).
 
 ## Execution and ownership
 

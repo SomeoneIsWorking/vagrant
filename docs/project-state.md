@@ -1,7 +1,7 @@
 # Vagrant Story project state
 
 Epic intent is in `docs/project-goals.md`, atomic work in `docs/issues/`, placement in
-`docs/codemap.md`.
+`docs/codemap.md`, ordered binary evidence in `docs/re-frontier.md`.
 
 | id | capability | state | one-line evidence or gap |
 |---|---|---|---|

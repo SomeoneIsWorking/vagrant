@@ -2,7 +2,8 @@
 
 This map answers which subsystem owns each responsibility, where it lives, and where related work
 belongs. Capability status is authoritative in `docs/project-state.md`; epic intent is in
-`docs/project-goals.md`; atomic work is in `docs/issues/`.
+`docs/project-goals.md`; atomic work is in `docs/issues/`; ordered binary evidence is in
+`docs/re-frontier.md`.
 
 ## Architecture
 
@@ -60,6 +61,7 @@ verified retail inputs -> psxport runtime image mapping -> dynarec execution
 | Field cadence | Fields consumed per game frame, which decides whether an interpolated 60 fps path is in scope. MEASURED at 2 (30 fps) or 4 (15 fps) chosen at run time, never 60; the 2-vs-4 choice is PRESENTATION because every consumer scales its per-step increment by the same value that scales the field wait | `docs/issues/0039` | `docs/issues/0039` | — | `docs/issues/0039` | | `docs/issues/0039` |
 | Verification | Build and run current C++ image and native-owner contracts, enforce compile coverage and C++ policy, and exercise launcher, provisioning, and structure contracts | `CMakeLists.txt`, `tests/`, `tools/verify.py`, `tools/quality/structure.py`, shared `external/psxport/tools/check_cpp_style.py` | `verify.main`, CTest and Python test mains | `README.md` |
 | Atomic work | One open defect, missing capability, or blocker per file | `docs/issues/` | — | `docs/project-state.md` |
+| RE frontier | Order the binary evidence still needed, with each step's status, deps, evidence, owner files and gap | `docs/re-frontier.md`, shimmed to the framework engine by `tools/re_frontier.py` | `re_frontier.next`, `re_frontier.check` | `docs/project-state.md` |
 | Framework platform layer | Own Lightrec execution, PSX hardware services, rendering backend, UI, configuration, and shared presentation mechanisms | `external/psxport/` | target per-Core executor API | `external/psxport/CLAUDE.md` |
 
 ## Source tree
@@ -84,7 +86,8 @@ note used to name does not exist in this repository, so the numbers were being c
 ## Where does new work go?
 
 - Boot, overlay, ABI, camera, or render constants measured from retail bytes → the owning typed
-  module's `*_facts.h`, where the value carries its provenance.
+  module's `*_facts.h`, where the value carries its provenance, and the ordered evidence chain in
+  `docs/re-frontier.md`.
 - Execution-boundary mechanism (install a leaf, call a guest, re-enter the original) →
   `game/core/dynarec_dispatch.{h,cpp}`. Never spell an `ExecutionBudget` or resolve an image
   identity anywhere else; `vagrant::dynarec` is the only place that may.
