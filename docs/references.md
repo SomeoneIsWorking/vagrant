@@ -47,8 +47,8 @@ SLUS_010.40 alone) is a map into the exact executable this repo extracts.
 1. **Nothing is filled in from it — not one value, including the group that is now filled in.** A
    borrowed address is a HYPOTHESIS until measured against these bytes; the workspace has already
    recorded wrong conclusions from reading an address out of the wrong image. RE-01 is the pattern to
-   copy: `tools/re_crt0.py` EXECUTES crt0 on our extracted image and derives all eleven boot-group
-   values from what that execution did, and the current `game/core/vagrant_runtime.cpp` retains the
+   copy: the boot group's eleven values are DERIVED by executing crt0 on our extracted image rather
+   than read out of the decompilation, and the current `game/core/vagrant_runtime.cpp` retains the
    measured resident bootstrap facts. The decomp's names for the same addresses (`__ra_temp`,
    `_ramsize`, `_stacksize`, `__heapbase`, `__heapsize`, `InitHeap`, `vs_main_exec`,
    `__SN_ENTRY_POINT`) turned out to agree —
@@ -61,10 +61,10 @@ SLUS_010.40 alone) is a map into the exact executable this repo extracts.
    implies the other.
 3. **The load bases in its splat configs are not evidence by themselves.** They read:
    `0x80068800` for BATTLE/TITLE/ENDING, `0x800F9800` for INITBTL/SCREFF2/MAINMENU, `0x80102800` for
-   the other non-empty MENU modules — three shared slots. RE-03 is now measured without treating those
-   values as the source: `tools/re_overlay.py` M2 derives all 20 bases from each owned module's own
-   absolute `jal` targets and entry offsets; M3 then requires that owned image's SHA-1 to match the
-   corresponding config before comparing its independently stated `vram`. Result: 20/20 identity and
+   the other non-empty MENU modules — three shared slots. The overlay bases are measured without
+   treating those values as the source: all 20 are derived from each owned module's own absolute
+   `jal` targets and entry offsets, each requiring the owned image's SHA-1 to match the corresponding
+   config before comparing its independently stated `vram`. Result: 20/20 identity and
    address agreements, zero undecided/missing/extra. The three values also appear in four contiguous
    resident words at `0x80010000..0x8001000C`. The current `OverlayImages` owner maps and
    authenticates the first three reached overlays; observing the product's natural CD loader and

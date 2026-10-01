@@ -11,59 +11,39 @@ updated: 2026-08-27
 
 ## Established boundary
 
-`tools/re_frame.py` now SHA-measures BATTLE's sole presenter `0x8007629C`, dynamic OT submit owner
-`0x8008A3A0`, viewport initializer `0x800760CC`, 320x240 input/320x224 draw area, per-field
-`SetGeomOffset(160,112)`, projection-distance word `0x8005E248`, and setter `0x8007CCF0`.
+Measured from BATTLE.PRG's own bytes: the sole presenter `0x8007629C`, the dynamic OT submit owner
+`0x8008A3A0`, the viewport initializer `0x800760CC`, the 320x240 input / 320x224 draw area, the
+per-field `SetGeomOffset(160,112)`, the projection-distance word `0x8005E248` and its setter
+`0x8007CCF0`.
 
 `game/render/battle_frame.{h,cpp}` installs a retained-super completion fence on the measured
-presenter. The per-Core `BattleFrameProducer` flushes only after that guest presenter has translated
-its dynamic OT; `VagrantFrameDriver` owns the one field commit. Clang builds the seam and full generated product; the runtime/context test,
-clang-format/clang-tidy gate, and `re_frame.py` 6/6 controlled-mutation self-test pass.
+presenter; the per-Core `BattleFrameProducer` flushes only after that presenter has translated its
+dynamic OT, and `VagrantFrameDriver` owns the one field commit.
 
-This is a render-ownership prerequisite, not a native world renderer and not a visual fix. A serialized
-240-second product run against pinned psxport `99a42aa3` reached the completion override 9,073 times,
-so the measured fence is live. The four exact-index guest captures at fields 6100, 6600, 7000, and
-7500 are byte-identical all-black 320x224 images (SHA-256
-`15428e41dc15a5f0c2adbd364f3fd7d1c2f4e602dbde9afd9b956be22aa556d8`), while a separate diagnostic
-composition at 6600 still shows the readable title menu. This falsifies any claim that fence reach or
-the current neutral commits already produce a BATTLE world picture.
-The checkout-local settings currently request `fps60=1`, but Vagrant's producers use neutral commits
-and expose no semantic camera/world pass, so that preference is not interpolation evidence.
+This is a render-ownership prerequisite, not a native world renderer and not a visual fix. A 240-second
+product run reached the completion override 9,073 times, so the fence is live. The guest captures at
+fields 6100, 6600, 7000 and 7500 are byte-identical all-black 320x224 images (SHA-256
+`15428e41dc15a5f0c2adbd364f3fd7d1c2f4e602dbde9afd9b956be22aa556d8`), while a separate composition at
+6600 still shows the readable title menu. **That falsifies any claim that fence reach or the current
+neutral commits already produce a BATTLE world picture.**
 
 ## Next proof
 
-The 2026-08-27 serialized run proves override reach and falsifies the visible-world condition. The
-remaining controlled comparison must require all of the following:
-
 1. one commit corresponds to one completed BATTLE presenter call;
-2. the first intended room/world field contains the expected scene rather than only transition/loading
-   primitives;
+2. the first intended room/world field contains the expected scene rather than only transition or
+   loading primitives;
 3. a producer-disabled control removes that same-index field or changes it detectably.
 
-If the retained guest batch still renders black, compare the captured OT/primitive stream and guest
-VRAM against the reference before implementing a semantic world producer. Do not infer that the new
-field fence itself fixes pixels.
+If the retained guest batch still renders black, compare the captured OT/primitive stream and guest VRAM
+against the reference before implementing a semantic world producer. Do not infer that the field fence
+itself fixes pixels.
 
-## Serialized product gate
+## Running it
 
-The historical operator-owned recipe used the former guest-loop product, at paced guest speed, against
-the recording that reaches BATTLE around pad frame 6000:
+The recipe is a paced product run with the pad replay that reaches BATTLE around frame 6000, with
+`PSXPORT_PAD_SHOT_AT=6100,6600,7000,7500`, a watchdog, and a **fresh log filename every attempt**
+because `PSXPORT_LOG_FILE` appends. Exit 124 from the external time bound is expected, not a success
+code: the title stays inside guest `main`, so a native-frames bound cannot end this path.
 
-```sh
-timeout --signal=TERM --kill-after=5s 240s env \
-  PSXPORT_PAD_REPLAY=scratch/vs-newgame.pad \
-  PSXPORT_PAD_SHOT_AT=6100,6600,7000,7500 \
-  PSXPORT_DEBUG=vagrant-battle \
-  PSXPORT_LOG_FILE=scratch/logs/re17-battle-frame-live-99a42aa3.log \
-  PSXPORT_WATCHDOG=15 \
-  ./scratch/bin/vagrant_port
-```
-
-Use a fresh log filename for every attempt because `PSXPORT_LOG_FILE` appends. Exit 124 is the
-expected external time bound, not a product success code: Vagrant remains inside guest `main`, so
-`PSXPORT_NATIVE_FRAMES` cannot end this path and `atexit` hit counts are unavailable. The completed
-run's log SHA-256 is
-`87fe8f94d54fd2b373e6e1ab6bc0a3e270ac19c150866e91283ff3403627ca62`. `timeout` sent TERM, the
-watchdog emitted its scoped interrupt report, and no game process remained. The run cannot prove one
-completion per commit or the producer-disabled same-index control; those require explicit count
-evidence and a controlled disabled-producer run before this issue can close.
+The checkout-local `fps60=1` preference is **not** interpolation evidence: the producers use neutral
+commits and expose no semantic camera/world pass.

@@ -1,8 +1,8 @@
 # BATTLE rendering boundary
 
 This document separates retail-byte facts, corroborating decomp leads, and unimplemented enhancement
-design. `tools/re_frame.py` is the authority for the measured addresses; the CC0 `rood-reverse` source
-is a Rosetta stone, not proof by itself.
+design. The measured addresses come from the authenticated retail bytes; the CC0 `rood-reverse`
+source is a Rosetta stone, not proof by itself.
 
 ## Retail-measured field and projection ownership
 
@@ -47,7 +47,7 @@ their game-owned inputs:
   rather than a gap. `vagrant::BattleProjectionOwner` (`game/render/battle_projection.{h,cpp}`) owns the
   four measured resident SDK leaves this viewport is stated through, measures the publication, and
   derives the wide one — but publishes no aspect. **The reason was corrected on 2026-09-27 by reading
-  the bytes** (`tools/re_viewport.py`, issue 0038), and the correction is to the REASON, not the outcome:
+  the bytes** (issue 0038), and the correction is to the REASON, not the outcome:
   the 256 in the display `screen` rect is NOT a horizontal clip. **The previous revision of this
   sentence also said the draw-area clip is written to zero by `SetDefDrawEnv` and never touched, so
   the drawing area is unclipped; that is REFUTED** — `+0x00..+0x06` is the clip and the leaf fills it

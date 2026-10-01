@@ -13,16 +13,16 @@ Lightrec executor. There is no interpreter fallback, no engine selector, and no 
 corpus; `tools/verify.py` inspects the shipped binary's symbols to keep that true.
 
 **The title has not been run against the real disc, so it does not yet play.** The adapter and its
-gates are covered (`docs/info/claims/030`); the run is not, because the workspace's single product
-slot was held by another agent (`docs/issues/0040`, which also states what a run would settle).
+gates are covered; the run is not, because the workspace's single product slot was held by another
+agent (`docs/issues/0040`, which also states what a run would settle).
 "the adapter exists" and "the title runs" are different claims and only the first is established.
 
 Substantial title-owned work remains in the tree: authenticated resident and `.PRG` provisioning,
 finite resident/TITLE phases, CD and memory-card ownership, pad delivery, native heap behavior, TITLE
-presentation producers, a BATTLE field fence, and the associated retail-backed RE instruments. The
+presentation producers, a BATTLE field fence, and the measured retail facts each of them rests on. The
 old runtime's successful splash/menu/BATTLE observations are historical evidence from the RETIRED
 static-recomp product, not claims about this one. See `docs/project-state.md` for the capability
-inventory and `docs/re-frontier.md` for the evidence chain.
+inventory and `docs/issues/` for the open defects.
 
 ## Intended product
 

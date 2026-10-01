@@ -32,8 +32,8 @@ shows `vs_main_exec 0x80042C38` holding a 0x18-byte frame across `__main`, `_sys
 sets s0 to `0x8005DFD0`, calls `OverlayGetSp(s0)`, `_sysReinit`, `_loadTitlePrg`, then JALs to TITLE
 `0x80071334` from `0x80042BD8` (return `0x80042BE0`). The finite phase currently omits those two
 outer frames and the second `OverlayGetSp`; adding only those stack effects would leave the guest
-return path wrong. `tools/re_resident.py --check-source --selftest` now follows the shipping
-`readAndLoadTitle` boundary and refuses a broken TITLE publication path.
+return path wrong. The shipping `readAndLoadTitle` boundary refuses a broken TITLE publication path,
+and `tests/test_vagrant_overlay_images` exercises it.
 
 ## Next proof
 
