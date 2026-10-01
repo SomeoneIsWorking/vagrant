@@ -251,9 +251,8 @@ class EntryContractTest(unittest.TestCase):
         """S002, asserted through the repository's OWN retired-pattern table.
 
         The pattern list is not restated here. A second list would be a second answer to "what counts
-        as the retired product", and it would drift: this test would keep passing on a selector the
-        shipping structure gate had learned to reject. The gate's `analyze_text` is the owner, so
-        this asks it the same question `tools/check_structure.py` asks.
+        as the retired product", and it would drift. The gate's `analyze_text` is the owner, and
+        `tools/verify.py` runs it over the whole repository.
         """
         for relative in ("tools/run.py", "tools/launcher/runtime_boundary.py"):
             with self.subTest(source=relative):

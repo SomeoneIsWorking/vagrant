@@ -106,7 +106,7 @@ struct Fixture {
       // carry. What is staged is the smallest finite body that RETURNS — `jr $ra` and a delay slot —
       // and the four halfwords the reader checks are staged by the test below, not produced here.
       // So this double establishes that the original ran and the read happened afterwards; it does
-      // not assert what retail's leaf writes, which is `tools/re_viewport.py`'s claim instead.
+      // not assert what retail's leaf writes, which is the byte measurement's claim instead.
       for (std::uint32_t leaf : {facts::kSetDefDispEnv, facts::kSetDefDrawEnv}) {
         core.mem_w32(leaf, kReturnNow);
         core.mem_w32(leaf + 4, kDelaySlot);
@@ -354,7 +354,7 @@ int main() {
   //     aborted comparing the boot's 320-wide publication against BATTLE's rectangle, which is
   //     still zero BSS while the resident runs. So the same publication is driven again with that
   //     rectangle left at zero — and the owner must SURVIVE it, which it could not before. The
-  //     widths below are the boot's own: `re_viewport.py` reads them out of `_initScreen` at
+  //     widths below are the boot's own: they are read out of `_initScreen` at
   //     0x80042054 and the single call site at 0x800420F0, so this is the boot and not a convenient
   //     number.
   {

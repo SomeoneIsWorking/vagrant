@@ -7,8 +7,7 @@
 #include <memory>
 
 // Hermetic contract of the first decomp-seeded native body (RE-07): vs_main_initHeap at
-// 0x80043F74. tools/re_heap.py measures every constant below from SLUS_010.40 itself and
-// --check-source fails when this file's shipped values drift from that measurement; this test
+// 0x80043F74. Every constant below was measured from SLUS_010.40's own bytes; this test
 // pins the BEHAVIOUR the measured body must produce on a real Core.
 
 namespace {
