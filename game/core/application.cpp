@@ -9,6 +9,7 @@
 #include "game.h"
 #include "hw_bind.h"
 #include "lightrec_executor.h"
+#include "machine.h"
 #include "memcensus.h"
 #include "mods.h"
 #include "platform_hle.h"
@@ -149,7 +150,6 @@ bool Application::start(Game &game, const std::string &residentImagePath) {
 
 void Application::run(Game &game) {
   Core &core = game.core;
-  FrameLoopShell shell;
   if (!started_) {
     lucent::error("vagrant-boot", "the Vagrant Story product loop was entered before the resident image was published");
     std::abort();
@@ -162,15 +162,14 @@ void Application::run(Game &game) {
 
   psx::config::report_once();
   lucent::info("vagrant-boot", "entering the bounded Vagrant Story product loop");
-  // The live control channel is started here rather than in the adapter, beside the loop it serves,
-  // because a surface nobody opens is not a surface.
-  core.game->dbg_server.start(&core);
-  store_observe_configure(core);
-  for (std::uint32_t frame = 0;; ++frame) {
-    core.game->dbg_server.honourPause(&core);
-    shell.step(core, frame);
-    core.game->dbg_server.service(&core);
-  }
+  // The composition every product shares: the live control channel and the store observer armed
+  // together, then the field turn (honour a client pause, run this title's finite frame step, service
+  // one queued command) with an end-of-run predicate and the run-end ledger. It is here rather than
+  // in the adapter because a surface nobody opens is not a surface, and a loop with no exit is a
+  // process no tool can stop.
+  psx::Machine machine{game};
+  machine.attachControlChannel(0u);
+  machine.run(0u);
 }
 
 void Application::reportRunEnd(Game &game) const {
