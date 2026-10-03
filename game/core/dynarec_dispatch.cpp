@@ -54,10 +54,9 @@ bool installNativeOverride(Core &core,
     recordInstall(core, true, false);
     return false;
   }
-  const bool accepted = core.nativeDispatcher().install({{*image, address}, name, function});
-  if (!accepted) {
-    lucent::error("vagrant-dynarec", "psxport's dispatcher refused override '{}' at 0x{:08X}", name, address);
-  }
+  // The image is resolved and the generation checked, so what remains is the framework's rule: build
+  // the (identity, address) key and refuse a key that already has an owner.
+  const bool accepted = psx::cpu::tryInstallNativeOverride(core, address, name, function).has_value();
   recordInstall(core, true, accepted);
   return accepted;
 }
