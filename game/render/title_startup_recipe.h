@@ -1,0 +1,32 @@
+#pragma once
+
+#include <cstdint>
+
+namespace vagrant {
+
+struct PackedTitleSprite {
+  std::uint32_t xy;
+  std::uint32_t uvClut;
+  std::uint32_t wh;
+  std::uint32_t tpageFade;
+};
+
+// Semantic arguments of TITLE's _drawSprt leaf, decoded from the guest ABI.
+struct TitleSpriteRecipe {
+  int x = 0;
+  int y = 0;
+  int width = 0;
+  int height = 0;
+  int u = 0;
+  int v = 0;
+  int texturePageX = 0;
+  int texturePageY = 0;
+  int textureMode = 0;
+  int clutX = 0;
+  int clutY = 0;
+  std::uint8_t shade = 0;
+
+  static TitleSpriteRecipe decode(PackedTitleSprite packed);
+};
+
+} // namespace vagrant
