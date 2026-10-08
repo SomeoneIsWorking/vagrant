@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""discdump.py — locate (and, if needed, build) the framework's `discdump` tool, and read a disc.
+
+`discdump` is psxport's ISO9660/CHD reader (external/psxport/tools/discdump.cpp); all disc reads go
+through it. Built from $PSXPORT_DIR (default external/psxport) under scratch/build/psxport;
+$PSXPORT_DISCDUMP overrides with a prebuilt binary. Listings are never cached.
+"""
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_BUILD = Path(ROOT) / "scratch/build/psxport"
+
+
+def psxport_dir():
+    d = os.environ.get("PSXPORT_DIR") or os.path.join(ROOT, "external", "psxport")
+    if not os.path.isabs(d):
+        d = os.path.join(ROOT, d)
+    return d
+
+
+def find(build_if_missing=True):
+    """Return an absolute path to a usable `discdump`, or raise SystemExit(2) saying why not."""
+    override = os.environ.get("PSXPORT_DISCDUMP")
+    if override:
+        if not os.access(override, os.X_OK):
+            print(
+                f"[discdump] $PSXPORT_DISCDUMP={override} is not executable",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
+        return os.path.abspath(override)
+
+    px = psxport_dir()
+    if not os.path.isfile(os.path.join(px, "cmake", "psxport.cmake")):
+        print(
+            f"[discdump] PSXPORT_DIR={px} is not a psxport checkout — run "
+            "`git submodule update --init external/psxport`, or set PSXPORT_DIR.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    build_dir = Path(os.environ.get("PSXPORT_DISCDUMP_BUILD", DEFAULT_BUILD))
+    for name in ("discdump", "discdump.exe"):
+        cand = build_dir / "tools" / name
+        if os.access(cand, os.X_OK):
+            return str(cand.resolve())
+    if not build_if_missing:
+        print(f"[discdump] not built under {build_dir}/tools", file=sys.stderr)
+        raise SystemExit(2)
+
+    return build(Path(px), build_dir)
+
+
+def configure_command(psxport, build_dir, cc, cxx, python):
+    """Return the test-free player configure for the authoritative disc reader."""
+    return [
+        "cmake",
+        "-S",
+        str(psxport),
+        "-B",
+        str(build_dir),
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DBUILD_TESTING=OFF",
+        "-DPSXPORT_BUILD_TESTS=OFF",
+        f"-DCMAKE_C_COMPILER={cc}",
+        f"-DCMAKE_CXX_COMPILER={cxx}",
+        f"-DPython3_EXECUTABLE={python}",
+    ]
+
+
+def build(psxport=None, build_dir=None, cc=None, cxx=None, python=None):
+    """Incrementally build the authoritative disc reader with the selected toolchain."""
+    psxport = Path(psxport or psxport_dir()).resolve()
+    build_dir = Path(
+        build_dir or os.environ.get("PSXPORT_DISCDUMP_BUILD", DEFAULT_BUILD)
+    )
+    cc = cc or os.environ.get("CC", "cc")
+    cxx = cxx or os.environ.get("CXX", "c++")
+    python = python or sys.executable
+
+    print(f"[discdump] building it from {psxport} (incremental)…", file=sys.stderr)
+    jobs = str(os.cpu_count() or 4)
+    for cmd in (
+        configure_command(psxport, build_dir, cc, cxx, python),
+        ["cmake", "--build", str(build_dir), "-j", jobs, "--target", "discdump"],
+    ):
+        r = subprocess.run(cmd, stdout=subprocess.DEVNULL, check=False)
+        if r.returncode != 0:
+            print(f"[discdump] FAILED: {' '.join(cmd)}", file=sys.stderr)
+            raise SystemExit(2)
+    for name in ("discdump", "discdump.exe"):
+        candidate = build_dir / "tools" / name
+        if os.access(candidate, os.X_OK):
+            return str(candidate.resolve())
+    raise SystemExit(f"[discdump] build produced no executable under {build_dir}/tools")
+
+
+def listing(disc, dd=None):
+    """Every file on the disc, as a list of (path, lba, size). Raises SystemExit(2) on a bad read."""
+    dd = dd or find()
+    out = subprocess.run(
+        [dd, "list", disc], capture_output=True, text=True, check=False
+    )
+    if out.returncode != 0:
+        print(
+            f"[discdump] list failed on {disc}:\n{out.stdout}{out.stderr}",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    # `discdump list` already prints each file with its full path; do not prepend the header directory.
+    files = []
+    for line in out.stdout.splitlines():
+        s = line.strip()
+        if (
+            not s
+            or s.startswith(("disc:", "root dir"))
+            or (s.endswith("/") and " " not in s)
+        ):
+            continue
+        parts = s.split()
+        if len(parts) >= 5 and parts[1] == "LBA":
+            files.append((parts[0], int(parts[2]), int(parts[3])))
+    if not files:
+        print(
+            f"[discdump] list produced ZERO files for {disc} — refusing to report an empty disc "
+            "as a successful read",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return files
+
+
+def get(disc, path_on_disc, outdir, dd=None):
+    """Extract one file. `path_on_disc` uses forward slashes ('BATTLE/BATTLE.PRG'), exactly as
+    `discdump list` prints it — the backslash form does NOT resolve. Returns the written path."""
+    dd = dd or find()
+    os.makedirs(outdir, exist_ok=True)
+    out = subprocess.run(
+        [dd, "get", path_on_disc, disc, outdir],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    dest = os.path.join(outdir, os.path.basename(path_on_disc))
+    if out.returncode != 0 or not os.path.isfile(dest):
+        print(
+            f"[discdump] get {path_on_disc} failed:\n{out.stdout}{out.stderr}",
+            file=sys.stderr,
+        )
+        return None
+    return dest
