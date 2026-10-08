@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# The dynarec adapter is not implemented, so this Linux-hosted job runs the
+# asset-free launcher/provisioning/structure verifier without claiming product
+# support for the host operating system.
+jobs:
+  policy:
+    name: Asset-free policy (Linux host)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install locked uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: '0.10.12'
+          python-version: '3.12'
+          enable-cache: false
+      - name: Verify checkout is not shallow
+        shell: bash
+        run: test "$(git rev-parse --is-shallow-repository)" = false
+      - name: Install locked Python environment
+        run: uv sync --locked
+      - name: Run the maintained verifier
+        run: uv run --frozen python tools/verify.py
