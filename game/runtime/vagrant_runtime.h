@@ -45,6 +45,8 @@ public:
   const char *discEnvVar() const override;
   // The libetc VSync body; psxport refuses a title without one before boot.
   const PlatformHlePlan *platformHlePlan() const override;
+  // Receive buffers PadInitDirect registered; without them the host never publishes a pad packet.
+  const GuestPadBufferLayout *guestPadBufferLayout() const override;
   // Non-null title field driver, or the framework refuses the product loop.
   std::unique_ptr<FrameDriver> createFrameDriver(Game &game) override;
 
@@ -58,6 +60,7 @@ public:
 private:
   static const GuestProgramImage programImage_;
   static const PlatformHlePlan platformPlan_;
+  static const GuestPadBufferLayout padLayout_;
 };
 
 } // namespace vagrant

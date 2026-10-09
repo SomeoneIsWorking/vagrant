@@ -7,6 +7,7 @@
 #include "execution/dynarec_dispatch.h"
 #include "game.h"
 #include "images/overlay_images.h"
+#include "input/pad_facts.h"
 #include "lightrec_executor.h"
 #include "lucent/content.h"
 #include "runtime/vagrant_context.h"
@@ -272,7 +273,7 @@ void registersTheMeasuredHeapLeaf() {
           "vs_main_initHeap is reachable through a generation that was never published");
 }
 
-// 6b. Every leaf `installResidentNativeOwners` claims must be bound; an unbound `handleDsControlB` hung libcd `CD_sync`
+// 6b. Every leaf `installResidentNativeOwners` claims must be bound; an unbound `handleDsControl` hung libcd `CD_sync`
 // (0x80020F28).
 void everyClaimedResidentLeafIsBound() {
   const auto bytes = residentFixture(0u);
@@ -284,7 +285,11 @@ void everyClaimedResidentLeafIsBound() {
     return;
   }
   const psx::cpu::ImageIdentity resident = identityOf(loaded, "bound-leaves");
-  for (const std::uint32_t leaf : {vagrant::heap::kInitHeap, vagrant::cd::kDsControlB}) {
+  for (const std::uint32_t leaf : {vagrant::heap::kInitHeap,
+                                   vagrant::cd::kDsControl,
+                                   vagrant::cd::kDsControlB,
+                                   vagrant::cd::kDsReadyCallback,
+                                   vagrant::resident::kLoadBattlePrg}) {
     require(vagrant::dynarec::hasNativeOverride(core, resident, leaf),
             "bound-leaves",
             "a leaf the resident registry claims is not reachable on the generation it published");
@@ -292,6 +297,23 @@ void everyClaimedResidentLeafIsBound() {
             "bound-leaves",
             "a resident leaf is reachable through a generation that was never published");
   }
+}
+
+// 6c. The host publishes the pad packet only into buffers the runtime declares; the title's PadInitDirect pair is
+// declared.
+void declaresThePadReceiveBuffers() {
+  auto machine = makeMachine(residentFixture(0u));
+  const GuestPadBufferLayout *layout = machine->runtime->guestPadBufferLayout();
+  require(
+      layout != nullptr, "pad-layout", "the runtime declares no pad receive buffers, so no input reaches the guest");
+  if (layout == nullptr) {
+    return;
+  }
+  require(layout->slot0Buffer == vagrant::pad::kSlot0Buffer && layout->slot1Buffer == vagrant::pad::kSlot1Buffer &&
+              layout->slotPointerTable == vagrant::pad::kDriverPointerTable &&
+              layout->slotPointerStride == vagrant::pad::kDriverPointerStride,
+          "pad-layout",
+          "the declared pad buffers differ from the measured PadInitDirect registration");
 }
 
 // 7. Replacing an overlay generation retires its override keys; the resident leaf survives (its range is disjoint).
@@ -366,6 +388,7 @@ void runEveryGroup() {
   originalCallReachesTheGuestBody();
   registersTheMeasuredHeapLeaf();
   everyClaimedResidentLeafIsBound();
+  declaresThePadReceiveBuffers();
   overlayReplacementRetiresThePriorGenerationsKeys();
 }
 

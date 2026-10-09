@@ -115,13 +115,12 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
   2026-10-04 records exactly one invocation of it with one original call that returned. What is NOT
   done: the other retained owners are still called as finite guest leaves rather than registered as
   overrides, so no run has compared a native owner against its ordinary dynarec path.
-  A second dispatch form now exists for the one retained leaf that measures longer than a host turn:
-  `vagrant::dynarec::callGuestResumingToReturn`, reached through `ResidentCallServices::callResuming`.
-  `_copyTitleBgData` (`0x8006FC6C`) is finite compute — a 222,928-byte run-length expand plus two
-  `LoadImage`s, with no I/O register, no VSync poll and no CD access anywhere in it — and it measured
-  4 host turns and 1,823,518 guest cycles, aborting at `0x8006FCEC` mid word-copy under the
-  one-turn form. The cap is that measurement plus one field (`title_splash::kCopyTitleBgDataTurns`
-  = 5), and it is a stated number the run-end census reports rather than an unbounded loop.
+  Guest code spanning fields runs as a suspended `ResumableGuestCall` (`GuestPhase`); the R3000 register
+  file is restored on every resume. `vs_main_execTitle` (0x80042BAC) after `vs_title_exec` is guest code run
+  by `ExecTitleTail`; `_loadBattlePrg` (0x80041E4C) is native, and `vs_battle_exec` (0x800798A4) runs from
+  the guest tail. libds: `CD_cw` sync completion is delivered by `LibDsField::completeOwedCommand` into the
+  slot at 0x800321FC, and the `ds_cbready` body (0x8002559C) is wrapped so INT1 data-ready never precedes
+  the owed completion.
 
 ### RE-08 — platform/HLE leaf inventory
 - status: re-partial

@@ -2,10 +2,12 @@
 
 #include "boot/resident_facts.h"
 #include "boot/resident_image.h"
+#include "cd/cd_command.h"
 #include "cd/cd_facts.h"
 #include "core.h"
 #include "execution/native_owners.h"
 #include "game.h"
+#include "input/pad_facts.h"
 #include "runtime/vagrant_context.h"
 #include "sync/frame_loop.h"
 #include "sync/vsync_facts.h"
@@ -35,7 +37,6 @@ std::string headerMismatch(const psx::cpu::PsxExeImage &image) {
 const PlatformHlePlan VagrantRuntime::platformPlan_{
     // The two stock libcd leaves are typed synchronous owners: as guest code the boot spun in CD_sync's completion wait
     // at 0x8002105C on a controller IRQ the synchronous CD model never delivers.
-    .cdCommandAddress = cd::kCdCommand,
     .cdSyncAddress = cd::kCdSync,
     // Guest libapi DMA callback table: channel 4's slot body at 0x8001DE94 is the only clearer of the transfer flag
     // at 0x800377F0, which `_waitTransferAvailable` polls and `_initSound` parks in.
@@ -43,10 +44,20 @@ const PlatformHlePlan VagrantRuntime::platformPlan_{
     .vsyncAddress = sync::kVSync,
     // libetc field counter retail `VSync` polls; the guest's first VSync is `VSync(-1)` from `CD_cw`.
     .vsyncQueryCounterAddress = sync::kVSyncQueryCounter,
+    // CD_cw is a title binding: libds is owed the sync callback the controller interrupt would deliver.
+    .bindings = {{cd::kCdCommand, cd::handleCdCommand}},
+    .bindingCount = 1,
     // One instruction per leaf, so the `CD_cw` and `CD_sync` waits stay unreachable. `stockCdWorkArea` stays zero: the
     // libcd CdLastPos/last-mode bytes are unmeasured, so that state stays guest-owned.
     .windowLo = {sync::kVSync, cd::kCdCommand, cd::kCdSync},
     .windowHi = {sync::kVSyncWindowEnd, cd::kCdCommandWindowEnd, cd::kCdSyncWindowEnd},
+};
+
+const GuestPadBufferLayout VagrantRuntime::padLayout_{
+    .slot0Buffer = pad::kSlot0Buffer,
+    .slot1Buffer = pad::kSlot1Buffer,
+    .slotPointerTable = pad::kDriverPointerTable,
+    .slotPointerStride = pad::kDriverPointerStride,
 };
 
 const GuestProgramImage VagrantRuntime::programImage_{
@@ -101,6 +112,10 @@ const char *VagrantRuntime::discEnvVar() const {
 
 const PlatformHlePlan *VagrantRuntime::platformHlePlan() const {
   return &platformPlan_;
+}
+
+const GuestPadBufferLayout *VagrantRuntime::guestPadBufferLayout() const {
+  return &padLayout_;
 }
 
 std::unique_ptr<FrameDriver> VagrantRuntime::createFrameDriver(Game &) {

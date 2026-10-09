@@ -94,16 +94,32 @@ psx::cpu::ExecutionResult callOriginalResuming(Core &core, psx::cpu::NativeKey k
   return psx::cpu::callOriginalResumingToExit(core, key, psx::cpu::ExecutionBudget::currentTurn(core));
 }
 
-std::uint32_t callGuestResumingToReturn(Core &core, std::uint32_t entry, std::uint32_t turnCap) {
-  return psx::cpu::callGuestToReturnResuming(
-      core, "Vagrant finite guest leaf", entry, core.r[31], std::nullopt, turnCap);
-}
-
 void requireGuestReturn(const psx::cpu::ExecutionResult &result, std::string_view owner) {
   if (psx::cpu::requireGuestReturn(result, owner)) {
     return;
   }
   std::abort();
+}
+
+void ResumableContinuation::begin(Core &core, std::uint32_t entry, std::string_view owner, std::uint32_t returnPc) {
+  call_.begin(core, owner, entry, returnPc, psx::cpu::kUnboundedCallTurns);
+}
+
+ContinuationStep ResumableContinuation::advance() {
+  const psx::cpu::CallStep step = call_.advance();
+  switch (step.outcome) {
+  case psx::cpu::CallOutcome::Returned:
+    return {ContinuationStep::Kind::Returned, step.value, step.guestPc, {}};
+  case psx::cpu::CallOutcome::Suspended:
+    return {ContinuationStep::Kind::Suspended,
+            0u,
+            step.guestPc,
+            {},
+            step.reason == psx::cpu::ExecutionExitReason::FrameBoundary};
+  case psx::cpu::CallOutcome::Refused:
+    break;
+  }
+  return {ContinuationStep::Kind::Refused, 0u, step.guestPc, step.detail};
 }
 
 bool hasNativeOverride(Core &core, psx::cpu::ImageIdentity image, std::uint32_t address) {

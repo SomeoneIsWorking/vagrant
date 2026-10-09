@@ -3,8 +3,10 @@
 #include "execution_exit.h"
 #include "image_identity.h"
 #include "native_dispatch.h"
+#include "resumable_guest_call.h"
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 class Core;
@@ -53,8 +55,32 @@ bool hasNativeOverride(Core &core, psx::cpu::ImageIdentity image, std::uint32_t 
 // and PC otherwise.
 psx::cpu::ExecutionResult callOriginalResuming(Core &core, psx::cpu::NativeKey key);
 
-// A finite leaf needing more than one turn, resumed up to `turnCap` display fields.
-// The return address is `r[31]` read before the call because the body overwrites it.
-std::uint32_t callGuestResumingToReturn(Core &core, std::uint32_t entry, std::uint32_t turnCap);
+// How one display field of a resumable guest call ended.
+struct ContinuationStep {
+  enum class Kind : std::uint8_t { Suspended, Returned, Refused };
+  Kind kind = Kind::Refused;
+  std::uint32_t value = 0;    // `$v0` once Returned
+  std::uint32_t pc = 0;       // where the guest stopped
+  std::string detail;         // the refusal
+  bool frameBoundary = false; // Suspended at the guest's own VSync, not at an exhausted turn
+};
+
+// A guest call that spans display fields: a guest VSync or an exhausted turn suspends it and `advance` resumes it on
+// the next field. `begin` accepts any PC inside a loaded image, not only a function entry.
+class GuestContinuation {
+public:
+  virtual ~GuestContinuation() = default;
+  virtual void begin(Core &core, std::uint32_t entry, std::string_view owner, std::uint32_t returnPc) = 0;
+  virtual ContinuationStep advance() = 0;
+};
+
+class ResumableContinuation final : public GuestContinuation {
+public:
+  void begin(Core &core, std::uint32_t entry, std::string_view owner, std::uint32_t returnPc) override;
+  ContinuationStep advance() override;
+
+private:
+  psx::cpu::ResumableGuestCall call_;
+};
 
 } // namespace vagrant::dynarec

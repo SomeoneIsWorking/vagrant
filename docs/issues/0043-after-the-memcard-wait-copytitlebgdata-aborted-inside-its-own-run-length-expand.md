@@ -30,3 +30,6 @@ address read from `r[31]` before the call because the guest body overwrites it a
 `ResidentCallServices::callResuming` is the owner-facing seam and
 `title_splash::kCopyTitleBgDataTurns` the stated cap (the measurement plus one field), so
 `tests/test_vagrant_runtime.cpp` fails if this leaf silently returns to the single-turn form.
+## Update 2026-10-09
+
+`callResuming` and `kCopyTitleBgDataTurns` no longer exist; TITLE's guest code, including this leaf, now runs as a suspended guest call that spans fields (`TitleExecPhase`).

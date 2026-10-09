@@ -27,16 +27,20 @@ target_link_libraries(vagrant_runtime PUBLIC psxport)
 # Native owners that link and test without the process adapter.
 add_library(vagrant_native STATIC
   game/boot/application.cpp
+  game/boot/exec_title_tail.cpp
   game/boot/game_heap.cpp
   game/boot/game_time.cpp
   game/boot/guest_rect.cpp
   game/boot/resident_image.cpp
   game/boot/resident_phase.cpp
+  game/cd/cd_command.cpp
   game/cd/ds_control.cpp
   game/cd/libds_field.cpp
   game/cd/native_file.cpp
   game/execution/dynarec_dispatch.cpp
+  game/execution/guest_phase.cpp
   game/execution/native_owners.cpp
+  game/images/battle_transfer.cpp
   game/images/title_entry.cpp
   game/images/title_transfer.cpp
   game/input/pad_delivery.cpp
@@ -51,7 +55,8 @@ add_library(vagrant_native STATIC
   game/runtime/vagrant_runtime.cpp
   game/save/title_memcard_init.cpp
   game/save/title_save_check.cpp
-  game/sync/frame_loop.cpp)
+  game/sync/frame_loop.cpp
+  game/title/title_exec_phase.cpp)
 target_include_directories(vagrant_native PUBLIC game)
 target_link_libraries(vagrant_native PUBLIC psxport vagrant_runtime)
 

@@ -43,9 +43,10 @@ Two rules hold everywhere below:
 
 | File | Symbol | Responsibility |
 |---|---|---|
-| `cd_facts.h` | `kDsControlB`, `kCdCommand`, `kCdSync`, `kDiskState`, `kSystemState`, `kCommandDeadline`, `ownedControl` | the measured libcd/libds addresses and command classification this directory ships, with their provenance |
-| `ds_control.{h,cpp}` | `handleDsControlB` | the native body for the blocking `DsControlB` boundary: refuses an unowned command by name, establishes the measured libds Ready postcondition, and clears the retry deadline. It is BOUND at `cd::kDsControlB` by `execution/native_owners.cpp` — a body here that nothing installs is not an owner, and the guest's own libds wait behind it is unbounded |
-| `libds_field.{h,cpp}` | `LibDsField` | the finite libds state transition formerly reached from the guest's VBlank callback, and the synchronous-`DsInit` Ready postcondition |
+| `cd_facts.h` | `kDsControl`, `kDsControlB`, `kCdCommand`, `kCdSync`, `kDiskState`, `kSystemState`, `kCommandDeadline`, `ownedControl` | the measured libcd/libds addresses and command classification this directory ships, with their provenance |
+| `ds_control.{h,cpp}` | `handleDsControl` | the native body for the blocking `DsControlB` boundary: refuses an unowned command by name, establishes the measured libds Ready postcondition, and clears the retry deadline. It is BOUND at `cd::kDsControlB` by `execution/native_owners.cpp` — a body here that nothing installs is not an owner, and the guest's own libds wait behind it is unbounded |
+| `cd_command.{h,cpp}` | `handleCdCommand` | the `CD_cw` leaf: the stock send, then the owed sync completion is recorded for the next field |
+| `libds_field.{h,cpp}` | `LibDsField` (`commandSent`, `completeOwedCommand`) | the finite libds state transition formerly reached from the guest's VBlank callback, and the synchronous-`DsInit` Ready postcondition |
 | `native_file.{h,cpp}` | `readNativeSectors`, `readNativeFile`, `readDiscSector`, `SectorTransfer`, `ReadSector` | acquire whole sectors and copy a measured file extent from the real disc into guest RAM; a failed read leaves guest RAM untouched |
 
 ### `game/boot/` — the boot spine (`namespace vagrant`, `vagrant::heap`, `vagrant::game_time`, `vagrant::guest`, `vagrant::resident`)
@@ -54,7 +55,8 @@ Two rules hold everywhere below:
 |---|---|---|
 | `application.{h,cpp}` | `Application`, `runApplication` | the ORDER the machine becomes a product: publish the resident image, bind peripherals, register native leaves, preflight the platform sync boundary, run the measured boot phase, enter the product loop, report the run-end census |
 | `resident_image.{h,cpp}` | `readResidentImage`, `ResidentImage`, `kResidentImageName`, `kDiscEnvKey`, `kResidentFileBytes` | read the provisioned resident file whole, refuse any size but the measured one, and digest exactly the bytes about to be mapped |
-| `resident_phase.{h,cpp}` | `ResidentPhase`, `ResidentCallServices`, `productionResidentCallServices`, `ResidentPhaseState` | the finite resident bootstrap and the start of TITLE reinitialisation: retail leaf order, with every measured guest field wait turned into an explicit host state, and the one finite leaf that measures longer than a host turn reached through `callResuming` |
+| `resident_phase.{h,cpp}` | `ResidentPhase`, `ResidentCallServices`, `productionResidentCallServices`, `ResidentPhaseState` | the finite resident bootstrap and the start of TITLE reinitialisation: retail leaf order, with every measured guest field wait turned into an explicit host state; `TitleExecRunning` and `ExecTitleTailRunning` hand TITLE and the `vs_main_execTitle` tail to suspended guest calls |
+| `exec_title_tail.{h,cpp}` | `ExecTitleTail` | `vs_main_execTitle` after `vs_title_exec` returns (0x80042BE0): continues the guest tail through `_loadBattlePrg` into `vs_battle_exec`, one suspended call across fields |
 | `resident_facts.h` | `kCxxMain`, `kInitHeap`, `kTitlePrgLba`, `kGameTime`, `kTitleCallSite`, … | the resident addresses, offsets and load bases `ResidentPhase` ships |
 | `game_time.{h,cpp}` | `game_time::advance` | the packed tick/frame/second/minute/hour transition from `vs_main_gametimeUpdate`, wherever a native field replaces it |
 | `guest_rect.{h,cpp}` | `guest::writeRect` | materialise a PSX RECT in guest RAM; the one implementation of that field order |
@@ -65,6 +67,7 @@ Two rules hold everywhere below:
 | File | Symbol | Responsibility |
 |---|---|---|
 | `dynarec_dispatch.{h,cpp}` | `installNativeOverride`, `callGuest`, `callReturning0..4`, `callGuestResumingToReturn`, `executeTurn`, `callOriginal`, `callOriginalResuming`, `callOriginalToReturn`, `requireGuestReturn`, `hasNativeOverride` | the entire title adapter surface over psxport's executor: the only place that spells a budget, resolves an image identity, or picks a dispatch form |
+| `guest_phase.{h,cpp}` | `GuestPhase` | a suspended guest call that spans fields: begin, advance per field, abort on refusal |
 | `native_owners.{h,cpp}` | `installResidentNativeOwners`, `NativeOwnerRegistration` | WHICH leaves the title owns for the resident generation, and the all-or-nothing registration bound to the generation that published them |
 
 ### `game/images/` — image residency and the cross-image call gates (`namespace vagrant`)
@@ -73,6 +76,7 @@ Two rules hold everywhere below:
 |---|---|---|
 | `overlay_images.{h,cpp}` | `OverlayImages`, `OverlayKind`, `OverlaySpec`, `OverlayLoadResult` | per-Core overlay residency: authenticate a complete input, publish it into its measured slot, and invalidate the generation it replaces |
 | `title_transfer.{h,cpp}` | `readAndLoadTitle` | the completed resident-sector TITLE.PRG transfer: acquire the whole extent, then publish it as an executable image |
+| `battle_transfer.{h,cpp}` | `readAndLoadBattle` | the `_loadBattlePrg` body: read BATTLE.PRG and INITBTL.PRG and publish both as executable images |
 | `title_entry.{h,cpp}` | `validateTitleEntry`, `enterTitle` | admit only the measured resident-to-TITLE call, from the still-active resident generation into the just-published TITLE generation |
 
 ### `game/runtime/` — the per-Core composition root (`namespace vagrant`)
@@ -170,13 +174,9 @@ The framework's own `psx::Fmv` is stepped rather than blocking for the same reas
 does not use it. So the frame turn, the control channel and host input keep running for the whole
 duration of both.
 
-The one exception is FINITE COMPUTE that measures longer than a host field, not a wait: TITLE's
-`_copyTitleBgData` measured 4 turns and 1,823,518 guest cycles (issue 0043), so `ResidentPhase`
-reaches it through `ResidentCallServices::callResuming`, which resumes it up to
-`title_splash::kCopyTitleBgDataTurns` fields. During those fields no frame is presented and no control
-command is serviced, which is acceptable only because the call runs once, during TITLE setup, before
-anything is on screen; a resumable leaf on a presented screen has to become a `ResidentPhase` state
-instead.
+Guest code that spans fields (TITLE's menu loop, the `vs_main_execTitle` tail) runs as a `GuestPhase`: a
+suspended `ResumableGuestCall` that VSync or an exhausted turn suspends and the next field resumes. The menu
+producer presents only on a VSync suspension (`TitleMenu::frameCompleted`), never on an exhausted turn.
 
 ### Host input -> `Pad` -> guest pad buffer
 

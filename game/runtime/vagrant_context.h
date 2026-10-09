@@ -1,5 +1,6 @@
 #pragma once
 
+#include "boot/exec_title_tail.h"
 #include "boot/resident_phase.h"
 #include "cd/libds_field.h"
 #include "images/overlay_images.h"
@@ -12,6 +13,7 @@
 #include "render/title_startup.h"
 #include "save/title_memcard_init.h"
 #include "save/title_save_check.h"
+#include "title/title_exec_phase.h"
 
 #include <utility>
 
@@ -35,6 +37,8 @@ struct VagrantContext {
   TitleSplashPhase titleSplash{};
   TitleMemcardInit titleMemcardInit{};
   TitleSaveCheck titleSaveCheck{};
+  TitleExecPhase titleExec{};
+  ExecTitleTail execTitleTail{};
   TitleStartupProducer titleStartup{};
   TitleMovieProducer titleMovie{};
 };

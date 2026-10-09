@@ -1,11 +1,11 @@
 ---
 id: 35
 title: TITLE stops at _initIntroMovie boundary with partial lower-right texture
-status: investigating
+status: resolved
 symptom: After finite save/memcard initialization completes, the exact product reaches _initIntroMovie but subsequent fields show a stable partial texture strip at the lower-right instead of a proper intro frame.
 tags: S003,S004,S013,title,intro,movie,presentation,native-ownership,re-23
 created: 2026-08-27
-updated: 2026-08-27
+updated: 2026-10-09
 ---
 
 ## Live evidence
@@ -19,3 +19,7 @@ The native resident phase deliberately stops at `TitleIntroBoundary`; `_initIntr
 ## Proper fix
 
 Measure `_initIntroMovie` top-down from the SHA-bound TITLE overlay, preserve every finite non-VSync state transition and restricted-byte load, then resume through host-owned fields into the existing retained-super movie producer. Keep guest VSync globally fatal and verify the first actual intro frame visually on the real disc.
+
+## Resolution
+
+`ExecTitleTail`, `TitleExecPhase` and the CD completion owners (issues 0045-0050) run the intro movie and menu; shots `scratch/title-to-battle/shots3`, `shots12` show them.

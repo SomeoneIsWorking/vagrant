@@ -6,6 +6,8 @@ namespace vagrant::cd {
 
 // libcd/libds leaves. CD_cw contains two waits and CD_init calls CD_sync directly; both are bound so no guest VSync
 // query is reachable.
+// Both blocking libds command wrappers (byte-identical bodies); TITLE's movie start calls `kDsControl`.
+inline constexpr std::uint32_t kDsControl = 0x80025B7Cu;
 inline constexpr std::uint32_t kDsControlB = 0x80025BE4u;
 inline constexpr std::uint32_t kCdCommand = 0x80021470u;
 inline constexpr std::uint32_t kCdCommandWindowEnd = kCdCommand + 4u;
@@ -17,6 +19,15 @@ inline constexpr std::uint32_t kDsFlush = 0x800243A0u;
 inline constexpr std::uint32_t kDiskState = 0x80055D10u;
 inline constexpr std::uint32_t kDsControlBuffer = 0x80055D2Cu;
 inline constexpr std::uint32_t kCdReadBuffer = 0x80050110u;
+
+// libcd's sync-callback slot (CdSyncCallback), the interrupt-code byte its ISR sets and the 8-byte result it hands the
+// callback; libds registers ds_cbsync (0x80024F34) there.
+inline constexpr std::uint32_t kSyncCallbackSlot = 0x800321FCu;
+inline constexpr std::uint32_t kSyncInterruptCode = 0x800324D8u;
+inline constexpr std::uint32_t kSyncResult = 0x80039C50u;
+inline constexpr std::uint32_t kCdlComplete = 2u;
+// ds_cbready: libcd's ready callback for libds (slot 0x80032200), run by the CD interrupt for each sector.
+inline constexpr std::uint32_t kDsReadyCallback = 0x8002559Cu;
 
 // The libds system-state word and its Busy/Ready values.
 inline constexpr std::uint32_t kSystemState = 0x8003269Cu;

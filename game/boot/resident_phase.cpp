@@ -15,22 +15,12 @@
 #include <lucent/log.h>
 
 namespace vagrant {
-namespace {
-
-// TITLE `_copyTitleBgData` expands the 544x576 background in a 222,928-byte run-length walk with no I/O or VSync.
-// Finite compute longer than one field, so the cap is one field more than it needs.
-std::uint32_t resumingTitleBgCopy(Core &core, std::uint32_t entry, std::uint32_t turnCap) {
-  return dynarec::callGuestResumingToReturn(core, entry, turnCap);
-}
-
-} // namespace
 
 ResidentCallServices productionResidentCallServices() {
   return {.call0 = dynarec::callReturning0,
           .call1 = dynarec::callReturning1,
           .call2 = dynarec::callReturning2,
           .call4 = dynarec::callReturning4,
-          .callResuming = resumingTitleBgCopy,
           .readFile = cd::readNativeFile,
           .readSector = cd::readDiscSector};
 }
@@ -43,8 +33,8 @@ ResidentPhase::ResidentPhase(ResidentCallServices services) : services_(services
 }
 
 void ResidentPhase::requireServices(const ResidentCallServices &services) {
-  if (services.call0 && services.call1 && services.call2 && services.call4 && services.callResuming &&
-      services.readFile && services.readSector) {
+  if (services.call0 && services.call1 && services.call2 && services.call4 && services.readFile &&
+      services.readSector) {
     return;
   }
   lucent::error("vagrant-resident", "ResidentPhase requires every finite guest-call service");
@@ -312,12 +302,25 @@ void ResidentPhase::advanceAfterField(Core &core) {
     if (!saveCheck.complete()) {
       return;
     }
-    for (std::uint32_t index = 0u; index < 8u; ++index) {
-      core.mem_w8(title_splash::kMenuItemStates + index * 8u, 0u);
+    state_ = ResidentPhaseState::TitleExecRunning;
+    lucent::info("vagrant-resident", "TITLE save-file check completed; vs_title_exec continues as guest code");
+    contextOf(core).titleExec.begin(core, saveCheck.saveFileExists() ? 1u : 0u);
+    return;
+  }
+  if (state_ == ResidentPhaseState::TitleExecRunning) {
+    auto &titleExec = contextOf(core).titleExec;
+    titleExec.advanceAfterField(core);
+    if (titleExec.complete()) {
+      state_ = ResidentPhaseState::ExecTitleTailRunning;
+      lucent::info("vagrant-resident",
+                   "TITLE returned option {}; vs_main_execTitle continues as guest code",
+                   titleExec.selectedOption());
+      contextOf(core).execTitleTail.begin(core, titleExec.selectedOption());
     }
-    services_.callResuming(core, title_splash::kCopyTitleBgData, title_splash::kCopyTitleBgDataTurns);
-    state_ = ResidentPhaseState::TitleIntroBoundary;
-    lucent::info("vagrant-resident", "TITLE save-file check completed; next owner is _initIntroMovie");
+    return;
+  }
+  if (state_ == ResidentPhaseState::ExecTitleTailRunning) {
+    contextOf(core).execTitleTail.advanceAfterField(core);
     return;
   }
   if (state_ == ResidentPhaseState::InitCardFieldWait) {

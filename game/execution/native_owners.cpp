@@ -1,13 +1,16 @@
 #include "execution/native_owners.h"
 
 #include "boot/game_heap.h"
+#include "boot/resident_facts.h"
 #include "cd/cd_facts.h"
 #include "cd/ds_control.h"
 #include "core.h"
 #include "execution/dynarec_dispatch.h"
+#include "images/battle_transfer.h"
 #include "render/battle_projection.h"
 #include "runtime/vagrant_context.h"
 
+#include <cstdlib>
 #include <lucent/log.h>
 
 namespace vagrant {
@@ -45,10 +48,38 @@ void initHeapOverride(Core *core) {
 
 namespace {
 
-// libds's blocking `DsControlB` spins in DS_getready -> DS_sync -> CD_sync (0x80020F28) on 0x800324D8, written only
-// by libcd's CD interrupt handler, which nothing in the port raises.
-void dsControlBOverride(Core *core) {
-  cd::handleDsControlB(*core);
+// libds's blocking `DsControl`/`DsControlB` spin in DS_getready -> DS_sync -> CD_sync (0x80020F28) on 0x800324D8,
+// written only by libcd's CD interrupt handler, which nothing in the port raises.
+void dsControlOverride(Core *core) {
+  cd::handleDsControl(*core);
+}
+
+// ds_cbready: the command's completion is owed before its first sector, which instant reads would otherwise put first.
+void dsReadyOverride(Core *core) {
+  const std::uint32_t intr = core->r[4];
+  const std::uint32_t result = core->r[5];
+  const std::uint32_t returnAddress = core->r[31];
+  contextOf(*core).libDsField.completeOwedCommand(*core);
+  core->r[4] = intr;
+  core->r[5] = result;
+  core->r[31] = returnAddress;
+  dynarec::callOriginalToReturn(*core, cd::kDsReadyCallback, "Vagrant libds ds_cbready");
+}
+
+} // namespace
+
+namespace {
+
+// `_loadBattlePrg` waits on the CD queue for both overlays; the finite read publishes them whole instead, and the
+// trailing `vs_overlay_wait` is a 4096-instruction nop sled.
+void loadBattleProgramsOverride(Core *core) {
+  const OverlayLoadResult loaded = readAndLoadBattle(*core, contextOf(*core).overlayImages, cd::readDiscSector);
+  if (loaded) {
+    lucent::info("vagrant-owners", "BATTLE.PRG and INITBTL.PRG loaded as published images");
+    return;
+  }
+  lucent::error("vagrant-owners", "BATTLE.PRG/INITBTL.PRG load refused: {}", loaded.detail);
+  std::abort();
 }
 
 } // namespace
@@ -61,7 +92,10 @@ NativeOwnerRegistration installResidentNativeOwners(Core &core, psx::cpu::ImageI
     psx::cpu::NativeFunction function;
   } bindings[]{
       {heap::kInitHeap, "Vagrant vs_main_initHeap", initHeapOverride},
-      {cd::kDsControlB, "Vagrant libds DsControlB", dsControlBOverride},
+      {cd::kDsControl, "Vagrant libds DsControl", dsControlOverride},
+      {cd::kDsControlB, "Vagrant libds DsControlB", dsControlOverride},
+      {cd::kDsReadyCallback, "Vagrant libds ds_cbready", dsReadyOverride},
+      {resident::kLoadBattlePrg, "Vagrant _loadBattlePrg", loadBattleProgramsOverride},
   };
   for (const Binding &binding : bindings) {
     ++registration.attempts;

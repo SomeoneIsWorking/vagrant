@@ -42,6 +42,22 @@ inline constexpr std::uint32_t kTitleOuterStack = 0x80050474u;
 inline constexpr std::uint32_t kTitlePrgLba = 0x0003E800u;
 inline constexpr std::uint32_t kTitlePrgSize = 0x00087800u;
 inline constexpr std::uint32_t kTitleOverlayBase = 0x80068800u;
+
+// `vs_main_execTitle` 0x80042BAC: 0x18-byte frame (s0 at +0x10, ra at +0x14), s0 = 0x8005DFD0 (the overlay stack slot).
+// Its tail resumes at the instruction after the TITLE call and returns into `vs_main_exec`.
+inline constexpr std::uint32_t kExecTitleFrameSize = 0x18u;
+inline constexpr std::uint32_t kExecTitleSavedS0 = 0x10u;
+inline constexpr std::uint32_t kExecTitleSavedRa = 0x14u;
+inline constexpr std::uint32_t kExecTitleStackSlot = 0x8005DFD0u;
+inline constexpr std::uint32_t kExecTitleTail = 0x80042BE0u;
+inline constexpr std::uint32_t kExecTitleReturn = 0x80042C64u;
+
+// `_loadBattlePrg` 0x80041E4C reads BATTLE.PRG into overlay slot 0 and INITBTL.PRG into slot 1 through the CD queue.
+inline constexpr std::uint32_t kLoadBattlePrg = 0x80041E4Cu;
+inline constexpr std::uint32_t kBattlePrgLba = 0x0000044Cu;
+inline constexpr std::uint32_t kBattlePrgSize = 0x0008D800u;
+inline constexpr std::uint32_t kInitBtlPrgLba = 0x00000567u;
+inline constexpr std::uint32_t kInitBtlPrgSize = 0x00002000u;
 inline constexpr std::uint32_t kTitleCallSite = 0x80042BD8u;
 inline constexpr std::uint32_t kTitleCallDelayWord = 0x00000000u;
 inline constexpr std::uint32_t kTitleEntry = 0x80071334u;

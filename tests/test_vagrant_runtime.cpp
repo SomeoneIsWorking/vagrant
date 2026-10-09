@@ -1,5 +1,6 @@
 #include "boot/resident_facts.h"
 #include "boot/resident_phase.h"
+#include "cd/cd_command.h"
 #include "cd/cd_facts.h"
 #include "cd/native_file.h"
 #include "core.h"
@@ -12,9 +13,9 @@
 #include "save/title_save_facts.h"
 #include "sync/frame_loop.h"
 #include "sync/vsync_facts.h"
+#include "title/title_exec_facts.h"
 
 #include <cstdio>
-#include <map>
 #include <memory>
 #include <vector>
 
@@ -42,7 +43,6 @@ bool g_titleMenuReady = false;
 bool g_battleReady = false;
 bool g_titleMovieReady = false;
 std::uint32_t g_memcardEvents[8] = {};
-std::map<std::uint32_t, std::uint32_t> g_resumingTurnCaps;
 int g_memcardEventCount = 0;
 int g_memcardEventIndex = 0;
 std::uint32_t g_firstFileResult = 0u;
@@ -108,17 +108,18 @@ std::uint32_t recordCall(std::uint32_t address,
   return 0;
 }
 
-void libDsCall0(Core &, std::uint32_t address) {
+std::uint32_t libDsCall0(Core &, std::uint32_t address) {
   recordCall(address, 0);
+  return 0u;
+}
+
+std::uint32_t libDsCall2(Core &, std::uint32_t address, std::uint32_t a0, std::uint32_t a1) {
+  recordCall(address, 2, a0, a1);
+  return 0u;
 }
 
 std::uint32_t guestCall0(Core &, std::uint32_t address) {
   return recordCall(address, 0);
-}
-std::uint32_t guestCallResuming(Core &, std::uint32_t address, std::uint32_t turnCap) {
-  recordCall(address, 0);
-  g_resumingTurnCaps[address] = turnCap;
-  return 0u;
 }
 std::uint32_t guestCall1(Core &, std::uint32_t address, std::uint32_t a0) {
   if (address == vagrant::title_save::kMemcardEventHandler && a0 == 0u) {
@@ -155,6 +156,29 @@ bool readFile(Core &, std::uint32_t lba, std::uint32_t size, std::uint32_t desti
   g_fileReads[g_fileReadCount++] = {.lba = lba, .size = size, .destination = destination};
   return true;
 }
+
+// Stands in for the resumable guest call: records the entry it was given and suspends for a stated number of fields.
+class FakeContinuation final : public vagrant::dynarec::GuestContinuation {
+public:
+  void begin(Core &, std::uint32_t entry, std::string_view, std::uint32_t returnPc) override {
+    ++begins;
+    this->entry = entry;
+    this->returnPc = returnPc;
+  }
+  vagrant::dynarec::ContinuationStep advance() override {
+    ++advances;
+    if (advances <= suspendedFields) {
+      return {vagrant::dynarec::ContinuationStep::Kind::Suspended, 0u, entry, {}, frameBoundary};
+    }
+    return {vagrant::dynarec::ContinuationStep::Kind::Returned, 5u, returnPc, {}};
+  }
+  int begins = 0;
+  int advances = 0;
+  int suspendedFields = 2;
+  bool frameBoundary = false;
+  std::uint32_t entry = 0;
+  std::uint32_t returnPc = 0;
+};
 
 bool expectEvents(const int *expected, int count) {
   if (g_eventCount != count) {
@@ -194,13 +218,12 @@ int main() {
   vagrant::VagrantContext contextStorage(game->core, std::move(specs));
   game->core.gameCtx = &contextStorage;
   auto *context = &contextStorage;
-  context->libDsField = vagrant::cd::LibDsField({.call0 = libDsCall0});
+  context->libDsField = vagrant::cd::LibDsField({.call0 = libDsCall0, .call2 = libDsCall2});
   const vagrant::ResidentCallServices residentServices{
       .call0 = guestCall0,
       .call1 = guestCall1,
       .call2 = guestCall2,
       .call4 = guestCall4,
-      .callResuming = guestCallResuming,
       .readFile = readFile,
       .readSector = zeroSector,
   };
@@ -208,6 +231,13 @@ int main() {
   context->titleSplash = vagrant::TitleSplashPhase(residentServices);
   context->titleMemcardInit = vagrant::TitleMemcardInit(residentServices);
   context->titleSaveCheck = vagrant::TitleSaveCheck(residentServices);
+  auto fakeContinuation = std::make_unique<FakeContinuation>();
+  FakeContinuation *titleExecCall = fakeContinuation.get();
+  context->titleExec = vagrant::TitleExecPhase(std::move(fakeContinuation));
+  auto fakeTail = std::make_unique<FakeContinuation>();
+  FakeContinuation *execTailCall = fakeTail.get();
+  execTailCall->suspendedFields = 1;
+  context->execTitleTail = vagrant::ExecTitleTail(std::move(fakeTail));
 
   vagrant::FrameServices services{
       .input = input,
@@ -289,6 +319,28 @@ int main() {
   context->libDsField.serviceField(game->core);
   if (g_callCount != 1 || g_calls[0].address != vagrant::cd::kFieldStatusTick) {
     std::fprintf(stderr, "native field did not invoke the exact finite libds field services\n");
+    return 1;
+  }
+  // libcd's CD_cw accepting a libds command owes the registered sync callback one Complete(2) on the next field.
+  constexpr std::uint32_t kDsCallback = 0x80024F34u;
+  game->core.mem_w32(vagrant::cd::kSyncCallbackSlot, kDsCallback);
+  game->core.r[4] = 0x01u;
+  game->core.r[5] = 0u;
+  game->core.r[6] = 0u;
+  vagrant::cd::handleCdCommand(&game->core);
+  g_callCount = 0;
+  context->libDsField.serviceField(game->core);
+  if (g_callCount != 2 || g_calls[0].address != kDsCallback || g_calls[0].arity != 2 ||
+      g_calls[0].args[0] != vagrant::cd::kCdlComplete || g_calls[0].args[1] != vagrant::cd::kSyncResult ||
+      game->core.mem_r8(vagrant::cd::kSyncInterruptCode) != vagrant::cd::kCdlComplete ||
+      g_calls[1].address != vagrant::cd::kFieldStatusTick) {
+    std::fprintf(stderr, "an accepted libcd command did not owe libds exactly one sync completion\n");
+    return 1;
+  }
+  g_callCount = 0;
+  context->libDsField.serviceField(game->core);
+  if (g_callCount != 1) {
+    std::fprintf(stderr, "libds sync completion was delivered twice for one command\n");
     return 1;
   }
   g_callCount = 0;
@@ -481,21 +533,49 @@ int main() {
   }
   // One frame-counter advance per poll: 3 x the measured 2-per-frame tick speed.
   if (!context->titleSaveCheck.complete() || context->titleSaveCheck.saveFileExists() ||
-      game->core.r[29] != initialStack || game->core.mem_r8(vagrant::resident::kGameTime) != 6u ||
+      game->core.mem_r8(vagrant::resident::kGameTime) != 6u ||
       game->core.mem_r8(filename + 2u) != static_cast<std::uint8_t>('0') ||
       game->core.mem_r8(filename + 20u) != static_cast<std::uint8_t>('?')) {
     std::fprintf(stderr, "TITLE save-file phase lost a memcard, gametime, filename, or stack transition\n");
     return 1;
   }
-  if (context->residentPhase.state() != vagrant::ResidentPhaseState::TitleIntroBoundary) {
-    std::fprintf(stderr, "TITLE save-file completion did not reach the intro ownership boundary\n");
+  // The tail of vs_title_exec continues as guest code from the loop top, in a rebuilt 0x40-byte frame with the
+  // prologue's registers, and the resident phase hands each following field to it.
+  const std::uint32_t execFrame = initialStack - vagrant::title_exec::kFrameSize;
+  if (context->residentPhase.state() != vagrant::ResidentPhaseState::TitleExecRunning || titleExecCall->begins != 1 ||
+      titleExecCall->entry != vagrant::title_exec::kLoopTop ||
+      titleExecCall->returnPc != vagrant::title_exec::kReturn || game->core.r[29] != execFrame ||
+      game->core.r[18] != 0u || game->core.r[23] != 1u || game->core.r[30] != vagrant::title_exec::kDataBase ||
+      game->core.mem_r32(execFrame + vagrant::title_exec::kSavedRa) != vagrant::title_exec::kReturn ||
+      titleExecCall->advances != 1 || context->titleExec.state() != vagrant::TitleExecState::Running) {
+    std::fprintf(stderr, "TITLE save-file completion did not hand the rest of vs_title_exec to the guest\n");
     return 1;
   }
-  // `_copyTitleBgData` measures longer than one field, so it uses the resuming form under its measured cap
-  // (0x8006FCEC).
-  const auto bgCap = g_resumingTurnCaps.find(vagrant::title_splash::kCopyTitleBgData);
-  if (bgCap == g_resumingTurnCaps.end() || bgCap->second != vagrant::title_splash::kCopyTitleBgDataTurns) {
-    std::fprintf(stderr, "TITLE background copy did not run under its measured display-field cap\n");
+  context->residentPhase.advanceAfterField(game->core);
+  if (context->titleExec.complete() || titleExecCall->advances != 2) {
+    std::fprintf(stderr, "TITLE exec was not resumed exactly once per field\n");
+    return 1;
+  }
+  game->core.r[29] = initialStack; // the guest epilogue pops vs_title_exec's frame
+  context->residentPhase.advanceAfterField(game->core);
+  if (!context->titleExec.complete() || context->titleExec.selectedOption() != 5u || titleExecCall->advances != 3) {
+    std::fprintf(stderr, "TITLE exec did not report the option vs_title_exec returned\n");
+    return 1;
+  }
+  // The return hands the rest of vs_main_execTitle to the guest in its own frame, with the option in `$v0`.
+  const std::uint32_t tailFrame = initialStack - vagrant::resident::kExecTitleFrameSize;
+  if (context->residentPhase.state() != vagrant::ResidentPhaseState::ExecTitleTailRunning ||
+      execTailCall->begins != 1 || execTailCall->entry != vagrant::resident::kExecTitleTail ||
+      execTailCall->returnPc != vagrant::resident::kExecTitleReturn || game->core.r[29] != tailFrame ||
+      game->core.r[2] != 5u || game->core.r[16] != vagrant::resident::kExecTitleStackSlot ||
+      game->core.mem_r32(tailFrame + vagrant::resident::kExecTitleSavedRa) != vagrant::resident::kExecTitleReturn ||
+      execTailCall->advances != 1 || context->execTitleTail.state() != vagrant::ExecTitleTailState::Running) {
+    std::fprintf(stderr, "TITLE return did not hand vs_main_execTitle's tail to the guest\n");
+    return 1;
+  }
+  context->residentPhase.advanceAfterField(game->core);
+  if (context->execTitleTail.state() != vagrant::ExecTitleTailState::Complete || execTailCall->advances != 2) {
+    std::fprintf(stderr, "vs_main_execTitle's tail was not resumed once per field and then completed\n");
     return 1;
   }
 
@@ -585,6 +665,25 @@ int main() {
   if (!context->titleMenu.frameReady()) {
     std::fprintf(stderr, "VagrantContext did not retain TITLE menu producer state\n");
     return 1;
+  }
+
+  // Only a suspension at the guest's own VSync completes a menu pass; an exhausted turn is mid-pass.
+  {
+    context->titleMenu = vagrant::TitleMenuProducer{};
+    auto boundaryFake = std::make_unique<FakeContinuation>();
+    FakeContinuation *boundaryCall = boundaryFake.get();
+    vagrant::TitleExecPhase boundaryPhase(std::move(boundaryFake));
+    boundaryPhase.begin(game->core, 0u);
+    if (context->titleMenu.frameReady()) {
+      std::fprintf(stderr, "an exhausted TITLE turn completed a menu pass\n");
+      return 1;
+    }
+    boundaryCall->frameBoundary = true;
+    boundaryPhase.advanceAfterField(game->core);
+    if (!context->titleMenu.frameReady()) {
+      std::fprintf(stderr, "a TITLE VSync suspension did not complete the menu pass\n");
+      return 1;
+    }
   }
 
   std::puts("Vagrant native owners: finite TITLE reinitialisation, fatal guest VSync");

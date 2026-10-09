@@ -18,8 +18,8 @@ enum class ResidentPhaseState {
   TitleProgramRunning,
   TitleSplashRunning,
   TitleSaveCheckRunning,
-  TitleIntroBoundary,
-  BattleProgramBoundary,
+  TitleExecRunning,
+  ExecTitleTailRunning,
 };
 
 struct ResidentCallServices {
@@ -27,15 +27,12 @@ struct ResidentCallServices {
   using Call1 = std::uint32_t (*)(Core &, std::uint32_t, std::uint32_t);
   using Call2 = std::uint32_t (*)(Core &, std::uint32_t, std::uint32_t, std::uint32_t);
   using Call4 = std::uint32_t (*)(Core &, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
-  // Longer than one turn's cycle budget: finite compute, resumed by the mechanism.
-  using CallResuming = std::uint32_t (*)(Core &, std::uint32_t, std::uint32_t);
   using ReadFile = bool (*)(Core &, std::uint32_t, std::uint32_t, std::uint32_t);
 
   Call0 call0 = nullptr;
   Call1 call1 = nullptr;
   Call2 call2 = nullptr;
   Call4 call4 = nullptr;
-  CallResuming callResuming = nullptr;
   ReadFile readFile = nullptr;
   cd::ReadSector readSector = nullptr;
 };
