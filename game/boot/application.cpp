@@ -120,7 +120,6 @@ void Application::run(Game &game) {
   }
 
   psx::Machine machine{game};
-  machine.installRenderPath();
   core.runtime->bootInit(core);
 
   psx::config::report_once();
