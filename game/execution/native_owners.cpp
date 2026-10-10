@@ -7,6 +7,7 @@
 #include "core.h"
 #include "execution/dynarec_dispatch.h"
 #include "images/battle_transfer.h"
+#include "render/battle_cull.h"
 #include "render/battle_projection.h"
 #include "runtime/vagrant_context.h"
 
@@ -76,6 +77,10 @@ void loadBattleProgramsOverride(Core *core) {
   const OverlayLoadResult loaded = readAndLoadBattle(*core, contextOf(*core).overlayImages, cd::readDiscSector);
   if (loaded) {
     lucent::info("vagrant-owners", "BATTLE.PRG and INITBTL.PRG loaded as published images");
+    if (!battle_cull::installBattleCull(*core)) {
+      lucent::error("vagrant-owners", "BATTLE room quad reject was not installed");
+      std::abort();
+    }
     return;
   }
   lucent::error("vagrant-owners", "BATTLE.PRG/INITBTL.PRG load refused: {}", loaded.detail);

@@ -40,23 +40,22 @@ owner, and it does not recreate scene geometry semantically.
 
 ## Current adapter status
 
-The framework has generic widescreen and `Fps60` machinery, but Vagrant does not currently satisfy
-their game-owned inputs:
+The framework has generic widescreen and `Fps60` machinery; Vagrant satisfies the widescreen inputs on the record
+canvas and none of the `Fps60` ones:
 
-- `VagrantRuntime` does not publish a `GuestWidescreenProjection`, and the absence is now DELIBERATE
-  rather than a gap. `vagrant::BattleProjectionOwner` (`game/render/battle_projection.{h,cpp}`) owns the
-  four measured resident SDK leaves this viewport is stated through, measures the publication, and
-  derives the wide one — but publishes no aspect. The 256 in the display `screen` rect is NOT a
-  horizontal clip. The previous claim that the draw-area clip is written to zero by `SetDefDrawEnv`
-  and never touched, so the drawing area is unclipped, is REFUTED — `+0x00..+0x06` is the clip and
-  the leaf fills it from its arguments, `+0x0C/+0x0E` is the texture window's x/y, and the drawing
-  area is clipped to 640 x 224 (`0x8002B3AC`, `0x8002B3B0`, `0x8002B3B4`, `0x8002B3DC`). The boundary
-  is unchanged, because the clip was never what it named, and the clip is already twice the presented
-  width. What a widening would actually have to move is the guest's DISPLAY RESOLUTION, which
-  `SetDefDispEnv` states and `PutDispEnv` at `0x80028E80` turns into the GPU's display-mode word.
-  That is presentation infrastructure this port has not measured and cannot verify without the adapter
-  S015 has not supplied. With no title policy the framework resolves the guest projection at
-  `Standard4x3`, which is the enforcement.
+- `VagrantRuntime` declares `RenderPath::Record` and a `GuestWidescreenProjection`, and widens the CANVAS: psxport's
+  record canvas adds `presentationHorizontalMargin` columns on each side of the 320 x 224 buffer while the guest keeps
+  its retail centre (160) and clip. `vagrant::BattleProjectionOwner` (`game/render/battle_projection.{h,cpp}`) only
+  observes the four measured resident SDK leaves the viewport is stated through. The 256 in the display `screen`
+  rect is NOT a horizontal clip: `+0x00..+0x06` of the DRAWENV is the clip, filled from the leaf's arguments, and
+  the drawing area is two 320-wide halves (the two frame buffers) at `0x8005E0D0` and `0x8005E12C`. The display
+  resolution `SetDefDispEnv` states is never moved.
+- What stops a margin from drawing is the guest's screen-space reject. The room draw is `0x8008AC78` ->
+  `0x8008B1FC` -> `0x8009723C` -> `0x80097388`, and its screen tests all go through `0x80098014`, a
+  register-convention routine (projected vertices in `$t0-$t3`, answer in `$at`) that rejects a quad wholly outside
+  x [0,320) or y [0,224). `game/render/battle_cull.{h,cpp}` replaces it with the same test over the box grown by
+  the canvas margin. Actors have no screen cull. Still retail: the sky-dome inline reject near `0x8009820C`, the
+  literal-320 gradient in `0x8008EC48`, rain (`0x8008F440`), particles, HUD and the `0x800BB874` scanline effect.
 - The publication's own vertical centre is 128, not the presenter's 112, and both were read from
   BATTLE.PRG. The overlay computes `(height-16)/2 + 16`; the presenter re-states the literal (160,
   112) every field, so the presenter's is in force at the frame boundary. This is the concrete reason
@@ -95,23 +94,12 @@ runtime-owned temporal product rather than new legacy callbacks.
 
 ## Widescreen boundary
 
-Widescreen belongs to a future BATTLE world producer, at the camera/projection stage before vertices
-become screen coordinates. It must not be a global `SetGeomOffset` or `SetGeomScreen` override:
-TITLE, menus, loading layers, and HUD use those SDK calls for fixed 2D layouts, while the BATTLE
-presenter deliberately restores `(160,112)` every field.
+Widescreen is the canvas margin plus the widened room reject above; no SDK projection leaf is overridden and the
+projection word `0x8005E248` is never written, because BATTLE branches on it. TITLE, menus and HUD keep their
+literal 4:3 layouts and draw into the same canvas without the room's reject.
 
-The world producer should therefore:
-
-1. preserve BATTLE's vertical center and clipping convention;
-2. compute a wide horizontal projection and center for world geometry only;
-3. retain original 4:3 coordinates for HUD/menu/loading layers;
-4. treat projection-distance changes as camera state, including transitions, rather than replacing
-   `0x8005E248` with a constant.
-
-The matching decomp corroborates the state that will need a binary-backed extractor: camera
-position/look-at/angles/far clip live in the scratchpad camera structure, near clip is resident, and
-camera transitions update projection distance through `vs_battle_setProjectionDistance`. Exact
-camera snapshot addresses and a reached world draw owner remain unmeasured.
+A true semantic widening (camera, object and material state before the GTE) remains a future BATTLE world producer
+and is the only route to correct culling of the unhandled effects listed above.
 
 ## Interpolation boundary
 

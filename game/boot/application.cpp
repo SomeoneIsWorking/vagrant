@@ -119,12 +119,13 @@ void Application::run(Game &game) {
     std::abort();
   }
 
+  psx::Machine machine{game};
+  machine.installRenderPath();
   core.runtime->bootInit(core);
 
   psx::config::report_once();
   lucent::info("vagrant-boot", "entering the bounded Vagrant Story product loop");
 
-  psx::Machine machine{game};
   machine.attachControlChannel(0u);
   machine.run(0u);
 }

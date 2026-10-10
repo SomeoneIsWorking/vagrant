@@ -44,6 +44,7 @@ add_library(vagrant_native STATIC
   game/images/title_entry.cpp
   game/images/title_transfer.cpp
   game/input/pad_delivery.cpp
+  game/render/battle_cull.cpp
   game/render/battle_frame.cpp
   game/render/battle_projection.cpp
   game/render/title_menu.cpp
@@ -96,6 +97,10 @@ if(BUILD_TESTING)
   add_executable(vagrant_battle_projection tests/test_battle_projection.cpp)
   target_link_libraries(vagrant_battle_projection PRIVATE vagrant_native)
   add_test(NAME vagrant_battle_projection COMMAND vagrant_battle_projection)
+
+  add_executable(vagrant_battle_cull tests/test_battle_cull.cpp)
+  target_link_libraries(vagrant_battle_cull PRIVATE vagrant_native)
+  add_test(NAME vagrant_battle_cull COMMAND vagrant_battle_cull)
 
   add_executable(vagrant_dynarec_dispatch tests/test_dynarec_dispatch.cpp)
   target_link_libraries(vagrant_dynarec_dispatch PRIVATE vagrant_native)

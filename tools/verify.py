@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "build" / "verify"
 NATIVE_TESTS = frozenset({
+    "vagrant_battle_cull",
     "vagrant_battle_projection",
     "vagrant_ds_control_contract",
     "vagrant_dynarec_dispatch",

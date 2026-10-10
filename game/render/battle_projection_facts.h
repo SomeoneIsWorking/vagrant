@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <string_view>
 
 namespace vagrant::battle_projection {
 
@@ -80,14 +79,6 @@ inline constexpr std::int32_t kProjectionDistanceBranchThreshold = 272;
 inline constexpr std::int32_t kProjectionDistanceZoomClamp = 768;
 inline constexpr std::int32_t kProjectionDistanceZoomStep = 64;
 
-// The centre and the clip (the 640 x 224 DRAWENV pair) are owned, but the guest states its DISPLAY RESOLUTION through
-// SetDefDispEnv and PutDispEnv turns that into the GPU mode word at 0x80028E80.
-inline constexpr const char *kUnappliedBoundary =
-    "the centre is owned and the clip is owned, but the guest states its DISPLAY RESOLUTION through "
-    "SetDefDispEnv and a widening has to move that and the VRAM layout behind it; that is "
-    "presentation infrastructure this port has not measured, so derive() is shipped and no widening "
-    "is published";
-
 // Constant-to-symbol pairs checked against the decompilation's module map; addresses absent here are not gated.
 struct DecompSymbol {
   const char *constant; // the shipping constant
@@ -105,14 +96,5 @@ inline constexpr DecompSymbol kDecompSymbols[] = {
     {"kProjectionDistanceWord", "vs_main_projectionDistance"},
     {"kNearClipWord", "vs_main_nearClip"},
 };
-
-// Whether this title may widen yet.
-inline constexpr std::string_view wideningBlocker() {
-  return kUnappliedBoundary;
-}
-
-inline constexpr bool wideningAvailable() {
-  return wideningBlocker().empty();
-}
 
 } // namespace vagrant::battle_projection

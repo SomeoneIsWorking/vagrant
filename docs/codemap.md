@@ -97,8 +97,9 @@ Two rules hold everywhere below:
 
 | File | Symbol | Responsibility |
 |---|---|---|
-| `battle_projection.{h,cpp}` | `BattleProjectionOwner`, `BattleProjectionPublication`, `WideBattleProjection`, `installBattleProjection`, `readPublishedArea`, `derive` | observe the guest's own viewport publication through the four resident SDK leaves, and derive (without publishing) the wide form |
-| `battle_projection_facts.h` | `kSetGeomOffset`, `kSetGeomScreen`, `kSetDefDrawEnv`, `kSetDefDispEnv`, `kProjectionDistanceWord`, `wideningBlocker` | the measured publication addresses with their provenance, and the boundary that stops a widening |
+| `battle_projection.{h,cpp}` | `BattleProjectionOwner`, `BattleProjectionPublication`, `installBattleProjection`, `readPublishedArea` | observe the guest's own viewport publication through the four resident SDK leaves |
+| `battle_cull.{h,cpp}` | `testQuad`, `widenedBox`, `installBattleCull` | BATTLE's room quad reject `0x80098014`, widened by the record canvas margin; installed after the BATTLE load |
+| `battle_projection_facts.h` | `kSetGeomOffset`, `kSetGeomScreen`, `kSetDefDrawEnv`, `kSetDefDispEnv`, `kProjectionDistanceWord` | the measured publication addresses with their provenance |
 | `battle_frame.{h,cpp}` | `BattleFrameProducer`, `prepareBattleField` | make a completed BATTLE guest field eligible for the frame driver's single commit |
 | `title_splash.{h,cpp}` | `TitleSplashPhase`, `TitleSplashState` | the finite publisher/developer splash: each retail VSync becomes one return to the frame owner |
 | `title_splash_facts.h` | `kMemset`, `kDrawImage`, `kSettings`, … | the measured TITLE.PRG addresses the splash phase ships |
@@ -218,10 +219,9 @@ guest draw / VRAM upload
   (30 fps) or 4 (15 fps), chosen at run time, so 60 fps is structurally impossible; interpolation
   would be a presentation decision over matching source geometry (issue 0039). `psxport` refuses
   `fps60=1` at startup for this title.
-- **Widescreen**: NOT APPLIED. `BattleProjectionOwner::derive` ships and publishes nothing;
-  `VagrantRuntime::guestWidescreenProjection()` is deliberately not overridden, so the framework
-  resolves Standard 4:3. The horizontal projection word at `0x8005E248` is gameplay state (BATTLE
-  branches on it), so the canvas would widen, never `H`.
+- **Widescreen**: PARTIAL. The record canvas adds margin columns and `battle_cull` widens BATTLE's room quad reject;
+  the horizontal projection word at `0x8005E248` is gameplay state (BATTLE branches on it) and is never written.
+  Sky dome, effects and HUD keep retail limits (issue 0037).
 
 ### CD / streaming
 
@@ -321,8 +321,9 @@ Counted with `find <dir> -maxdepth 1 -type f \( -name '*.h' -o -name '*.cpp' -o 
   composed by `VagrantContext` and reached through `contextOf`.
 - BATTLE world camera/projection/object production → the semantic BATTLE render owner described in
   `docs/battle-rendering.md`, never `BattleFrameProducer` or `BattleProjectionOwner`.
-- Widescreen policy → the BATTLE guest projection publication owner. `derive()` is shipped; the
-  widening is not, and that absence is what keeps the framework at 4:3.
+- Widescreen policy → `VagrantRuntime::guestWidescreenProjection` declares it and psxport's record canvas draws the
+  margins; what the guest's own screen rejects admit is `game/render/battle_cull.{h,cpp}`.
+- Render path → `VagrantRuntime::renderCapabilities` declares Record; `Application::run` installs it.
 - Interpolation → previous/current semantic snapshot ownership beside the BATTLE world producer; guest
   RAM and post-projection queue vertices are not interpolation sources.
 - Framework-generic behavior → the single writable psxport checkout, not this consumer tree.

@@ -50,8 +50,8 @@ public:
   // Non-null title field driver, or the framework refuses the product loop.
   std::unique_ptr<FrameDriver> createFrameDriver(Game &game) override;
 
-  // No widescreen policy: the guest projection stays 4:3. The horizontal clip is published by an overlay call whose
-  // VRAM layout is unread; see `vagrant::battle_projection::wideningBlocker()`.
+  // The player's aspect; the record canvas holds the margins and BATTLE's culls widen what is drawn.
+  const GuestWidescreenProjection *guestWidescreenProjection() const override;
 
   // Authenticates the title PS-X header, then delegates publication to psxport.
   psx::cpu::PsxExeLoadResult
@@ -61,6 +61,7 @@ private:
   static const GuestProgramImage programImage_;
   static const PlatformHlePlan platformPlan_;
   static const GuestPadBufferLayout padLayout_;
+  static const GuestWidescreenProjection widescreen_;
 };
 
 } // namespace vagrant

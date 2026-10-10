@@ -16,7 +16,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
-#include <string_view>
 
 namespace {
 
@@ -141,61 +140,6 @@ vagrant::BattleProjectionPublication measure() {
   return vagrant::BattleProjectionOwner::from(fixture.core).retail();
 }
 
-// The framework's plan builder, so the plans match the runtime's.
-GuestProjectionPlan planFor(PresentationAspect aspect) {
-  return guest_projection_plan({
-      .path = RenderPath::Gte,
-      .requested = aspect,
-      .nativePresentation = {320, 240},
-      .nativeProjection = {{320, 240}, 320},
-      .sink = {1280, 720},
-      .vramWidth = 1024,
-  });
-}
-
-vagrant::BattleProjectionPublication completePublication() {
-  return {kRetailCentreX, kPresenterCentreY, kRetailScreenDistance, kRetailWidth, kRetailHeight};
-}
-
-// Refusals, one static body each so each can be forked.
-
-void refusesIncompletePublication() {
-  vagrant::BattleProjectionPublication partial{};
-  partial.centreX = kRetailCentreX;
-  (void)vagrant::BattleProjectionOwner::derive(partial, planFor(PresentationAspect::Wide16x9));
-}
-
-void refusesUncentredRetail() {
-  auto retail = completePublication();
-  retail.centreX = 96; // not the half of the measured width
-  (void)vagrant::BattleProjectionOwner::derive(retail, planFor(PresentationAspect::Wide16x9));
-}
-
-void refusesUnwidenedClip() {
-  // Projection widened but the guest clip not: the field would be cropped.
-  auto plan = planFor(PresentationAspect::Wide16x9);
-  plan.guestDrawWidth = kRetailWidth;
-  (void)vagrant::BattleProjectionOwner::derive(completePublication(), plan);
-}
-
-void refusesInconsistentClipEdge() {
-  auto plan = planFor(PresentationAspect::Wide16x9);
-  plan.guestClipRight = plan.guestDrawWidth; // one past the widened width
-  (void)vagrant::BattleProjectionOwner::derive(completePublication(), plan);
-}
-
-void refusesOffCentreWidening() {
-  auto plan = planFor(PresentationAspect::Wide16x9);
-  plan.projectionCenterX = 160; // the retail centre, not the widened width's half
-  (void)vagrant::BattleProjectionOwner::derive(completePublication(), plan);
-}
-
-void refusesUnusablePlan() {
-  auto plan = planFor(PresentationAspect::Wide16x9);
-  plan.guestDrawWidth = 0;
-  (void)vagrant::BattleProjectionOwner::derive(completePublication(), plan);
-}
-
 // Display-area cross-check on the shipping reader: only the leaf's stored word is perturbed, to BATTLE's 256 `screen`
 // literal.
 void refusesDrawAreaDisagreement() {
@@ -227,9 +171,8 @@ int main() {
   vagrant::VagrantRuntime runtime;
   psxport_install_game(runtime);
 
-  // 0. With no widening policy the framework resolves the guest projection at 4:3.
-  expect(runtime.guestWidescreenProjection() == nullptr,
-         "VagrantRuntime must publish no guest widescreen policy while the clip boundary stands");
+  // 0. The canvas widens; the title declares the aspect and moves no projection word.
+  expect(runtime.guestWidescreenProjection() != nullptr, "VagrantRuntime must declare its guest widescreen policy");
 
   // 1. The measured publication.
   const vagrant::BattleProjectionPublication publication = measure();
@@ -240,26 +183,7 @@ int main() {
   expect(publication.drawHeight == kRetailHeight, "the measured height must be the guest's own rectangle");
   expect(publication.valid(), "a complete publication must report itself valid");
 
-  // 2. The 4:3 identity, by construction.
-  const auto identity = vagrant::BattleProjectionOwner::derive(publication, planFor(PresentationAspect::Standard4x3));
-  expect(!identity.widens, "a 4:3 plan must not claim a widening");
-  expect(identity.centreX == publication.centreX, "4:3 must pass the measured centre through untouched");
-  expect(identity.drawWidth == publication.drawWidth, "4:3 must pass the measured width through untouched");
-
-  // 3. Positive control: widening centre and clip in lockstep must widen.
-  const auto wide = vagrant::BattleProjectionOwner::derive(publication, planFor(PresentationAspect::Wide16x9));
-  expect(wide.widens, "a plan widening centre and clip together must produce a widening");
-  expect(wide.centreX == 214, "the widened centre must be half the widened width, which is 214 at 16:9");
-  expect(wide.drawWidth == 428, "the widened clip must be 428 px at 16:9 from a 320 px retail width");
-  expect(wide.clipRight == wide.drawWidth - 1, "the clip's right edge must be the widened width's last column");
-
   // 4. The refusals.
-  expect(diesOnSignal(refusesIncompletePublication), "an incomplete publication must be refused");
-  expect(diesOnSignal(refusesUncentredRetail), "a retail centre that is not half the width must be refused");
-  expect(diesOnSignal(refusesUnwidenedClip), "a plan that widens the projection but not the clip must be refused");
-  expect(diesOnSignal(refusesInconsistentClipEdge), "a clip right edge past the widened width must be refused");
-  expect(diesOnSignal(refusesOffCentreWidening), "a widened centre that is not half the widened width must be refused");
-  expect(diesOnSignal(refusesUnusablePlan), "a plan with no guest draw width must be refused");
   expect(diesOnSignal(refusesDrawAreaDisagreement),
          "a publication whose own width word disagrees with the stated width must be refused");
   expect(diesOnSignal(refusesNonGuestRamArea), "a display area outside guest RAM must be refused rather than read");
@@ -369,32 +293,19 @@ int main() {
   expect(facts::kInitBtlPublicationCallSite == 0x800FA69Cu,
          "the INITBTL.PRG call site of the publication must be 0x800FA69C as read from the bytes");
 
-  // 11. 256 is the DISPENV `screen` rect literal, not a clip; the 4:3 identity proves it scales nothing.
+  // 11. 256 is the DISPENV `screen` rect literal, not a clip.
   expect(facts::kPublicationScreenWidth == 256 && facts::kPublicationScreenHeight == 224,
          "the publication's `screen` rect must be recorded as the 256x224 literals the bytes show");
   expect(facts::kPublicationScreenWidth != facts::kPublicationScreenHeight,
          "the `screen` rect is not square, so a reader cannot mistake one for the other");
-
-  // 12. The blocker names the display resolution.
-  expect(!facts::wideningAvailable(), "this title must report itself unable to widen while the boundary stands");
-  expect(!facts::wideningBlocker().empty(), "an unavailable widening must name the boundary that stops it");
-  {
-    const std::string_view blocker = facts::wideningBlocker();
-    expect(blocker.find("screen rect") == std::string_view::npos,
-           "the boundary must not claim the `screen` rect is an unread clip; the bytes refute that");
-    expect(blocker.find("SetDefDispEnv") != std::string_view::npos,
-           "the boundary must name the display resolution, which is what actually has to move");
-    expect(blocker.find("has not read from bytes") == std::string_view::npos,
-           "the boundary must not rest on an unread reconstruction; the bodies are read now");
-  }
 
   if (failures != 0) {
     std::fprintf(stderr, "battle projection contract: %d failure(s)\n", failures);
     return 1;
   }
   std::printf("battle projection contract: retail publication %dx%d at (%d,%d) H %d measured; the GTE "
-              "leaves moved CR24/CR25/CR26 themselves; 4:3 identity and the 428 px 16:9 derivation both "
-              "accepted; 6 derivation, 2 display-area and 2 registration refusals observed to fire\n",
+              "leaves moved CR24/CR25/CR26 themselves; 2 display-area and 2 registration refusals observed "
+              "to fire\n",
               publication.drawWidth,
               publication.drawHeight,
               publication.centreX,

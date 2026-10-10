@@ -59,13 +59,11 @@ Both halves of the pair are measured:
 | clip | DRAWENV `clip` rect, literals (0,0,320,224) and (320,0,320,224) at `0x8005E0D0`/`0x8005E12C` | at `0x8008A288`, then re-`Put` every field by the presenter at `0x8007642C` |
 | display resolution | DISPENV `screen` rect, literals (0,8,256,224) | once, then re-`Put` every field |
 
-`derive()` refuses anything that is not the pair, and its two clip refusals now rest on a measured
-clip rather than an assumed one. **The outcome is unchanged and the reason is stronger**: the previous
+The pair (centre, clip) is measured, not assumed. **The outcome is unchanged and the reason is stronger**: the previous
 arm's refusal was right to refuse and wrong about why. `SetDefDispEnv(disp, 320, 0, 320, 224)` states
 the **display resolution**, and `PutDispEnv` at `0x80028E80` turns the `disp` rect into the GPU's
 display-mode word. Widening means moving the guest's display mode and its VRAM layout, which is
-presentation infrastructure this port has not measured. `kUnappliedBoundary` names `SetDefDispEnv` and
-the test asserts the reason string still contains it.
+presentation infrastructure this port does not need to move: the record canvas widens instead (issue 0037).
 
 ## The frame-rate census, from this title's own `VSync` at `0x8001F6C4`
 
@@ -79,8 +77,7 @@ claimed here; issue 0039 settles it from the rate-bearing word instead.
 
 ## What remains
 
-- **S010 is still `missing`**; `derive()` is shipped and correct, the display resolution it would have
-  to move is not owned.
+- **S010 is `partial`** (issue 0037); the display resolution is left alone.
 - **The resting value of the projection word is still unmeasured** — the one number the 272/768
   branches are stated against.
 - **The display-mode path (`PutDispEnv` → GP0)** is read only as far as the two coordinate words; the

@@ -53,6 +53,8 @@ const PlatformHlePlan VagrantRuntime::platformPlan_{
     .windowHi = {sync::kVSyncWindowEnd, cd::kCdCommandWindowEnd, cd::kCdSyncWindowEnd},
 };
 
+const GuestWidescreenProjection VagrantRuntime::widescreen_{};
+
 const GuestPadBufferLayout VagrantRuntime::padLayout_{
     .slot0Buffer = pad::kSlot0Buffer,
     .slot1Buffer = pad::kSlot1Buffer,
@@ -99,7 +101,16 @@ const GuestProgramImage *VagrantRuntime::guestProgramImage() const {
 }
 
 RenderCapabilities VagrantRuntime::renderCapabilities() const {
-  return RenderCapabilities::direct();
+  // The picture is the guest's GP0 output replayed from the frame record; no native producers, no interpolation.
+  return RenderCapabilities{
+      .defaultPath = RenderPath::Record,
+      .nativeRenderPath = false,
+      .temporalInterpolation = false,
+  };
+}
+
+const GuestWidescreenProjection *VagrantRuntime::guestWidescreenProjection() const {
+  return &widescreen_;
 }
 
 bool VagrantRuntime::guestVramIsPicture(const Game &) const {

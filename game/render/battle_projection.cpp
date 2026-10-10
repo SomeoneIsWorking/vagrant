@@ -182,68 +182,6 @@ PublishedArea BattleProjectionOwner::readPublishedArea(Core &core, const Display
   return {publishedWidth, publishedHeight};
 }
 
-WideBattleProjection BattleProjectionOwner::derive(const BattleProjectionPublication &retail,
-                                                   const GuestProjectionPlan &plan) {
-  if (!retail.valid()) {
-    lucent::error("vagrant-proj",
-                  "refusing to derive a projection from an incomplete publication (centre {}x{}, H "
-                  "{}, area {}x{})",
-                  retail.centreX,
-                  retail.centreY,
-                  retail.screenDistance,
-                  retail.drawWidth,
-                  retail.drawHeight);
-    std::abort();
-  }
-  if (plan.nativeProjectionExtent.width <= 0 || plan.guestDrawWidth <= 0 || plan.projectionExtent.width <= 0) {
-    lucent::error("vagrant-proj",
-                  "the framework returned an unusable guest projection plan (native {} px, guest draw "
-                  "{}, projection {})",
-                  plan.nativeProjectionExtent.width,
-                  plan.guestDrawWidth,
-                  plan.projectionExtent.width);
-    std::abort();
-  }
-
-  if (!plan.widescreen()) {
-    // 4:3 identity: the plan's margin is zero.
-    return {retail.centreX, retail.drawWidth, retail.drawWidth - 1, false};
-  }
-
-  // A centre that is not half the width would make this a translation, not a widening.
-  if (retail.centreX != retail.drawWidth / 2) {
-    lucent::error("vagrant-proj",
-                  "the measured centre {} is not the half of the measured width {}; deriving a "
-                  "widening from it would translate the picture rather than widen it",
-                  retail.centreX,
-                  retail.drawWidth);
-    std::abort();
-  }
-
-  // A widening is the pair (centre, clip); widening only the centre crops the left edge.
-  if (plan.guestDrawWidth != plan.projectionExtent.width) {
-    lucent::error("vagrant-proj",
-                  "the plan widens the projection to {} px but the guest clip only to {} px; the "
-                  "widened geometry would be clipped away, so refusing rather than publishing a "
-                  "cropped frame as a widening",
-                  plan.projectionExtent.width,
-                  plan.guestDrawWidth);
-    std::abort();
-  }
-  if (plan.guestClipRight != plan.guestDrawWidth - 1 || plan.projectionCenterX != plan.projectionExtent.width / 2) {
-    lucent::error("vagrant-proj",
-                  "the plan's clip right {} and centre {} do not describe a {} px wide frustum "
-                  "centred on the {} px it claims",
-                  plan.guestClipRight,
-                  plan.projectionCenterX,
-                  plan.guestDrawWidth,
-                  plan.projectionExtent.width);
-    std::abort();
-  }
-
-  return {plan.projectionCenterX, plan.guestDrawWidth, plan.guestClipRight, true};
-}
-
 bool BattleProjectionOwner::isGuestRam(std::uint32_t address) {
   // Physical address 0 is the BIOS/KSEG-aliased region, not a title-owned word.
   constexpr std::uint32_t kKseg0Base = 0x80000000u;
@@ -336,13 +274,12 @@ bool installBattleProjection(Core &core, psx::cpu::ImageIdentity residentImage) 
 
   lucent::info("vagrant-proj",
                "guest projection publication owned: SetGeomOffset 0x{:08X}, SetGeomScreen "
-               "0x{:08X}, SetDefDrawEnv 0x{:08X}, SetDefDispEnv 0x{:08X}. Observation only — no "
-               "widening is applied, because {}",
+               "0x{:08X}, SetDefDrawEnv 0x{:08X}, SetDefDispEnv 0x{:08X}. Observation only; the "
+               "canvas widens and the guest's projection is never changed",
                facts::kSetGeomOffset,
                facts::kSetGeomScreen,
                facts::kSetDefDrawEnv,
-               facts::kSetDefDispEnv,
-               facts::wideningBlocker());
+               facts::kSetDefDispEnv);
   return true;
 }
 

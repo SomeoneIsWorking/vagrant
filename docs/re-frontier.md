@@ -313,3 +313,19 @@ Statuses: `re-verified`, `re-partial`, `in-progress`, `todo`, `skip-by-design`, 
   or faulted still takes the guest's `memcardEventTimeout`/`Unformatted` branches, and no run has
   exercised them. The save-file check also still runs only against port 1 and 2 with a stubbed
   `firstfile`; the load/save arms beyond `_saveFileExists` are unowned.
+
+### RE-24 — BATTLE room draw and its screen-space reject
+- status: re-partial
+- deps: RE-22
+- evidence: Decompiled from the authenticated BATTLE.PRG with the pipeline and checked against the image's own
+  words. The room draw is `0x8008AC78` -> `0x8008B1FC` -> `0x8009723C` -> `0x80097388`. `0x80097388` loops the
+  room quads: RTPT and NCLIP through `0x80097A10`, then `0x80098014` (screen reject, register convention, vertices in
+  `$t0-$t3`, answer in `$at`, leftovers in `$t4-$t7`), then the OT insert `0x800980F8` (depth window 8..0x7FF) and
+  the near-clip subdivision `0x80097AEC`, which calls `0x80098014` too. `0x80098014` compares rows against
+  `[0,224)` then columns against `[0,320)` and returns when all four vertices lie past one side. Nothing reads its
+  result but packet emission, so it is widened for drawing (`game/render/battle_cull.cpp`). Actors have no
+  screen-space cull.
+- where: `game/render/battle_cull.{h,cpp}`, `tests/test_battle_cull.cpp`
+- gap: the sky-dome inline reject near `0x8009820C`, the literal-320 gradient in `0x8008EC48`, rain `0x8008F440`,
+  particles, HUD and the `0x800BB874` scanline effect still use retail 4:3 limits; whether any of their results
+  feeds gameplay is unread. `0x80098160` (near-clip consumer) is named but not decompiled.

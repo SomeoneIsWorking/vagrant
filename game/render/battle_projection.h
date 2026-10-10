@@ -2,12 +2,10 @@
 // BATTLE's call site, because the presenter restates a literal centre through SetGeomOffset every field.
 #pragma once
 
-#include "guest_widescreen_projection.h"
 #include "image_identity.h"
 #include "render/battle_projection_facts.h"
 
 #include <cstdint>
-#include <string_view>
 
 class Core;
 
@@ -24,14 +22,6 @@ struct BattleProjectionPublication {
   [[nodiscard]] bool valid() const {
     return centreX > 0 && centreY > 0 && screenDistance > 0 && drawWidth > 0 && drawHeight > 0;
   }
-};
-
-// A wide publication derived from a measured retail one; the 4:3 identity passes through untouched.
-struct WideBattleProjection {
-  int centreX = 0;
-  int drawWidth = 0;
-  int clipRight = 0;
-  bool widens = false;
 };
 
 // What one display-area publication left in the struct the leaf was handed: width at +4, height at +6.
@@ -64,10 +54,6 @@ public:
   [[nodiscard]] bool observed() const {
     return centreSet_ && screenDistanceSet_ && drawAreaSet_;
   }
-
-  // Pure. Aborts when the publication is incomplete, when the retail centre is not the half-width it
-  // states (a translation), or when the plan's clip is not widened with its projection (a cropped field).
-  static WideBattleProjection derive(const BattleProjectionPublication &retail, const GuestProjectionPlan &plan);
 
   // Is this a guest RAM address the owner may read?
   static bool isGuestRam(std::uint32_t address);
